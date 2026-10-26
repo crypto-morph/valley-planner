@@ -288,8 +288,9 @@ def plan(farm: Farm, deadline: int | None = None) -> dict:
         if slot_name:
             for u in steps:
                 row = summary.setdefault(u.key, {"key": u.key, "label": u.label, "gold": u.gold, "days": u.days,
-                                                 "how": u.how, "materials": [{"name": farm.name(f"(O){m}"), "count": n}
-                                                               for m, n in u.materials], "slots": []})
+                                                 "how": u.how, "slots": [],
+                                                 "materials": [{"id": m, "name": farm.name(f"(O){m}"), "count": n}
+                                                               for m, n in u.materials]})
                 row["slots"].append(slot_name)
         earliest = x.earliest
         if earliest is not None and steps:

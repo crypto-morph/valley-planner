@@ -18,6 +18,7 @@
 
   <nav id="tabs" class="tabs" aria-label="Views">
     <button type="button" class="active" data-view="morning">Morning</button>
+    <button type="button" data-view="todo">To-do</button>
     <button type="button" data-view="today">Today</button>
     <button type="button" data-view="ask">Ask</button>
     <button type="button" data-view="crops">Crops</button>
@@ -40,6 +41,19 @@
         <section class="parch panel">
           <h2 class="sign">This week</h2>
           <div id="m-week"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-todo" class="view" hidden>
+      <div class="two">
+        <section class="parch panel">
+          <h2 class="sign" id="todo-head">Today</h2>
+          <div id="todo-list"></div>
+        </section>
+        <section class="parch panel" id="todo-review-box" hidden>
+          <h2 class="sign" id="todo-review-head">Yesterday</h2>
+          <div id="todo-review"></div>
         </section>
       </div>
     </section>

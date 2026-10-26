@@ -72,6 +72,27 @@ const views = {
     $("#m-week").innerHTML = list(v.week.map((e) => li(`<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`, esc(e.date))));
   },
 
+  async todo() {
+    const v = await get("/api/todo");
+    $("#todo-head").textContent = `To do: ${v.date}`;
+    const groups = { people: "People", farm: "On the farm", cc: "Community Center", shopping: "Shopping" };
+    $("#todo-list").innerHTML = Object.entries(groups).map(([g, label]) => {
+      const rows = v.tasks.filter((t) => t.group === g);
+      return rows.length ? `<h3>${label}</h3><ul class="list">` + rows.map((t) =>
+        `<li><label class="filter"><input type="checkbox" data-task="${esc(t.id)}" ${v.ticks[t.id] ? "checked" : ""}> ${esc(t.title)}</label><span class="sub">${esc(t.why)}</span></li>`
+      ).join("") + "</ul>" : "";
+    }).join("") || '<p class="sub">Nothing on the list today.</p>';
+    document.querySelectorAll("#todo-list input").forEach((box) => box.addEventListener("change", () =>
+      fetch(`/api/todo/tick?task=${encodeURIComponent(box.dataset.task)}&done=${box.checked}`, { method: "PUT" })));
+    const y = v.yesterday;
+    $("#todo-review-box").hidden = !y;
+    if (y) {
+      $("#todo-review-head").textContent = `${y.label}: ${y.done} of ${y.total} done`;
+      $("#todo-review").innerHTML = list(y.items.map((r) => li(esc(r.title),
+        r.done === true ? "done" : r.done === false ? (r.ticked ? "you ticked it" : "not done") : (r.ticked ? "ticked" : "can't tell"))));
+    }
+  },
+
   async plan() {
     const v = await get("/api/plan");
     const c = v.counts;

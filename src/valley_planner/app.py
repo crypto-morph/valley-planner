@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .discover import find_game, find_saves_root, list_saves
-from .engine import cc
+from .engine import cc, todo
 from .gamedata import GameData
 from .views import ask, calendar, cart, crops, morning, sell
 from .views.farm import Farm
@@ -123,6 +123,21 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     @app.get("/api/plan")
     def plan_view(deadline: int | None = None) -> dict:
         return cc.plan(p().farm(), deadline)
+
+    @app.get("/api/todo")
+    def todo_view() -> dict:
+        pl = p()
+        f = pl.farm()
+        return todo.today(f, todo.DayLog(pl.path().parent.name))
+
+    @app.put("/api/todo/tick")
+    def todo_tick(task: str, done: bool = True) -> dict:
+        pl = p()
+        f = pl.farm()
+        rec = todo.DayLog(pl.path().parent.name).tick(f.save.days_played, task, done)
+        if rec is None:
+            raise HTTPException(404, "No list for today yet")
+        return {"ticks": rec["ticks"]}
 
     @app.get("/api/ask")
     def ask_search(q: str = "") -> dict:
