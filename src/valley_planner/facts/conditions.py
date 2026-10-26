@@ -42,6 +42,9 @@ class When:
     game_id: int | None = None  # seeds SYNCED_RANDOM rolls
     legacy_random: bool = False
     world_fields: dict[str, int] = field(default_factory=dict)  # WORLD_STATE_FIELD values known for this day
+    axe_level: int = 0
+    rod_level: int = -1  # -1: no rod yet
+    flags: set[str] = field(default_factory=set)  # world facts from the save (Save.flags)
 
     @classmethod
     def from_save(cls, save, *, season: str | None = None, day: int | None = None, year: int | None = None,
@@ -55,7 +58,8 @@ class When:
             mine_lowest=max(getattr(save, "mine_lowest", 0), save.deepest_mine_level),
             museum_count=len(save.museum), hearts={k: f.hearts for k, f in save.friends.items()},
             game_id=int(save.unique_id) if str(save.unique_id or "").isdigit() else None,
-            legacy_random=save.legacy_random)
+            legacy_random=save.legacy_random, axe_level=getattr(save, "axe_level", 0),
+            rod_level=getattr(save, "rod_level", -1), flags=set(getattr(save, "flags", set())))
 
     def on(self, days_played: int, **changes) -> When:
         """The same farm on another day (what the save knows stays as it is)."""

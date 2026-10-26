@@ -432,6 +432,7 @@
    "data": [],
    "status": "verified",
    "tests": [
+    "tests/test_engine.py::test_place_gates",
     "tests/test_schedules.py::test_closed_places"
    ]
   },
@@ -464,7 +465,10 @@
     "StardewValley.TerrainFeatures.ResourceClump.performToolAction"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_engine.py::test_place_gates"
+   ]
   },
   {
    "id": "access.sewer-rusty-key",
@@ -475,7 +479,10 @@
     "StardewValley.Locations.Forest.checkAction"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_engine.py::test_place_gates"
+   ]
   },
   {
    "id": "access.island-boat",
@@ -486,6 +493,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.Locations.BoatTunnel"
+   ],
+   "tests": [
+    "tests/test_engine.py::test_place_gates"
    ]
   },
   {
@@ -8224,7 +8234,10 @@
    "data": [
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_engine.py::test_place_gates"
+   ]
   },
   {
    "id": "access.spot-closed",
@@ -12328,6 +12341,32 @@
    "tests": [
     "tests/test_views.py::test_help_wanted_pool_and_holds"
    ]
+  },
+  {
+   "id": "src.tide-pools",
+   "area": "Items & sources",
+   "summary": "Every night the Beach scatters items on the tide pools (tiles 65-89 x 11-22, east of the broken bridge): a run of rolls that keeps going while a roll falls under a shrinking chance, each item a Sea Urchin 1 time in 5, else Coral. They're only reachable once the bridge is repaired (Beach bridgeFixed, 300 Wood).",
+   "checked_against": [
+    "StardewValley.Locations.Beach.DayUpdate"
+   ],
+   "data": [
+    "save: Beach bridgeFixed"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_engine.py::test_place_gates"
+   ]
+  },
+  {
+   "id": "src.winter-digging",
+   "area": "Items & sources",
+   "summary": "In winter, hoeing soil outdoors off the farm (not in the Desert) has an 8% chance a tile to turn up a Winter Root or a Snow Yam (half each), twice with a Generous hoe at 50%.",
+   "checked_against": [
+    "StardewValley.GameLocation.checkForBuriedItem"
+   ],
+   "data": [],
+   "status": "verified",
+   "tests": []
   }
  ]
 }

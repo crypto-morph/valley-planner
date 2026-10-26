@@ -14,8 +14,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .discover import find_game, find_saves_root, list_saves
+from .engine import cc
 from .gamedata import GameData
-from .views import ask, calendar, cart, crops, sell
+from .views import ask, calendar, cart, crops, morning, sell
 from .views.farm import Farm
 
 STATIC = Path(__file__).parent / "static"
@@ -114,6 +115,14 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     @app.get("/api/sell")
     def sell_view(loved: bool = True, liked: bool = False, help_wanted: bool = True, seeds: bool = True) -> dict:
         return sell.view(p().farm(), {"loved": loved, "liked": liked, "help_wanted": help_wanted, "seeds": seeds})
+
+    @app.get("/api/morning")
+    def morning_view() -> dict:
+        return morning.view(p().farm())
+
+    @app.get("/api/plan")
+    def plan_view(deadline: int | None = None) -> dict:
+        return cc.plan(p().farm(), deadline)
 
     @app.get("/api/ask")
     def ask_search(q: str = "") -> dict:

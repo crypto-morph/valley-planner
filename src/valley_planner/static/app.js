@@ -58,7 +58,33 @@ async function searchAsk() {
   if (v.results.length === 1) showCard(v.results[0].kind, v.results[0].id);
 }
 
+const STATUS_TEXT = { have: "Set aside", ok: "On track", maybe: "Probably", luck: "Luck", blocked: "Unlock first", stuck: "No way yet" };
+
 const views = {
+  async morning() {
+    const v = await get("/api/morning");
+    $("#m-date").textContent = v.date;
+    const cc = v.cc;
+    $("#m-glance").textContent = `${v.money.toLocaleString()}g · ${v.weather}, tomorrow ${v.tomorrow} · luck ${v.luck > 0.02 ? "good" : v.luck < -0.02 ? "bad" : "neutral"} · Community Center ${cc.bundles_done}/${cc.bundles} bundles, ` +
+      `${cc.counts.ok + cc.counts.have} slots on track, ${cc.counts.blocked} need an unlock, ${cc.counts.luck} on luck (by ${cc.deadline})`;
+    $("#m-first").innerHTML = v.first.length ? list(v.first.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing urgent. A good day to fish, mine or make friends.</p>';
+    $("#m-week").innerHTML = list(v.week.map((e) => li(`<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`, esc(e.date))));
+  },
+
+  async plan() {
+    const v = await get("/api/plan");
+    const c = v.counts;
+    $("#plan-head").textContent = `From ${v.today} to ${v.deadline}: ${c.have} set aside, ${c.ok} on track, ${c.maybe} probably, ${c.luck} on luck, ${c.blocked} waiting on an unlock, ${c.stuck} with no way yet.`;
+    $("#plan-rows").innerHTML = "<tr><th>Slot</th><th>Status</th><th>Best way</th><th>When</th><th>Also</th></tr>" + v.slots.map((r) => {
+      const b = r.best;
+      const when = !b ? "" : b.odds != null ? `${Math.round(b.odds * 100)}% by the deadline` : `from ${esc(b.earliest)}${b.last_start ? `, start by ${esc(b.last_start)}` : ""}`;
+      const also = r.others.slice(0, 3).map((o) => `${esc(o.label)}${o.odds != null ? ` (${Math.round(o.odds * 100)}%)` : ""}${o.blocked.length ? ` <span class="sub">after ${esc(o.blocked.join(", "))}</span>` : ""}`).join("<br>");
+      return `<tr><td>${esc(r.name)}${r.count > 1 ? ` ×${r.count}` : ""}${r.quality ? ` <span class="sub">(quality ${r.quality}+)</span>` : ""}<br><span class="sub">${esc(r.bundle)} · ${esc(r.room)}</span></td>` +
+        `<td class="status-${esc(r.status)}">${esc(STATUS_TEXT[r.status] || r.status)}</td>` +
+        `<td>${b ? esc(b.label) : ""}${b && b.blocked.length ? `<br><span class="sub">after ${esc(b.blocked.join(", "))}</span>` : ""}</td><td>${when}</td><td class="sub">${also}</td></tr>`;
+    }).join("");
+  },
+
   async ask() { $("#ask-q").focus(); },
 
   async today() {
@@ -164,7 +190,7 @@ async function start() {
   let timer;
   $("#cart-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchCart, 250); });
   $("#ask-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchAsk, 200); });
-  show("today");
+  show("morning");
 }
 
 start();

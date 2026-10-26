@@ -982,3 +982,10 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | Rule | What the game does | Checked against | Status |
 |---|---|---|---|
 | `quest.help-wanted-pool` | Help Wanted item requests pick from: gems/minerals/fishing finds (68 66 78 80 86 152 167 153 420), more gems past mine floor 40 (62 70 72 84 422) and 80 (64 60 82) or once the bottom is reached, desert finds with ccVault (88 90 164 165), bars with the Furnace recipe (334 335 336 338) and Refined Quartz with the Quartz Globe, the season's forage and fish, the season's crops possible now (only the early ones in the first week; some Year 2+ or with the Vault; none in winter), and known dishes whose ingredients all come from that pool. Egg and Milk categories become a plain Egg or Milk. | `StardewValley.Utility.getRandomItemFromSeason/2`<br>`StardewValley.Utility.possibleCropsAtThisTime`<br>`StardewValley.Quests.ItemDeliveryQuest.loadQuestInfo` | verified |
+
+## Items & sources
+
+| Rule | What the game does | Checked against | Status |
+|---|---|---|---|
+| `src.tide-pools` | Every night the Beach scatters items on the tide pools (tiles 65-89 x 11-22, east of the broken bridge): a run of rolls that keeps going while a roll falls under a shrinking chance, each item a Sea Urchin 1 time in 5, else Coral. They're only reachable once the bridge is repaired (Beach bridgeFixed, 300 Wood). | `StardewValley.Locations.Beach.DayUpdate`<br>`save: Beach bridgeFixed` | verified |
+| `src.winter-digging` | In winter, hoeing soil outdoors off the farm (not in the Desert) has an 8% chance a tile to turn up a Winter Root or a Snow Yam (half each), twice with a Generous hoe at 50%. | `StardewValley.GameLocation.checkForBuriedItem` | verified |

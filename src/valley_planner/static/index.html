@@ -17,15 +17,34 @@
   </header>
 
   <nav id="tabs" class="tabs" aria-label="Views">
-    <button type="button" class="active" data-view="today">Today</button>
+    <button type="button" class="active" data-view="morning">Morning</button>
+    <button type="button" data-view="today">Today</button>
     <button type="button" data-view="ask">Ask</button>
     <button type="button" data-view="crops">Crops</button>
     <button type="button" data-view="sell">Sell</button>
+    <button type="button" data-view="plan">Plan</button>
     <button type="button" data-view="cart">Cart</button>
   </nav>
 
   <main>
-    <section id="view-today" class="view">
+    <section id="view-morning" class="view">
+      <section class="parch panel">
+        <h2 class="sign" id="m-date"></h2>
+        <p class="sub" id="m-glance"></p>
+      </section>
+      <div class="two">
+        <section class="parch panel">
+          <h2 class="sign">Do these first</h2>
+          <div id="m-first"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">This week</h2>
+          <div id="m-week"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-today" class="view" hidden>
       <div class="two">
         <section class="parch panel">
           <h2 class="sign">Shops today</h2>
@@ -79,6 +98,14 @@
           <div id="sell-keep"></div>
         </section>
       </div>
+    </section>
+
+    <section id="view-plan" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">The Community Center by the deadline</h2>
+        <p class="sub" id="plan-head"></p>
+        <div class="table-wrap"><table class="sell-table" id="plan-rows"></table></div>
+      </section>
     </section>
 
     <section id="view-cart" class="view" hidden>

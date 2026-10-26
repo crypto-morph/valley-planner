@@ -118,6 +118,10 @@ class Farm:
                 out[it.qualified_id] = out.get(it.qualified_id, 0) + it.stack
         return out
 
+    def hours_today(self) -> list[dict]:
+        from .calendar import shop_hours
+        return shop_hours(self)["shops"]
+
     def label(self, days_played: int) -> str:
         d = days_played - 1
         return date_label(SEASONS[d // 28 % 4], d % 28 + 1, d // 112 + 1)

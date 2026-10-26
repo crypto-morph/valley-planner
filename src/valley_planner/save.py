@@ -162,6 +162,7 @@ class Save:
     world_state: set[str] = field(default_factory=set)
     events_seen: set[str] = field(default_factory=set)
     stats: dict[str, int] = field(default_factory=dict)  # the named stats (books read, etc.)
+    flags: set[str] = field(default_factory=set)  # world facts kept on locations, e.g. "beachBridgeFixed"
     skills: dict[str, int] = field(default_factory=dict)
     professions: list[int] = field(default_factory=list)
     max_stamina: int = 270
@@ -421,6 +422,7 @@ def read_save(path: Path, data=None) -> Save:
     bundle_data = {_flat(k): _flat(v) for k, v in _dict(_child(root, "bundleData"))}
 
     farm = locations.get("Farm")
+    flags = {"beachBridgeFixed"} if _bool(locations.get("Beach"), "bridgeFixed") else set()
     buildings: Counter = Counter()
     animals = []
     for b in (_child(farm, "buildings") or []):
@@ -534,7 +536,7 @@ def read_save(path: Path, data=None) -> Save:
         mail_tomorrow=set(_strings(_child(player, "mailForTomorrow"))),
         mine_lowest=_int(root, "mine_lowestLevelReached"),
         world_state=set(_strings(_child(root, "worldStateIDs"))),
-        events_seen=set(_strings(_child(player, "eventsSeen"))), stats=stat_values,
+        events_seen=set(_strings(_child(player, "eventsSeen"))), stats=stat_values, flags=flags,
         skills=skills, professions=[int(x) for x in _strings(_child(player, "professions")) if x.isdigit()],
         max_stamina=_int(player, "maxStamina", 270), max_items=_int(player, "maxItems", 12),
         house_upgrade=house_upgrade, deepest_mine_level=_int(player, "deepestMineLevel"),
