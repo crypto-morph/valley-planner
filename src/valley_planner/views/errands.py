@@ -121,4 +121,57 @@ def _reward_name(farm: Farm, qid: str) -> str:
     return qid or "a reward"
 
 
-ERRANDS = {"gunther": gunther, "clint": clint, "cc": community_center, "birthdays": birthdays}
+FAIR = ("fall", 16)
+LEAD_DAYS = 7  # seasonal buttons show for the week before
+
+
+def grange(farm: Farm) -> dict:
+    """The best nine for the Fair's grange display from everything you hold, and what to pack."""
+    from ..facts.grange import Entry, best, prize, score
+    from ..facts.sell import item_sell_price
+    held: dict[tuple, list] = {}
+    for it in farm.save.items:
+        if not it.qualified_id or it.big or not it.qualified_id.startswith("(O)"):
+            continue
+        cat = it.category if it.category is not None else (farm.items.get(it.id).category if farm.items.get(it.id)
+                                                            else None)
+        e = Entry(it.qualified_id, it.name if it.preserve else farm.name(it.qualified_id), it.quality, cat,
+                  item_sell_price(it, farm.farmer, profit_margin=farm.save.profit_margin))
+        key = (e.item, e.quality, e.name)
+        if key in held:
+            held[key][1] += it.stack
+            held[key][2].add(it.where)
+        else:
+            held[key] = [e, it.stack, {it.where}]
+    picked = best([(e, n) for e, n, _ in held.values()])
+    points = score(picked)
+    place, tokens = prize(points)
+    where = {(e.item, e.quality, e.name): w for e, _, w in held.values()}
+    rows = [{"name": e.name, "quality": QUALITY.get(e.quality, ""), "kind": e.kind or "no kind bonus",
+             "price": e.price, "points": e.points,
+             "pack": sorted(x for x in where[(e.item, e.quality, e.name)] if x != "Backpack")} for e in picked]
+    kinds = sorted({e.kind for e in picked if e.kind})
+    days = _days_until(farm, FAIR)
+    return {"title": "Grange display for the Fair", "score": points, "place": place, "tokens": tokens,
+            "kinds": kinds, "items": rows, "days": days,
+            "short": max(0, 90 - points), "pack": sorted({w for r in rows for w in r["pack"]})}
+
+
+def _days_until(farm: Farm, when: tuple[str, int]) -> int:
+    w = farm.when
+    seasons = ("spring", "summer", "fall", "winter")
+    target = seasons.index(when[0]) * 28 + when[1]
+    now = seasons.index(w.season) * 28 + w.day
+    return (target - now) % 112
+
+
+def seasonal(farm: Farm) -> list[dict]:
+    """Errand buttons that only show for the week before their day."""
+    out = []
+    days = _days_until(farm, FAIR)
+    if days <= LEAD_DAYS:
+        out.append({"id": "grange", "label": "Grange display" + (" (today!)" if days == 0 else f" ({days} days)")})
+    return out
+
+
+ERRANDS = {"gunther": gunther, "clint": clint, "cc": community_center, "birthdays": birthdays, "grange": grange}

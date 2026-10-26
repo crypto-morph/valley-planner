@@ -33,3 +33,4 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 .ask-close { position: absolute; top: 0.4rem; right: 0.5rem; font-size: 1.2rem; line-height: 1; }
 .errands { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .errands button { font-size: 0.9rem; }
+.errands button.seasonal { border-color: var(--fest); color: var(--fest); font-weight: 700; }

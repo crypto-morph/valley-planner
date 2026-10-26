@@ -76,7 +76,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return {"game_version": pl.data.version, "saves_root": str(pl.saves_root or ""),
                 "save": path.name if path else None, "following_newest": pl.chosen is None,
                 "farm": f.save.farm if f else None, "player": f.save.farmer if f else None,
-                "date": f.label(f.save.days_played) if f else None}
+                "date": f.label(f.save.days_played) if f else None,
+                "seasonal_errands": errands.seasonal(f) if f else []}
 
     @app.get("/api/saves")
     def saves() -> dict:

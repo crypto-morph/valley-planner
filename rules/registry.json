@@ -12383,6 +12383,22 @@
    "tests": [
     "tests/test_engine.py::test_recipe_entries_are_not_the_item"
    ]
+  },
+  {
+   "id": "fest.grange-score",
+   "area": "Calendar & events & access",
+   "summary": "Lewis scores the Fair's grange display as 14, plus per item quality + 1 (iridium +5) and a point for each sale-price mark it reaches (20, 90, 200; 300 below gold; 400 at normal quality; the item's real sale price), plus 5 per different kind up to 30 (vegetables, fruit, animal goods, gems and minerals, fish, forage/flowers/syrups, cooking, artisan goods), plus 9 - 2 per empty slot (nine slots). 90+ wins 1,000 star tokens, 75+ 500, 60+ 250, else 50; Lewis's shorts on display skip judging for 750. Any small object can go on it, one per slot.",
+   "checked_against": [
+    "StardewValley.Event.judgeGrange",
+    "StardewValley.Event.interpretGrangeResults",
+    "StardewValley.Utility.highlightSmallObjects"
+   ],
+   "data": [],
+   "status": "verified",
+   "tests": [
+    "tests/test_grange.py::test_item_points",
+    "tests/test_grange.py::test_score_kinds_and_empty_slots"
+   ]
   }
  ]
 }

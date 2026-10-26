@@ -61,6 +61,13 @@ function errandCard(name, c) {
     return head + (c.rooms.length ? c.rooms.map((r) => `<h3>${esc(r.room)}</h3>` + list(r.items.map((x) => li(`${x.count} ${esc(x.name)}${x.quality ? ` (${esc(x.quality)})` : ""}`, `${esc(x.bundle)}${x.open ? "" : " · room not open yet"}`)))).join("") : "<p>Nothing you hold fills an open slot right now.</p>") +
       (c.vault.length ? "<h3>Vault</h3>" + list(c.vault.map((v) => li(esc(v.bundle), v.gold <= c.money ? "<b>you can pay this now</b>" : `${(v.gold - c.money).toLocaleString()}g to go`))) : "");
   }
+  if (name === "grange") {
+    return head + `<p><b>${c.score} points: ${esc(c.place)} place</b> (${c.tokens.toLocaleString()} star tokens)` +
+      (c.short ? ` · ${c.short} short of first: swap in higher-quality or pricier items, or more kinds` : "") + "</p>" +
+      `<p class="sub">${c.kinds.length} kinds (${esc(c.kinds.join(", "))}) · the Fair is ${c.days ? `in ${c.days} days` : "today"}</p>` +
+      "<h3>Put these on the display</h3>" + list(c.items.map((x) => li(`${esc(x.name)}${x.quality ? ` (${esc(x.quality)})` : ""}`, `${x.points} points · ${esc(x.kind)} · sells ${x.price}g`))) +
+      (c.pack.length ? `<p><b>Pack them first:</b> they're in ${esc(c.pack.join(", "))}, and only your backpack goes to the Fair.</p>` : "");
+  }
   return head + (c.birthdays.length ? c.birthdays.map((b) => `<h3>${esc(b.who)} · ${esc(b.date)}</h3>` +
     (b.loved.length ? `<p>Loves: ${esc(b.loved.join(", "))}</p>` : '<p class="sub">You hold nothing they love.</p>') +
     (b.liked.length ? `<p class="sub">Likes: ${esc(b.liked.join(", "))}</p>` : "")).join("") : "<p>No birthdays this week.</p>");
@@ -252,6 +259,13 @@ async function start() {
   try {
     const m = await get("/api/meta");
     $("#status").textContent = m.save ? `${m.player} · ${m.farm} Farm · ${m.date}` : "No save found";
+    const row = document.querySelector(".errands");
+    (m.seasonal_errands || []).forEach((e) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.errand = e.id; b.textContent = e.label; b.className = "seasonal";
+      b.addEventListener("click", () => showErrand(e.id));
+      row.appendChild(b);
+    });
   } catch (e) {
     $("#status").textContent = e.message;
   }
