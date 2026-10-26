@@ -49,6 +49,7 @@ jobs:
         with:
           files: out/*
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}  # v0.1.0-beta.1 is a pre-release
 
   pypi:
     needs: [package]
