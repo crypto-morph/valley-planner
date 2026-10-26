@@ -59,6 +59,22 @@ class When:
         return key in self.mail or key in self.mailbox or key in self.mail_tomorrow
 
 
+CC_RESTORED_EVENT = "191393"
+
+
+def location_accessible(name: str, w: When) -> bool:
+    """Game1.isLocationAccessible: the four places the game gates this way (others are always 'accessible')."""
+    if name == "Desert":
+        return "ccVault" in w.mail
+    if name == "CommunityCenter":
+        return CC_RESTORED_EVENT in w.events_seen
+    if name == "JojaMart":
+        return CC_RESTORED_EVENT not in w.events_seen
+    if name == "Railroad":
+        return w.days_played > 31
+    return True
+
+
 def split(condition: str) -> list[list[str]]:
     """'SEASON spring, !YEAR 2' -> [['SEASON', 'spring'], ['!YEAR', '2']] (commas inside quotes kept)."""
     parts, buf, quoted = [], [], False
@@ -118,6 +134,8 @@ def _query(key: str, args: list[str], w: When) -> bool | None:
         return _range(args, 0, w.days_played)
     if key == "MINE_LOWEST_LEVEL_REACHED":
         return _range(args, 0, w.mine_lowest)
+    if key == "LOCATION_ACCESSIBLE" and args:
+        return location_accessible(args[0], w)
     if key == "IS_COMMUNITY_CENTER_COMPLETE":
         rooms = ("ccBoilerRoom", "ccCraftsRoom", "ccPantry", "ccFishTank", "ccVault", "ccBulletin")
         return all(r in w.mail for r in rooms) and "JojaMember" not in w.mail

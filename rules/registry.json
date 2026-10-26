@@ -418,8 +418,10 @@
     "StardewValley.Locations.Railroad.DayUpdate"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Player access: Summer 3 Y1 (DaysPlayed >= 31). Schedule/'accessible' checks: DaysPlayed > 31 (Summer 4)."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_closed_places"
+   ]
   },
   {
    "id": "access.cc-event-191393",
@@ -979,8 +981,10 @@
     "StardewValley.NPC.parseMasterScheduleImpl"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Don't gate other locations (Desert, Woods, Sewer, Mines, Island) inside schedules. The planner's place_open is applied to every entry, which can wrongly drop e.g. Desert Festival or Sandy-birthday days."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_closed_places"
+   ]
   },
   {
    "id": "sched.replacement-spot",
@@ -993,9 +997,11 @@
    "data": [
     "Characters/schedules/<NPC> *_Replacement keys"
    ],
-   "status": "to fix",
-   "fix": "Apply the replacement only for JojaMart/Railroad. A CommunityCenter entry before event 191393 always switches the whole day to 'default' (or 'spring').",
-   "derive_from": "{\"asset_field\": \"Characters/schedules/<NPC> '<Location>_Replacement' (JojaMart/Railroad only)\", \"consumed_by\": \"NPC.changeScheduleForLocationAccessibility\"}"
+   "status": "verified",
+   "derive_from": "{\"asset_field\": \"Characters/schedules/<NPC> '<Location>_Replacement' (JojaMart/Railroad only)\", \"consumed_by\": \"NPC.changeScheduleForLocationAccessibility\"}",
+   "tests": [
+    "tests/test_schedules.py::test_closed_places"
+   ]
   },
   {
    "id": "sched.fallback-default",
@@ -1008,7 +1014,10 @@
    "data": [
     "Characters/schedules/<NPC>"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_closed_places"
+   ]
   },
   {
    "id": "sched.marriage-job-days",
@@ -1029,7 +1038,10 @@
     "StardewValley.Utility.GetAllPlayerFriendshipLevel"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_key_order_hearts_and_first_existing_wins"
+   ]
   },
   {
    "id": "sched.green-rain-y1",
@@ -1052,7 +1064,10 @@
    "data": [
     "Data/PassiveFestivals (Season, StartDay, EndDay, StartTime, Condition)"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_passive_festival_keys"
+   ]
   },
   {
    "id": "sched.married-order",
@@ -1072,8 +1087,10 @@
     "StardewValley.NPC.TryLoadSchedule"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Two things are missing: (1) a Ginger Island resort visit (islandScheduleName set by IslandSouth's daily setup) overrides everything after GreenRain; (2) the first key that exists wins even if it parses to nothing, see sched.empty-entries-skip."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_key_order_hearts_and_first_existing_wins"
+   ]
   },
   {
    "id": "sched.pam-bus",
@@ -1096,7 +1113,10 @@
     "StardewValley.NPC.TryLoadSchedule"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_rain_is_a_coin_flip"
+   ]
   },
   {
    "id": "sched.empty-entries-skip",
@@ -1107,8 +1127,10 @@
     "StardewValley.NPC.parseMasterScheduleImpl"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Stop at the first existing key. If the planner's own parser yields no entries (e.g. it dropped 'a'-prefixed or 'bed' lines), fix the parser rather than skipping the key."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_key_order_hearts_and_first_existing_wins"
+   ]
   },
   {
    "id": "gift.birthday-8x",
@@ -1311,8 +1333,10 @@
    "data": [
     "Characters/schedules/<NPC>"
    ],
-   "status": "to fix",
-   "fix": "Accept an optional leading 'a' on the time (12 uses, e.g. Emily fall_15), an omitted location (18 uses), and an omitted facing. The current regex drops or mislabels these."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_entry_format"
+   ]
   },
   {
    "id": "schedfile.bed-token",
@@ -1325,8 +1349,10 @@
     "Characters/schedules/<NPC>",
     "Data/animationDescriptions"
    ],
-   "status": "to fix",
-   "fix": "Parse '<time> bed' (two tokens); the current code only matches a bare 'bed' entry, and its fallback regex needs a third token, so these lines are dropped."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_entry_format"
+   ]
   },
   {
    "id": "schedfile.goto",
@@ -1338,8 +1364,10 @@
    "data": [
     "Characters/schedules/<NPC>"
    ],
-   "status": "to fix",
-   "fix": "Evaluate the conditions (see schedfile.conditions-ignored), and handle 'GOTO season' (Alex Wed_6 and Sun_normal, Haley Wed_6) and 'no_schedule'."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_goto_mail_and_not_friendship"
+   ]
   },
   {
    "id": "schedfile.conditions-ignored",
@@ -1351,10 +1379,12 @@
    "data": [
     "Characters/schedules/<NPC>"
    ],
-   "status": "to fix",
-   "fix": "The planner always takes the 'mail not received / hearts not reached' branch. E.g. Emily fall_15 (MAIL ccVault) visits Sandy in the desert once ccVault is set, and Alex's Sunday football needs saloonSportsRoom. Evaluate these against the save.",
+   "status": "verified",
    "refs": [
     "StardewValley.NetWorldState.checkAnywhereForWorldStateID"
+   ],
+   "tests": [
+    "tests/test_schedules.py::test_goto_mail_and_not_friendship"
    ]
   },
   {
@@ -1367,8 +1397,10 @@
    "data": [
     "Characters/schedules/<NPC>"
    ],
-   "status": "to fix",
-   "fix": "Format t >= 2400 as (t-2400) with AM, e.g. 2530 -> 1:30 AM, not a fixed 12:00 AM."
+   "status": "verified",
+   "tests": [
+    "tests/test_schedules.py::test_entry_format"
+   ]
   },
   {
    "id": "schedfile.source",
@@ -1381,7 +1413,10 @@
     "Characters/schedules/<NPC>"
    ],
    "status": "verified",
-   "derive_from": "{\"asset_field\": \"Characters/schedules/<Name> (LeoMainland for Leo off-island)\", \"consumed_by\": \"NPC.getMasterScheduleRawData\"}"
+   "derive_from": "{\"asset_field\": \"Characters/schedules/<Name> (LeoMainland for Leo off-island)\", \"consumed_by\": \"NPC.getMasterScheduleRawData\"}",
+   "tests": [
+    "tests/test_schedules.py::test_entry_format"
+   ]
   },
   {
    "id": "gifttaste.resolution-order",
