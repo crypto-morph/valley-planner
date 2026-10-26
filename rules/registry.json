@@ -4182,6 +4182,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.Farmer.FarmingLevel"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_quality_odds"
    ]
   },
   {
@@ -4192,8 +4195,10 @@
     "StardewValley.Crop.harvest"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "For F=3 use P(>=gold) = g/2 + (1 - g/2)*g (iridium g/2, exact gold (1-g/2)g, silver otherwise, never normal); for F<=2 keep g."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_quality_odds"
+   ]
   },
   {
    "id": "crop.fertilizer-levels",
@@ -4279,6 +4284,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.Crop..ctor"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_real_pierre_prices"
    ]
   },
   {
@@ -4368,8 +4376,10 @@
    "data": [
     "Data/Crops.json Seasons"
    ],
-   "status": "to fix",
-   "fix": "Let the run wrap Winter -> Spring (next year) for crops listing all four seasons."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_season_change_survival"
+   ]
   },
   {
    "id": "crop.seed-offer-gates",
@@ -4383,8 +4393,10 @@
    "data": [
     "Data/Shops.json Items[].Condition, Price, PriceModifiers, IgnoreShopPriceModifiers"
    ],
-   "status": "to fix",
-   "fix": "Optionally add the Missing Stock List (x1.5 out of season) and Joja as sources; keep reading gates from Data/Shops conditions."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_shop_prices_markups_and_missing_stock"
+   ]
   },
   {
    "id": "crop.regrow-harvest-count",
@@ -4419,8 +4431,10 @@
    "data": [
     "Data/Crops.json HarvestMinStack, HarvestMaxStack, HarvestMaxIncreasePerFarmingLevel, ExtraHarvestChance"
    ],
-   "status": "to fix",
-   "fix": "Mean = (Min + max(Min,Max) + floor(Farming*inc))/2 + p/(1-p) with p = min(0.9, ExtraHarvestChance); i.e. use floor(Farming*inc)/2, not inc*Farming/2."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_expected_stack"
+   ]
   },
   {
    "id": "crop.paddy-excluded",
@@ -4873,7 +4887,10 @@
    "data": [
     "Data/Crops.json HarvestMinStack, HarvestMaxStack, ExtraHarvestChance"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_expected_stack"
+   ]
   },
   {
    "id": "crop.stack-per-level",
@@ -4885,8 +4902,10 @@
    "data": [
     "Data/Crops.json HarvestMinStack, HarvestMaxStack, HarvestMaxIncreasePerFarmingLevel, ExtraHarvestChance"
    ],
-   "status": "to fix",
-   "fix": "Mean = (Min + max(Min,Max) + floor(Farming*inc))/2 + p/(1-p) with p = min(0.9, ExtraHarvestChance); i.e. use floor(Farming*inc)/2, not inc*Farming/2."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_expected_stack"
+   ]
   },
   {
    "id": "crop.regrow-zero",
@@ -4955,8 +4974,10 @@
    "data": [
     "Data/Crops.json Seasons, PlantableLocationRules"
    ],
-   "status": "to fix",
-   "fix": "Read Seasons from Data/Crops (keyed by seed, map to harvest name via HarvestItemId); treat 4 listed seasons as never wilting."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_season_change_survival"
+   ]
   },
   {
    "id": "crop-seasons.amaranth",
@@ -5065,8 +5086,10 @@
    "data": [
     "Data/Crops.json 802 Seasons, PlantableLocationRules"
    ],
-   "status": "to fix",
-   "fix": "Use the four listed seasons from data and the outdoor-planting ban (except Island)."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_season_change_survival"
+   ]
   },
   {
    "id": "crop-seasons.carrot",
@@ -6154,7 +6177,10 @@
     "Data/Objects Price",
     "Data/Shops SeedShop Items Price/IgnoreShopPriceModifiers/Condition"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_real_pierre_prices"
+   ]
   },
   {
    "id": "econ.sandy-honey",
@@ -6663,10 +6689,12 @@
    "data": [
     "Data/Shops Items[].Condition"
    ],
-   "status": "to fix",
-   "fix": "YEAR and DAYS_PLAYED also take an optional maximum as a second argument, which the planner ignores. DAY_OF_WEEK also accepts short names (Mon) and day numbers. Arguments can be quoted, as inside ANY. Every other query (PLAYER_*, SYNCED_RANDOM, WORLD_STATE_FIELD and so on) is correctly left as unknown.",
+   "status": "verified",
    "refs": [
     "StardewValley.GameStateQuery.DefaultResolvers"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_condition_grammar"
    ]
   },
   {
@@ -6801,8 +6829,10 @@
     "Data/Shops SeedShop PriceModifiers DefaultMarkup",
     "Data/Shops SeedShop/Sandy Items Price + IgnoreShopPriceModifiers"
    ],
-   "status": "to fix",
-   "fix": "The actual mechanism: the base is the entry's explicit Price, or else the item's salePrice(), which for an object is 2 x Data/Objects Price. The shop's PriceModifiers (Pierre's x2 DefaultMarkup) apply only to entries that do not set IgnoreShopPriceModifiers, and every no-price seed at Pierre's sets it. So the doubling comes from salePrice, not from the markup. The markup only doubles explicitly priced entries such as Sunflower Seeds, saplings and fertilizers. Seeds (-74) and saplings are also multiplied by the profit-margin setting. Pierre's Missing Stock List sells out-of-season seeds at x1.5. To derive the price, honour IgnoreShopPriceModifiers rather than inferring the markup from the shop."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_shop_prices_markups_and_missing_stock"
+   ]
   },
   {
    "id": "shop.seed-shops",
@@ -6843,6 +6873,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.GameStateQuery.DefaultResolvers"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_condition_grammar"
    ]
   },
   {
@@ -6952,8 +6985,10 @@
     "Data/Shops <shop>.PriceModifiers/Currency",
     "Data/Shops Items Price/IgnoreShopPriceModifiers/PriceModifiers/TradeItemId"
    ],
-   "status": "to fix",
-   "fix": "Gaps: (1) The shop markup is applied only when the entry does not set IgnoreShopPriceModifiers. (2) JojaMart has a conditional x1.25 NonMemberMarkup until the JojaMember mail, and the planner skips it (Sugar, Wheat Flour and Rice cost 25% more). (3) Items with a TradeItemId (Desert Trader, Island Trader) have gold price 0 and cost items. The planner shows them as gold (e.g. Cheese 460g instead of 1 Emerald). (4) Per-item PriceModifiers, such as Krobus's random Saturday Bread price, are ignored. (5) The Casino charges Qi Coins. (6) An explicit Price of 0 is valid, and the planner treats it as missing. (7) Recipe entries without a price would be 10 x Price via salePrice, not 2 x."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_shop_prices_markups_and_missing_stock"
+   ]
   },
   {
    "id": "shop.strawberry-seed-100",

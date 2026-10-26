@@ -156,6 +156,7 @@ class Save:
     crops: list[Crop] = field(default_factory=list)
     mail: set[str] = field(default_factory=set)  # received
     mailbox: set[str] = field(default_factory=set)  # arrived, not read yet
+    mail_tomorrow: set[str] = field(default_factory=set)  # arrives tomorrow morning
     world_state: set[str] = field(default_factory=set)
     events_seen: set[str] = field(default_factory=set)
     skills: dict[str, int] = field(default_factory=dict)
@@ -164,6 +165,7 @@ class Save:
     max_items: int = 12
     house_upgrade: int = 0
     deepest_mine_level: int = 0
+    mine_lowest: int = 0  # lowest Mines level anyone reached (shop conditions use this)
     cave_choice: int = 0  # 0 not chosen yet, 1 fruit bats, 2 mushrooms
     axe_level: int = 0
     rod_level: int = -1  # -1 no rod; 0 Bamboo, 1 Training, 2 Fiberglass, 3 Iridium, 4 Advanced Iridium
@@ -189,6 +191,7 @@ class Save:
     qi_orders_board: list[dict] = field(default_factory=list)
     cart_guarantee: int = -1  # Traveling Cart visits until the Year-1 Red Cabbage Seeds (-1 off/used)
     shipped: dict[str, int] = field(default_factory=dict)  # basicShipped: id -> count
+    profit_margin: float = 1.0  # the farm's profit-margin setting (player difficultyModifier)
 
     # --- questions everything else asks --------------------------------------------
 
@@ -515,6 +518,8 @@ def read_save(path: Path, data=None) -> Save:
         weather=weather, weather_tomorrow=tomorrow,
         daily_luck=max(-0.2, min(0.2, luck + (0.025 if "HasSpecialCharm" in mail else 0))),
         items=items, crops=crops, mail=mail, mailbox=set(_strings(_child(player, "mailbox"))),
+        mail_tomorrow=set(_strings(_child(player, "mailForTomorrow"))),
+        mine_lowest=_int(root, "mine_lowestLevelReached"),
         world_state=set(_strings(_child(root, "worldStateIDs"))),
         events_seen=set(_strings(_child(player, "eventsSeen"))),
         skills=skills, professions=[int(x) for x in _strings(_child(player, "professions")) if x.isdigit()],
@@ -533,6 +538,7 @@ def read_save(path: Path, data=None) -> Save:
         qi_orders_board=[o for o in board if o["type"] == "QiChallenge"],
         cart_guarantee=_int(root, "visitsUntilY1Guarantee", -1),
         shipped={_flat(k).removeprefix("(O)"): int(_flat(v) or 0) for k, v in _dict(_child(player, "basicShipped"))},
+        profit_margin=float(_text(player, "difficultyModifier", "1") or 1),
     )
 
 
