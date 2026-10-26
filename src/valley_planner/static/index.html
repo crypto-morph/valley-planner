@@ -19,6 +19,7 @@
   <nav id="tabs" class="tabs" aria-label="Views">
     <button type="button" class="active" data-view="today">Today</button>
     <button type="button" data-view="crops">Crops</button>
+    <button type="button" data-view="sell">Sell</button>
     <button type="button" data-view="cart">Cart</button>
   </nav>
 
@@ -47,6 +48,25 @@
         <p class="sub" id="mine-head"></p>
         <div class="table-wrap"><table class="sell-table" id="mine"></table></div>
       </section>
+    </section>
+
+    <section id="view-sell" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">Ship these</h2>
+        <p class="sub" id="sell-head"></p>
+        <div class="table-wrap"><table class="sell-table" id="sell-rows"></table></div>
+      </section>
+      <div class="two">
+        <section class="parch panel">
+          <h2 class="sign">Put through a machine first</h2>
+          <div id="sell-process"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">Hold on to</h2>
+          <div id="sell-filters" class="filter-list"></div>
+          <div id="sell-keep"></div>
+        </section>
+      </div>
     </section>
 
     <section id="view-cart" class="view" hidden>

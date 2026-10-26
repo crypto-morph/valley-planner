@@ -31,7 +31,22 @@ def test_app_end_to_end():
     client = TestClient(create_app())
     meta = client.get("/api/meta").json()
     assert meta["game_version"] and meta["save"]
-    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/"):
+    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/api/sell", "/api/sell?liked=true&seeds=false", "/"):
         assert client.get(url).status_code == 200, url
     crops = client.get("/api/crops").json()
     assert {"countdown", "mine"} <= set(crops)
+
+
+def test_help_wanted_pool_and_holds():
+    from types import SimpleNamespace
+
+    from valley_planner.facts.help_wanted import possible_crops, raw_pool
+    from valley_planner.views.sell import _Stack, _take
+    fall = raw_pool("fall", 10, 1)
+    assert {"404", "142", "272", "270"} <= fall and "62" not in fall and "334" not in fall
+    assert "270" not in raw_pool("fall", 3, 1)  # first week: only the early crops
+    assert {"62", "64", "334"} <= raw_pool("fall", 10, 1, mine_lowest=90, crafting={"Furnace"})
+    assert possible_crops("winter", False, 2, True) == [] and "266" in possible_crops("summer", True, 2, False)
+    stacks = [_Stack(SimpleNamespace(quality=2), 3), _Stack(SimpleNamespace(quality=0), 2)]
+    assert _take(stacks, 3) == [(0, 2), (2, 1)]  # the lowest quality goes first; the best stays to sell
+    assert _take(stacks, 5, min_q=2) == [(2, 2)]

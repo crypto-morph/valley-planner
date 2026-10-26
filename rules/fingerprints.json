@@ -296,6 +296,7 @@
  "StardewValley.Utility.getPurchaseAnimalStock": "8e59f7414e2303210502b40a98783826bac25c3ad6f164726862e836934f3145",
  "StardewValley.Utility.getQuestOfTheDay": "b2788517f3af2ae770037dcc14f4de6af04974250657123c6bf1b24e7c0a16b5",
  "StardewValley.Utility.getRandomItemFromSeason": "c0ad97acf235fc2afa9c6dcceba2f71ec042d72831fdbb9a3caf40419791b801",
+ "StardewValley.Utility.getRandomItemFromSeason/2": "1a67ef5c65e15094c5b3148f1c39758996aab3a6e06581922b266dbd4bc0df94",
  "StardewValley.Utility.getStartTimeOfFestival": "d9731c25def2851a6ce7801eba0284fc1fdb14abaedae34a5bb8444ea54c2f72",
  "StardewValley.Utility.getTreasureFromGeode": "5ba418ad3945d5256f9d4ecc96101cd7484ce0329907a62886ae66902517486b",
  "StardewValley.Utility.isFestivalDay": "675eed1a90ee48d1db97aed6da1d181ca1a93acb4e558f1269519958629379a1",

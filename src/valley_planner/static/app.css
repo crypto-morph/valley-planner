@@ -18,3 +18,5 @@ main { display: grid; gap: 1rem; }
 table.sell-table { width: 100%; border-collapse: collapse; }
 table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 #cart-q { width: 100%; padding: 0.5rem; font: inherit; border: 3px solid var(--wood-dark); background: var(--panel-2); }
+.filter { display: block; margin: 0.25rem 0; }
+.filter-list { margin-bottom: 0.6rem; }

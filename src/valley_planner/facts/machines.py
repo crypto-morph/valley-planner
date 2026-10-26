@@ -20,6 +20,8 @@ How the game decides, in our words:
   overnight jump to 6 AM: from bedtime that's what's left until 2 AM plus 400
   minutes, so every 6 AM-to-6 AM day is 1,600 machine minutes whenever you
   sleep.
+- Some machines also use up other items per load (AdditionalConsumedItems):
+  a coal for the Furnace and Fish Smoker, three for the Heavy Furnace.
 - Seed Maker: the seed of the first crop (in Data/Crops order) that harvests
   this item; 1-3 of it, or 0.5% one Ancient Seed, then 2% 1-4 Mixed Seeds.
 - Context tags an item has: its data tags, "id_(o)<id>", "id_o_<id>",
@@ -122,6 +124,7 @@ class Output:
     sure: bool = True  # False: random, or a condition we can't decide
     note: str = ""
     overnight_only: bool = False  # finishes only overnight (incubators)
+    also: tuple[tuple[str, int], ...] = ()  # other items each load uses up (coal for the furnace)
 
 
 class Machines:
@@ -249,6 +252,9 @@ class Machines:
 
     def _timed(self, data: dict, out: Output, professions) -> Output:
         """Apply the machine's ready-time modifiers (Coopmaster, per-gem Crystalarium times)."""
+        extra = tuple((a["ItemId"], a.get("RequiredCount") or 1) for a in data.get("AdditionalConsumedItems") or [])
+        if extra:
+            out = Output(**{**out.__dict__, "also": extra})
         if data.get("OnlyCompleteOvernight"):
             out = Output(**{**out.__dict__, "overnight_only": True})
         mods = data.get("ReadyTimeModifiers") or []

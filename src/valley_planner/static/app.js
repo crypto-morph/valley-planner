@@ -44,6 +44,28 @@ const views = {
     ).join("");
   },
 
+  async sell() {
+    const f = sellFilters();
+    const v = await get("/api/sell?" + new URLSearchParams(Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x ? "true" : "false"]))));
+    $("#sell-head").textContent = `${v.count} items for about ${v.total.toLocaleString()}g`;
+    $("#sell-rows").innerHTML = "<tr><th>Item</th><th>Count</th><th>Each</th><th>Total</th><th>Where</th></tr>" + v.sell.map((r) =>
+      `<tr><td>${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</td><td>${r.count}</td><td>${r.each}g</td><td>${r.total.toLocaleString()}g</td><td class="sub">${esc(r.where.join(", "))}</td></tr>`
+    ).join("");
+    $("#sell-process").innerHTML = v.process.length ? '<ul class="list">' + v.process.map((r) =>
+      `<li><span>${r.count} ${esc(r.name)} → ${esc(r.product)} <span class="sub">(${esc(r.machine)}${r.burns ? `, uses ${esc(r.burns)} each` : ""})</span></span><span>${r.seeds ? "" : `+${r.gain.toLocaleString()}g`}</span></li>`
+    ).join("") + `</ul><p class="sub">About ${v.process_gain.toLocaleString()}g more than selling them raw.</p>` : '<p class="sub">Nothing worth processing with the machines you have.</p>';
+    $("#sell-filters").innerHTML = v.filters.map((x) =>
+      `<label class="filter"><input type="checkbox" data-filter="${esc(x.id)}" ${x.on ? "checked" : ""}> ${esc(x.label)} <span class="sub">(${x.count} items, ${x.value.toLocaleString()}g)</span></label>`
+    ).join("");
+    document.querySelectorAll("#sell-filters input").forEach((box) => box.addEventListener("change", () => {
+      saveSellFilters({ ...sellFilters(), [box.dataset.filter]: box.checked });
+      views.sell();
+    }));
+    $("#sell-keep").innerHTML = '<ul class="list">' + v.keep.map((r) =>
+      `<li><span>${r.count} ${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</span><span class="sub">${esc(r.why)}</span></li>`
+    ).join("") + "</ul>";
+  },
+
   async cart() {
     const v = await get("/api/cart?days=14");
     $("#cart-days").innerHTML = v.days.map((d) =>
@@ -53,6 +75,14 @@ const views = {
     ).join("") || '<p class="sub">No cart in the next two weeks.</p>';
   },
 };
+
+const SELL_DEFAULTS = { loved: true, liked: false, help_wanted: true, seeds: true };
+function sellFilters() {
+  try { return { ...SELL_DEFAULTS, ...JSON.parse(localStorage.getItem("sellFilters") || "{}") }; } catch { return { ...SELL_DEFAULTS }; }
+}
+function saveSellFilters(f) {
+  try { localStorage.setItem("sellFilters", JSON.stringify(f)); } catch { /* private window: just don't remember */ }
+}
 
 async function searchCart() {
   const q = $("#cart-q").value.trim();
