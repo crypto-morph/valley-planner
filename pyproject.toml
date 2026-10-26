@@ -45,3 +45,6 @@ select = ["E", "F", "W", "B", "UP", "I"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["game: needs a local Stardew Valley install (skipped when none is found)"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # sample save XML reads better unwrapped

@@ -3962,11 +3962,13 @@
    "data": [
     "save file XML"
    ],
-   "status": "to fix",
-   "fix": "Also read Object[xsi:type=IndoorPot]/hoeDirt/crop (no tile key, location = pot's location; pots indoors never die of season). Not yet confirmed against a real save with a planted pot (none of the local 1.6 saves has one).",
+   "status": "verified",
    "refs": [
     "StardewValley.Objects.IndoorPot",
     "StardewValley.TerrainFeatures.HoeDirt"
+   ],
+   "tests": [
+    "tests/test_save.py::test_crops_regrow_pot_and_forage"
    ]
   },
   {
@@ -3983,6 +3985,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.Crop..ctor"
+   ],
+   "tests": [
+    "tests/test_save.py::test_crops_regrow_pot_and_forage"
    ]
   },
   {
@@ -4071,8 +4076,10 @@
    "data": [
     "Data/Crops.json RegrowDays (key = crop/seedIndex)"
    ],
-   "status": "to fix",
-   "fix": "regrows = Data/Crops[crop/seedIndex].RegrowDays > 0 (fall back to fullGrown only when the seed id is unknown)."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_crops_regrow_pot_and_forage"
+   ]
   },
   {
    "id": "crops.fertilizer-field",
@@ -4098,7 +4105,10 @@
    "data": [
     "save: crop/phaseDays, currentPhase, dayOfCurrentPhase"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_crops_regrow_pot_and_forage"
+   ]
   },
   {
    "id": "crops.hand-water-energy",
@@ -10307,12 +10317,14 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Treat xsi:type ColoredObject as an Object too (same itemId/price/category/preserve/preservedParentSheetIndex fields). Today those items get item_id '', price None and category None, so bundle matching by id, flower slots and the sell logic miss them.",
+   "status": "verified",
    "refs": [
     "StardewValley.Item.QualifiedItemId",
     "StardewValley.Objects.ColoredObject",
     "StardewValley.SaveMigrations.SaveFixes.MigratePreservesTo16"
+   ],
+   "tests": [
+    "tests/test_save.py::test_every_container_and_coloured_objects"
    ]
   },
   {
@@ -10371,10 +10383,12 @@
     "Data/Bundles 'Pantry/4' ingredient list and slot count (field 4)",
     "Data/Objects -> Name (duplicate names)"
    ],
-   "status": "to fix",
-   "fix": "The Animal bundle does not need each egg: it takes any 4 of its 6 listed items. Other same-name pairs exist and should be keyed by id too: 176/180 'Egg' (white/brown) and 126/127 'Strange Doll' (two separate museum pieces). Derive duplicates from Data/Objects rather than hard-coding 182.",
+   "status": "verified",
    "refs": [
     "StardewValley.Menus.Bundle"
+   ],
+   "tests": [
+    "tests/test_save.py::test_shared_names_kept_apart"
    ]
   },
   {
@@ -10387,11 +10401,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Also read <fridge><items> under FarmHouse/IslandFarmHouse/Cabin, root globalInventories (Junimo chest), and heldObject Chests (auto-grabber). Label chests inside a building's <indoors> by that indoors location.",
+   "status": "verified",
    "refs": [
     "StardewValley.Locations.FarmHouse.fridge",
     "StardewValley.SaveGame"
+   ],
+   "tests": [
+    "tests/test_save.py::test_every_container_and_coloured_objects"
    ]
   },
   {
@@ -10460,10 +10476,12 @@
    "data": [
     "Data/Tools -> ConventionalUpgradeFrom"
    ],
-   "status": "to fix",
-   "fix": "The planner also takes max(..., name tier) and the name is the new tool's name ('Copper Axe'), so it credits the target tier, not upgradeLevel-1. Drop the name lookup (or subtract 1 from it) for toolBeingUpgraded.",
+   "status": "verified",
    "refs": [
     "StardewValley.Farmer.toolBeingUpgraded"
+   ],
+   "tests": [
+    "tests/test_save.py::test_tools"
    ]
   },
   {
@@ -10474,10 +10492,12 @@
    "data": [
     "Data/Tools -> Name, UpgradeLevel (ClassName FishingRod)"
    ],
-   "status": "to fix",
-   "fix": "Fix the comment: game upgradeLevel is Bamboo 0, Training 1, Fiberglass 2, Iridium 3, Advanced Iridium 4. Add 'Advanced Iridium Rod' to the name map (it currently falls through to upgradeLevel 4, which only works by accident).",
+   "status": "verified",
    "refs": [
     "StardewValley.Tools.FishingRod"
+   ],
+   "tests": [
+    "tests/test_save.py::test_tools"
    ]
   },
   {
@@ -10551,10 +10571,12 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Keep ids as strings; don't int() them.",
+   "status": "verified",
    "refs": [
     "StardewValley.Farmer.eventsSeen"
+   ],
+   "tests": [
+    "tests/test_save.py::test_mail_unread_counts_and_rusty_key"
    ]
   },
   {
@@ -10621,11 +10643,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "If showing the player's luck, add 0.025 when mail 'HasSpecialCharm' is received (wallet item flag) and clamp to +-0.2.",
+   "status": "verified",
    "refs": [
     "StardewValley.Farmer.DailyLuck",
     "StardewValley.SaveGame"
+   ],
+   "tests": [
+    "tests/test_save.py::test_special_orders_and_rooms"
    ]
   },
   {
@@ -10639,11 +10663,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Read the root child, not the first match: in 1.6 the first weatherForTomorrow tags are inside locationWeather (text in a nested <string>), and the code only skips them because their .text is empty. Map legacy ints via the game's legacy codes.",
+   "status": "verified",
    "refs": [
     "StardewValley.SaveGame",
     "load"
+   ],
+   "tests": [
+    "tests/test_save.py::test_weather_from_the_farm"
    ]
   },
   {
@@ -10656,12 +10682,14 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "is_green_rain is always False today, so green-rain days show as plain rain. Read locationWeather item key 'Default' -> LocationWeather -> isGreenRain (or its Weather string) instead.",
+   "status": "verified",
    "refs": [
     "StardewValley.Network.LocationWeather.IsGreenRain",
     "StardewValley.SaveGame",
     "no"
+   ],
+   "tests": [
+    "tests/test_save.py::test_weather_from_the_farm"
    ]
   },
   {
@@ -10675,8 +10703,10 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Simplest: use locationWeather['Default'].Weather directly (Sun/Rain/Storm/Snow/Wind/GreenRain...). Otherwise add 'wind' from root isDebrisWeather."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_weather_from_the_farm"
+   ]
   },
   {
    "id": "save.buildings",
@@ -10689,10 +10719,12 @@
     "Data/Buildings keys",
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Exclude or flag Farmhouse/Greenhouse/Shipping Bin/Pet Bowl if 'farm buildings' means things you built; count an in-progress upgrade as its upgradeName if Robin will finish it.",
+   "status": "verified",
    "refs": [
     "StardewValley.Buildings.Building.buildingType"
+   ],
+   "tests": [
+    "tests/test_save.py::test_machines_buildings_and_cellar"
    ]
   },
   {
@@ -10718,11 +10750,13 @@
     "Data/Machines keys (qualified (BC) ids) = real machines",
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Treat as 'machine' only items whose qualified id is a key in Data/Machines; count placed Crab Pots separately from <Object xsi:type='CrabPot'> (they are not in Data/Machines; the CrabPot class handles them).",
+   "status": "verified",
    "refs": [
     "StardewValley.Object.bigCraftable",
     "StardewValley.Objects.CrabPot"
+   ],
+   "tests": [
+    "tests/test_save.py::test_machines_buildings_and_cellar"
    ]
   },
   {
@@ -10755,10 +10789,12 @@
     "Strings/SpecialOrderStrings",
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Multiply MoneyReward amount by its <multiplier> (default 1).",
+   "status": "verified",
    "refs": [
     "StardewValley.SpecialOrders.SpecialOrder"
+   ],
+   "tests": [
+    "tests/test_save.py::test_special_orders_and_rooms"
    ]
   },
   {
@@ -10769,11 +10805,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Split available orders by orderType ('QiChallenge' = Qi board) and filter accepted ones by questState InProgress.",
+   "status": "verified",
    "refs": [
     "StardewValley.SaveGame",
     "StardewValley.SpecialOrders.SpecialOrder.questState"
+   ],
+   "tests": [
+    "tests/test_save.py::test_special_orders_and_rooms"
    ]
   },
   {
@@ -10858,12 +10896,14 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Check mailReceived contains 'HasRustyKey' (host); fall back to <hasRustyKey>true only for pre-1.6 saves.",
+   "status": "verified",
    "refs": [
     "StardewValley.Farmer.hasRustyKey",
     "StardewValley.Locations.Forest",
     "StardewValley.SaveMigrations.SaveMigrator_1_6"
+   ],
+   "tests": [
+    "tests/test_save.py::test_mail_unread_counts_and_rusty_key"
    ]
   },
   {
@@ -10997,8 +11037,10 @@
     "StardewValley.Menus.JojaCDMenu.receiveLeftClick"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Treat a room as done if areasComplete[i] OR mail cc<Room> received (Bulletin Board: ccBulletin; no Joja equivalent)."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_special_orders_and_rooms"
+   ]
   },
   {
    "id": "save.check-fruit-tree",
@@ -11020,11 +11062,13 @@
    "data": [
     "Data/CraftingRecipes (Tapper 's Foraging 4', Mushroom Log 's Foraging 4', Crab Pot 's Fishing 3', Furnace 'l 2')"
    ],
-   "status": "to fix",
-   "fix": "Count placed CrabPot objects as owning a Crab Pot.",
+   "status": "verified",
    "refs": [
     "StardewValley.CraftingRecipe",
     "StardewValley.Objects.CrabPot"
+   ],
+   "tests": [
+    "tests/test_save.py::test_machines_buildings_and_cellar"
    ]
   },
   {
@@ -11127,11 +11171,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Detect them by <forageCrop>true (and whichForageCrop) rather than an empty/-1 harvest id; they are harvestable forage, not placeholders.",
+   "status": "verified",
    "refs": [
     "StardewValley.Crop",
     "StardewValley.Locations.IslandWest/IslandNorth (ginger spawn)"
+   ],
+   "tests": [
+    "tests/test_save.py::test_crops_regrow_pot_and_forage"
    ]
   },
   {
@@ -11325,8 +11371,10 @@
    "data": [
     "Data/mail wizardJunimoNote"
    ],
-   "status": "to fix",
-   "fix": "Check mailReceived OR mailbox; it arrives the morning after the first note is opened."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_mail_unread_counts_and_rusty_key"
+   ]
   },
   {
    "id": "mail.backpack-offered",
@@ -11340,8 +11388,10 @@
    "data": [
     "Data/mail pierreBackpack"
    ],
-   "status": "to fix",
-   "fix": "Treat the backpack as purchasable from day 1; read player <maxItems> (12/24/36) for what's owned."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_basics"
+   ]
   },
   {
    "id": "mail.guild-quest",
@@ -11353,8 +11403,10 @@
    "data": [
     "Data/mail guildQuest"
    ],
-   "status": "to fix",
-   "fix": "Check mailReceived OR mailbox."
+   "status": "verified",
+   "tests": [
+    "tests/test_save.py::test_mail_unread_counts_and_rusty_key"
+   ]
   },
   {
    "id": "mail.greenhouse",
@@ -11620,11 +11672,13 @@
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Read player maxStamina from the save instead of 270.",
+   "status": "verified",
    "refs": [
     "StardewValley.Farmer.MaxStamina",
     "StardewValley.Farmer.maxStamina"
+   ],
+   "tests": [
+    "tests/test_save.py::test_basics"
    ]
   },
   {
