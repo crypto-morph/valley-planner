@@ -18,6 +18,7 @@
 
   <nav id="tabs" class="tabs" aria-label="Views">
     <button type="button" class="active" data-view="today">Today</button>
+    <button type="button" data-view="ask">Ask</button>
     <button type="button" data-view="crops">Crops</button>
     <button type="button" data-view="sell">Sell</button>
     <button type="button" data-view="cart">Cart</button>
@@ -35,6 +36,17 @@
           <div id="days"></div>
         </section>
       </div>
+    </section>
+
+    <section id="view-ask" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">Ask about anything</h2>
+        <div class="askbox-field">
+          <input id="ask-q" type="search" autocomplete="off" placeholder="An item, a villager or a fish: Hot Pepper, Maru, Sturgeon…" />
+        </div>
+        <div id="ask-results" class="chip-row"></div>
+      </section>
+      <section class="parch panel" id="ask-card" hidden></section>
     </section>
 
     <section id="view-crops" class="view" hidden>

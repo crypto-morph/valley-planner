@@ -10,7 +10,57 @@ const get = async (url) => {
 };
 const unsure = (sure) => (sure === false ? ' <span class="unsure" title="depends on things the save can\'t tell yet">(maybe)</span>' : "");
 
+const list = (rows) => rows.length ? '<ul class="list">' + rows.join("") + "</ul>" : "";
+const li = (left, right = "") => `<li><span>${left}</span><span class="sub">${right}</span></li>`;
+const mins = (m, d) => (d ? `${d} day${d > 1 ? "s" : ""}` : m >= 1440 ? `${(m / 1600).toFixed(1)} machine days` : m >= 60 ? `${Math.round(m / 6) / 10} h` : `${m} min`);
+
+function itemCard(c) {
+  const parts = [`<h2 class="sign">${esc(c.name)}</h2><p class="sub">${c.held ? `You hold ${c.held}` : "You hold none"}${c.museum ? ` · museum: ${esc(c.museum)}` : ""}${c.help_wanted ? " · a Help Wanted request can ask for it this season" : ""}</p>`];
+  if (c.sells.length) parts.push("<h3>Sells for</h3>" + list(c.sells.map((x) => li(x.quality || "normal", `${x.each}g`))));
+  if (c.bundles.length) parts.push("<h3>Bundles</h3>" + list(c.bundles.map((b) => li(`${esc(b.bundle)} <span class="sub">(${esc(b.room)})</span>`, `${b.count}${b.quality ? `, quality ${b.quality}+` : ""}${b.open ? "" : " · room not open yet"}`))));
+  if (c.grows) parts.push(`<h3>Grows</h3><p>From ${esc(c.grows.seed)} in ${esc(c.grows.seasons.join(", "))}: ${c.grows.days} days${c.grows.regrow ? `, then every ${c.grows.regrow}` : ""}.</p>`);
+  if (c.plant) parts.push(`<h3>Plant it</h3><p>Grows ${esc(c.plant.crop)} in ${esc(c.plant.seasons.join(", "))}: ${c.plant.days} days${c.plant.regrow ? `, then every ${c.plant.regrow}` : ""}.</p>`);
+  if (c.fish) {
+    const f = c.fish;
+    parts.push("<h3>Catch it</h3>" + (f.trap ? `<p>Crab pot, ${esc(f.water)} water.</p>` :
+      `<p>${f.here_now.length ? `This season: ${esc(f.here_now.join(", "))}` : "Not this season"}${f.other_seasons.length ? ` · also ${esc(f.other_seasons.join(", "))}` : ""}<br>${esc(f.times.join(", "))} · ${esc(f.weather === "both" ? "any weather" : f.weather)}${f.min_level ? ` · fishing level ${f.min_level}` : ""} · difficulty ${f.difficulty}</p>`));
+  }
+  if (c.shops_today.length || c.shops_other.length) parts.push("<h3>Buy it</h3>" + list([
+    ...c.shops_today.map((o) => li(`${esc(o.shop)} today${unsure(o.sure)}`, o.trade ? `${o.trade_amount} ${esc(o.trade)}` : `${o.price}g`)),
+    ...c.shops_other.map((o) => li(`${esc(o.shop)} <span class="sub">(${esc(o.when || "other days")})</span>`, o.trade ? `${o.trade_amount} ${esc(o.trade)}` : `${o.price}g`)),
+  ]));
+  if (c.cart.length) parts.push("<h3>At the cart</h3>" + list(c.cart.map((x) => li(`${esc(x.date)}${unsure(x.sure)}`, `${x.price.toLocaleString()}g`))));
+  if (c.machines.length) parts.push("<h3>Machines</h3>" + list(c.machines.map((m) => li(`${esc(m.machine)}: ${m.uses > 1 ? `${m.uses} → ` : ""}${esc(m.product)}${m.owned ? ` <span class="sub">(you have ${m.owned})</span>` : ""}`, `${m.sells}g · ${mins(m.minutes, m.days)}`))));
+  if (c.gifts) parts.push("<h3>Gift tastes</h3>" + list(["love", "like", "dislike", "hate"].filter((t) => c.gifts[t].length).map((t) => li(t, esc(c.gifts[t].join(", "))))));
+  return parts.join("");
+}
+
+function villagerCard(c) {
+  const f = c.met ? `${c.hearts} hearts (${c.points} points) · ${c.gifts_this_week}/2 gifts this week${c.gifted_today ? " · gifted today" : ""}${c.talked_today ? " · talked today" : ""}` : "Not met yet";
+  return `<h2 class="sign">${esc(c.name)}</h2><p class="sub">Birthday ${esc(c.birthday)} · ${esc(f)}</p>` +
+    "<h3>Loves</h3>" + list(c.loves.map((x) => li(esc(x.name), x.held ? `you hold ${x.held}` : ""))) +
+    (c.likes_held.length ? `<h3>Likes that you hold</h3><p>${esc(c.likes_held.join(", "))}</p>` : "") +
+    "<h3>Today</h3>" + c.today.map((d) => (c.today.length > 1 ? `<p class="sub">${Math.round(d.chance * 100)}% chance:</p>` : "") +
+      (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
+}
+
+async function showCard(kind, id) {
+  const c = await get(`/api/ask/${kind}/${encodeURIComponent(id)}`);
+  $("#ask-card").innerHTML = kind === "item" ? itemCard(c) : villagerCard(c);
+  $("#ask-card").hidden = false;
+}
+
+async function searchAsk() {
+  const q = $("#ask-q").value.trim();
+  const v = await get(`/api/ask?q=${encodeURIComponent(q)}`);
+  $("#ask-results").innerHTML = v.results.map((r) => `<button type="button" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}">${esc(r.name)}</button>`).join("");
+  document.querySelectorAll("#ask-results button").forEach((b) => b.addEventListener("click", () => showCard(b.dataset.kind, b.dataset.id)));
+  if (v.results.length === 1) showCard(v.results[0].kind, v.results[0].id);
+}
+
 const views = {
+  async ask() { $("#ask-q").focus(); },
+
   async today() {
     const [hours, cal] = await Promise.all([get("/api/hours"), get("/api/calendar?days=14")]);
     $("#hours").innerHTML = `<p class="sub">${esc(hours.date)}</p><ul class="list">` + hours.shops.map((s) =>
@@ -113,6 +163,7 @@ async function start() {
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
   let timer;
   $("#cart-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchCart, 250); });
+  $("#ask-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchAsk, 200); });
   show("today");
 }
 
