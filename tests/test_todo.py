@@ -1,5 +1,6 @@
 """The To-do list: its next-morning checks and the day log."""
 
+from pathlib import Path
 from types import SimpleNamespace as NS
 
 from valley_planner.engine.todo import DayLog, Task, check, data_root
@@ -42,5 +43,5 @@ def test_day_log(tmp_path):
     log.store(60, "Fall 4", [Task("pet", "Pet them")])  # regenerating keeps the ticks
     assert log.load(60)["ticks"] == {"pet": True}
     assert log.earlier(61) == 60 and log.earlier(60) is None
-    assert str(data_root({"VALLEY_PLANNER_DATA": "/x"})) == "/x"
-    assert "ValleyPlanner" in str(data_root({"LOCALAPPDATA": "C:/L"}, "win32"))
+    assert data_root({"VALLEY_PLANNER_DATA": "/x"}) == Path("/x")
+    assert data_root({"LOCALAPPDATA": "C:/L"}, "win32") == Path("C:/L") / "ValleyPlanner" / "days"
