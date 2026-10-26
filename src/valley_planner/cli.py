@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import socket
 import sys
 import threading
 import webbrowser
@@ -10,6 +11,18 @@ import webbrowser
 from .discover import find_game, find_saves_root, list_saves
 
 DEFAULT_PORT = 8765
+
+
+def free_port(preferred: int, tries: int = 20) -> int | None:
+    """The preferred port if nothing is listening on it, else the next free one."""
+    for port in range(preferred, preferred + tries):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,11 +55,27 @@ def main(argv: list[str] | None = None) -> int:
 
     from .app import create_app
 
-    url = f"http://127.0.0.1:{args.port}/"
-    print(f"Valley Planner is running at {url} (Ctrl+C to stop)")
-    if not args.no_browser:
-        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
-    uvicorn.run(create_app(), host="127.0.0.1", port=args.port, log_level="warning")
+    port = free_port(args.port)
+    if port is None:
+        print(f"Ports {args.port}-{args.port + 19} are all in use; pick another with --port")
+        return 1
+    if port != args.port:
+        print(f"Port {args.port} is in use by something else, so using {port}")
+    url = f"http://127.0.0.1:{port}/"
+    config = uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+
+    def open_when_ready() -> None:
+        for _ in range(100):
+            if server.started:
+                print(f"Valley Planner is running at {url} (Ctrl+C to stop)")
+                if not args.no_browser:
+                    webbrowser.open(url)
+                return
+            threading.Event().wait(0.1)
+
+    threading.Thread(target=open_when_ready, daemon=True).start()
+    server.run()
     return 0
 
 
