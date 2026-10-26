@@ -121,7 +121,21 @@ class Unlocks:
             how = f"{parts[2]} hearts with {parts[1]} (a letter)"
         elif parts[:1] == ["default"]:
             known = True
+        bought = self._recipe_shop(raw.split("/")[2].split()[0] if raw and len(raw.split("/")) > 2 else "")
+        if bought and not known:
+            shop, price = bought
+            return Unlock(key, f"the {name} recipe", price, how=f"buy it from {shop}", done=False)
         return Unlock(key, f"the {name} recipe", how=how, done=known)
+
+    def _recipe_shop(self, output_id: str) -> tuple[str, int] | None:
+        """A shop entry that sells this recipe: (shop, price)."""
+        from ..facts.sources import _shop_label
+        for sid, shop in self.data.asset("Data/Shops").items():
+            for e in shop.get("Items") or []:
+                if e.get("IsRecipe") and (e.get("ItemId") or "").removeprefix("(O)") == output_id \
+                        and not e.get("Condition"):
+                    return _shop_label(sid), int(e.get("Price") or 0)
+        return None
 
     def _tool_level(self, tool: str) -> int:
         return self.save.axe_level if tool == "Axe" else 0

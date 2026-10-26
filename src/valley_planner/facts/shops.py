@@ -37,6 +37,7 @@ class Offer:
     condition: str
     available: bool | None  # on the given day: True / False / None (can't tell)
     out_of_season: bool  # via Pierre's Missing Stock List (at 1.5x)
+    recipe: bool = False  # the entry sells the recipe for this item, not the item
 
 
 def _modify(value: float, modifiers, mode: str | None, when: When) -> float:
@@ -86,7 +87,8 @@ class Shops:
                     shop=shop_id, item=qid,
                     price=self.price(shop, entry, qid, when, profit_margin=profit_margin, out_of_season=out_of_season),
                     trade_item=entry.get("TradeItemId"), trade_amount=int(entry.get("TradeItemAmount") or 1),
-                    condition=cond, available=available, out_of_season=out_of_season))
+                    condition=cond, available=available, out_of_season=out_of_season,
+                    recipe=bool(entry.get("IsRecipe"))))
         return out
 
     def price(self, shop: dict, entry: dict, qid: str, when: When, *, profit_margin: float = 1.0,

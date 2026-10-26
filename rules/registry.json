@@ -12367,6 +12367,22 @@
    "data": [],
    "status": "verified",
    "tests": []
+  },
+  {
+   "id": "shop.recipe-entries",
+   "area": "Economy & shops & selling",
+   "summary": "A shop entry with IsRecipe sells the recipe for the item, not the item: the Saloon's (O)228 at 300g is the Maki Roll recipe. The Saloon's only cooked dish for sale is DISH_OF_THE_DAY, the save's dishOfTheDay (chosen when the day starts), sold at its standard sale price (price x 2) with the stack as the stock.",
+   "checked_against": [
+    "StardewValley.Internal.ItemQueryResolver.DefaultResolvers.DISH_OF_THE_DAY",
+    "StardewValley.Internal.ShopBuilder.GetShopStock"
+   ],
+   "data": [
+    "Data/Shops Saloon"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_engine.py::test_recipe_entries_are_not_the_item"
+   ]
   }
  ]
 }

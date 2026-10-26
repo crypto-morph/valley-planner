@@ -110,7 +110,7 @@ class Sources:
         for sid, shop in shops.items():
             for e in shop.get("Items") or []:
                 qid = (e.get("ItemId") or "").strip()
-                if qid.startswith("(O)") and " " not in qid:
+                if qid.startswith("(O)") and " " not in qid and not e.get("IsRecipe"):  # a recipe isn't the item
                     sold.setdefault(qid[3:], []).append((sid, e))
         for oid, entries in sold.items():
             for sid, e in entries:

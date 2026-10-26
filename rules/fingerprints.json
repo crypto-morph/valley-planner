@@ -96,6 +96,7 @@
  "StardewValley.GameStateQuery.CheckConditions": "383a520a9b8173397611cfc1df6142fee2f6ad3899cbfa26f7099274ae884621",
  "StardewValley.GameStateQuery.SYNCED_SUMMER_RAIN_RANDOM": "fe38271711e2397a58b6c5bbb96e0116f6b7709c5b8eda10b64af89cd6384e44",
  "StardewValley.GameStateQuery.YEAR": "5e88da1f8dfbd1c4081dc6d0656b646a61501adb5a3d53536b8e1f33ce1f6c7a",
+ "StardewValley.Internal.ItemQueryResolver.DefaultResolvers.DISH_OF_THE_DAY": "bd45612fd889e40d3d8d8def1acc1c6b0ff7b15ddf0b821ac6e31626c1a28da0",
  "StardewValley.Internal.ItemQueryResolver.DefaultResolvers.RANDOM_ITEMS": "0704094d442bb64a5947e814be62bb1f4f87dcabbb875bd6799cb19b958d844c",
  "StardewValley.Internal.ItemQueryResolver.TOOL_UPGRADES": "4b94db73f1906ce5feb9614405922d91c51f46cd98b2608fdf0b0d76b57d0909",
  "StardewValley.Internal.ItemQueryResolver.TryResolve": "7221d59b53d861d1f4b177b3c6814cad605a63ebb0c2743343520b459f28e723",

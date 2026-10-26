@@ -53,7 +53,7 @@ def countdown(farm: Farm) -> dict:
     held = farm.held()
     offers: dict[str, list] = defaultdict(list)
     for o in farm.shops.offers(w, profit_margin=s.profit_margin):
-        if o.shop in REGULAR_SEED_SHOPS and o.available is not False and o.price \
+        if o.shop in REGULAR_SEED_SHOPS and o.available is not False and o.price and not o.recipe \
                 and location_accessible(SHOP_PLACE.get(o.shop, ""), w):
             offers[o.item].append(o)
     ferts = []

@@ -75,3 +75,23 @@ def test_income_helpers():
     run = _cumulative([crops], 50, 10, 20)
     assert run[0] == {"day": 10, "gold": 150} and run[-1] == {"day": 20, "gold": 350}
     assert afford_day(run, 300) == 17 and afford_day(run, 1000) is None
+
+
+def test_recipe_entries_are_not_the_item():
+    from valley_planner.facts.sources import Sources
+
+    class Data:
+        tables = {"Data/Shops": {"Saloon": {"Items": [{"ItemId": "(O)228", "IsRecipe": True, "Price": 300},
+                                                      {"ItemId": "(O)346", "Price": -1}]}},
+                  "Data/Objects": {"228": {"Name": "Maki Roll", "Price": 220, "Category": -7, "Type": "Cooking"},
+                                   "346": {"Name": "Beer", "Price": 200, "Category": -26, "Type": "Basic"}}}
+
+        def asset(self, name):
+            return self.tables.get(name, {})
+
+        def text(self, v):
+            return v
+
+    s = Sources(Data())
+    assert [x.label for x in s.of("228", cart=False)] == []  # the Saloon sells the Maki Roll recipe, not the dish
+    assert [x.label for x in s.of("346", cart=False)] == ["the Saloon"]

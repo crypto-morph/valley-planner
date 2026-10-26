@@ -209,6 +209,9 @@ class Planner:
                 item = ing.item or f"category {ing.category}"
                 name = f.name(ing.item) if ing.item else f"any {item}"
                 ways = [] if have or not ing.item else [self.way(s, ing.item) for s in self.sources.of(ing.item)]
+                dish = f.save.dish_of_the_day
+                if not have and dish and ing.item == dish[0] and dish[1] >= ing.stack:
+                    ways.insert(0, Way(Source("shop", "today's dish at the Saloon"), self.today, self.today))
                 slot = Slot(b.display, b.room, item, name, ing.stack, ing.quality, have, ways)
                 slot.best = _best(ways)
                 cands.append(slot)

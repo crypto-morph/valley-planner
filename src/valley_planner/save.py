@@ -202,6 +202,7 @@ class Save:
     qi_orders_board: list[dict] = field(default_factory=list)
     cart_guarantee: int = -1  # Traveling Cart visits until the Year-1 Red Cabbage Seeds (-1 off/used)
     shipped: dict[str, int] = field(default_factory=dict)  # basicShipped: id -> count
+    dish_of_the_day: tuple[str, int] | None = None  # the Saloon's dish today: (qualified id, how many)
     profit_margin: float = 1.0  # the farm's profit-margin setting (player difficultyModifier)
     farm_type: int = 0  # whichFarm: 0 Standard, 1 Riverland, 2 Forest, 3 Hilltop, 4 Wilderness, 5 Four Corners, 6 Beach
 
@@ -321,6 +322,15 @@ def _tool_level(player: ET.Element, xtype: str, root: ET.Element) -> int:
     if not _nil(upgrading) and _type(upgrading) == xtype:
         level = max(level, _int(upgrading, "upgradeLevel") - 1)
     return level
+
+
+def _dish(root: ET.Element) -> tuple[str, int] | None:
+    """The Saloon's dish of the day, chosen when the day began."""
+    el = _child(root, "dishOfTheDay")
+    if _nil(el) or el is None:
+        return None
+    item = (_text(el, "itemId") or _text(el, "parentSheetIndex")).removeprefix("(O)")
+    return (f"(O){item}", _int(el, "stack", 1)) if item else None
 
 
 def _upgrading(player: ET.Element) -> str:
@@ -568,6 +578,7 @@ def read_save(path: Path, data=None) -> Save:
         qi_orders_board=[o for o in board if o["type"] == "QiChallenge"],
         cart_guarantee=_int(root, "visitsUntilY1Guarantee", -1),
         shipped={_flat(k).removeprefix("(O)"): int(_flat(v) or 0) for k, v in _dict(_child(player, "basicShipped"))},
+        dish_of_the_day=_dish(root),
         profit_margin=float(_text(player, "difficultyModifier", "1") or 1),
         farm_type=_int(root, "whichFarm"),
     )

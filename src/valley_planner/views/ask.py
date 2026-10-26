@@ -7,7 +7,7 @@ from ..facts.help_wanted import raw_pool
 from ..facts.machines import Input
 from ..facts.schedules import Situation, time_label
 from ..facts.sell import sell_price
-from ..facts.sources import _shop_label
+from ..facts.sources import FESTIVAL_DAYS, _shop_label
 from .farm import Farm, date_label
 
 MAX_RESULTS = 8
@@ -51,12 +51,27 @@ def item(farm: Farm, qid: str) -> dict:
                                                           info.type, profit_margin=s.profit_margin)}
                      for q, word in QUALITIES] if info.price else []
 
-    today, other = [], []
+    today, other, recipes = [], [], []
     for o in farm.shops.offers(w, profit_margin=s.profit_margin, item=qid):
+        if o.recipe:
+            recipes.append({"shop": _shop_label(o.shop), "price": o.price, "when": o.condition,
+                            "known": info.name in s.cooking_recipes or info.name in s.crafting_recipes})
+            continue
+        fest = next((v for k, v in FESTIVAL_DAYS.items() if k in o.shop), None)
+        if fest:  # festival stalls only open on the festival's days
+            on = fest[0] == w.season and fest[1] <= w.day <= fest[2]
+            other_when = f"{fest[0].capitalize()} {fest[1]}" + (f"-{fest[2]}" if fest[2] != fest[1] else "")
+            row = {"shop": _shop_label(o.shop), "price": o.price, "trade": farm.name(o.trade_item) if o.trade_item
+                   else "", "trade_amount": o.trade_amount, "sure": True}
+            (today if on else other).append({**row, "when": other_when})
+            continue
         row = {"shop": _shop_label(o.shop), "price": o.price, "trade": farm.name(o.trade_item) if o.trade_item else "",
                "trade_amount": o.trade_amount, "sure": o.available is True}
         (today if o.available is not False else other).append({**row, "when": o.condition})
-    card["shops_today"], card["shops_other"] = today, other[:6]
+    if s.dish_of_the_day and s.dish_of_the_day[0] == qid:
+        today.insert(0, {"shop": "the Saloon (today's dish)", "price": _dish_price(farm, oid), "trade": "",
+                         "trade_amount": 0, "sure": True, "when": f"{s.dish_of_the_day[1]} left this morning"})
+    card["shops_today"], card["shops_other"], card["recipes"] = today, other[:6], recipes
     card["cart"] = [{"date": d.label, "price": i.price, "sure": i.sure}
                     for d in farm.cart.days(w, count_days=CART_DAYS, guarantee=s.cart_guarantee)
                     for i in d.items if i.item == qid][:5]
@@ -95,6 +110,11 @@ def item(farm: Farm, qid: str) -> dict:
                                           vault="ccVault" in s.mail, crafting=set(s.crafting_recipes))
     card["museum"] = info.type in ("Arch", "Minerals") and ("donated" if oid in s.museum else "not donated")
     return card
+
+
+def _dish_price(farm: Farm, oid: str) -> int:
+    """The Saloon's dish of the day has no price of its own, so it sells at the dish's standard sale price."""
+    return farm.items.sale_price(oid, year=farm.save.year, ignore_profit_margin=True)
 
 
 def _fish(farm: Farm, fish) -> dict:
