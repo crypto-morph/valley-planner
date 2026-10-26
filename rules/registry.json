@@ -7549,6 +7549,9 @@
    "status": "verified",
    "refs": [
     "StardewValley.Network.LocationWeather.IsGreenRain"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
    ]
   },
   {
@@ -7580,8 +7583,10 @@
    "data": [
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel) (Farm_Beach, Farm_Forest, Farm_FourCorners, Farm_Hilltop, Farm_Riverland, Farm_Wilderness, Farm_MeadowlandsFarm)"
    ],
-   "status": "to fix",
-   "fix": "Treat Farm_<Type> spots as available when the save's farm type matches. For example, Woodskip bites on the Forest Farm, and a Riverland farm inherits Town river fish."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_fish_inheritance_and_farm_type"
+   ]
   },
   {
    "id": "fish.island-excluded",
@@ -7646,7 +7651,10 @@
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
    "status": "verified",
-   "derive_from": "Data/Locations Fish[].Season / Condition LOCATION_SEASON -> GameLocation.GetFishFromLocationData"
+   "derive_from": "Data/Locations Fish[].Season / Condition LOCATION_SEASON -> GameLocation.GetFishFromLocationData",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.legendary-excluded",
@@ -7716,9 +7724,11 @@
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)",
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "to fix",
-   "fix": "Pufferfish is also year-round on Ginger Island (IslandSouth, IslandSouthEast, IslandSouthEastCave, IslandWest ocean).",
-   "derive_from": "Data/Locations Fish[].Season/Condition + Data/Fish fields 5,7 -> GameLocation.GetFishFromLocationData / CheckGenericFishRequirements"
+   "status": "verified",
+   "derive_from": "Data/Locations Fish[].Season/Condition + Data/Fish fields 5,7 -> GameLocation.GetFishFromLocationData / CheckGenericFishRequirements",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.weather-filter",
@@ -7730,7 +7740,10 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "fish.task-priority",
@@ -7781,11 +7794,13 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "to fix",
-   "fix": "Don't treat field 6 as a catch rule. Season availability is Data/Locations Fish[].Season or a LOCATION_SEASON condition, per location.",
+   "status": "verified",
    "derive_from": "Data/Fish -> GameLocation.CheckGenericFishRequirements (fields 1,5,7,9-13); seasons from Data/Locations",
    "refs": [
     "StardewValley.ItemContextTagManager"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
    ]
   },
   {
@@ -7798,9 +7813,11 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "to fix",
-   "fix": "The fallback is harmless for vanilla data, but the game's own behaviour for a blank span is 'never' (except with Magic Bait).",
-   "derive_from": "Data/Fish field 5 -> GameLocation.CheckGenericFishRequirements"
+   "status": "verified",
+   "derive_from": "Data/Fish field 5 -> GameLocation.CheckGenericFishRequirements",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "fish.time-first-pair-only",
@@ -7812,9 +7829,11 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "to fix",
-   "fix": "Parse all pairs in field 5. A fish bites if start <= time < end for any pair.",
-   "derive_from": "Data/Fish field 5 (all pairs) -> GameLocation.CheckGenericFishRequirements"
+   "status": "verified",
+   "derive_from": "Data/Fish field 5 (all pairs) -> GameLocation.CheckGenericFishRequirements",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "fish.trap-crab-pot",
@@ -7829,7 +7848,10 @@
     "Data/Locations[*].FishAreas[*].CrabPotFishTypes / CrabPotJunkChance"
    ],
    "status": "verified",
-   "derive_from": "Data/Fish 'trap' rows fields 2,4 + Data/Locations FishAreas CrabPotFishTypes -> CrabPot.DayUpdate / GameLocation.GetCrabPotFishForTile"
+   "derive_from": "Data/Fish 'trap' rows fields 2,4 + Data/Locations FishAreas CrabPotFishTypes -> CrabPot.DayUpdate / GameLocation.GetCrabPotFishForTile",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "fish.location-season-limit",
@@ -7842,9 +7864,11 @@
    "data": [
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "to fix",
-   "fix": "Season set = Season field, or LOCATION_SEASON values, or all four if neither; no Data/Fish intersection. Honour IgnoreFishDataRequirements (skip time and weather) per spawn.",
-   "derive_from": "Data/Locations Fish[].Season / Condition -> GameLocation.GetFishFromLocationData"
+   "status": "verified",
+   "derive_from": "Data/Locations Fish[].Season / Condition -> GameLocation.GetFishFromLocationData",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.island-always-summer",
@@ -7858,8 +7882,10 @@
     "Data/LocationContexts[Default].WeatherConditions; Data/LocationContexts[Island/Desert].SeasonOverride",
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "to fix",
-   "fix": "Island spots are available all year regardless of Data/Fish seasons."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.mines-code-spawn",
@@ -7872,7 +7898,10 @@
    "data": [
     "Data/Locations[UndergroundMine].Fish (fallback: Ghostfish, algae, Cave Jelly)"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.submarine-winter",
@@ -7911,9 +7940,11 @@
    "data": [
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "to fix",
-   "fix": "Ignore the Id field. Expand LOCATION_FISH <Location> into that location's spawns, or skip it knowingly.",
-   "derive_from": "Data/Locations Fish[].ItemId / RandomItemId -> ItemQueryResolver.TryResolveRandomItem"
+   "status": "verified",
+   "derive_from": "Data/Locations Fish[].ItemId / RandomItemId -> ItemQueryResolver.TryResolveRandomItem",
+   "tests": [
+    "tests/test_facts.py::test_fish_inheritance_and_farm_type"
+   ]
   },
   {
    "id": "fish.skip-pseudo-locations",
@@ -7925,7 +7956,10 @@
    "data": [
     "Data/Locations[*].Fish (ItemId/RandomItemId, Season, Condition LOCATION_SEASON, FishAreaId, IgnoreFishDataRequirements, RequireMagicBait, CatchLimit, MinFishingLevel)"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.legendary-list",
@@ -7956,9 +7990,11 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "to fix",
-   "fix": "Drop the dependence on Data/Fish seasons (see fish.location-season-limit).",
-   "derive_from": "(not consumed for catching) Data/Locations Fish[].Season"
+   "status": "verified",
+   "derive_from": "(not consumed for catching) Data/Locations Fish[].Season",
+   "tests": [
+    "tests/test_facts.py::test_fish_seasons_come_from_the_location"
+   ]
   },
   {
    "id": "fish.location-labels",
@@ -8022,6 +8058,9 @@
    "derive_from": "Data/Fish field 7 -> GameLocation.CheckGenericFishRequirements",
    "refs": [
     "StardewValley.Network.LocationWeather.IsGreenRain"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
    ]
   },
   {
@@ -8094,9 +8133,11 @@
    "data": [
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
-   "status": "to fix",
-   "fix": "Harmless fallback; the game's own blank-span behaviour is 'never'.",
-   "derive_from": "Data/Fish field 5 -> GameLocation.CheckGenericFishRequirements"
+   "status": "verified",
+   "derive_from": "Data/Fish field 5 -> GameLocation.CheckGenericFishRequirements",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "fish.legendary-skip",
@@ -8130,7 +8171,10 @@
     "Data/Fish (fields: 1 difficulty, 5 time spans, 6 seasons, 7 weather, 12 min level; 'trap' rows: 2 chance, 4 water type)"
    ],
    "status": "verified",
-   "derive_from": "Data/Fish field 7 -> GameLocation.CheckGenericFishRequirements"
+   "derive_from": "Data/Fish field 7 -> GameLocation.CheckGenericFishRequirements",
+   "tests": [
+    "tests/test_facts.py::test_fish_times_weather_and_traps"
+   ]
   },
   {
    "id": "wplay.shad",

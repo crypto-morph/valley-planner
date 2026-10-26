@@ -111,3 +111,58 @@ def test_season_change_survival():
     corn = CropInfo("487", "270", ("summer", "fall"), (2, 3, 3, 3, 3), 4, False, False, True, 1, 1, 0, 0, 0, 4)
     assert fiber.survives_into("spring") and fiber.survives_into("winter")  # lists all four: never dies of it
     assert corn.survives_into("fall") and not corn.survives_into("winter")
+
+
+def fish_data():
+    return Data(**{
+        "Data/Fish": {"143": "Catfish/75/mixed/12/72/600 2400/spring fall/rainy/x/4/.4/.1/0/false",
+                      "148": "Eel/70/smooth/12/80/1600 2600/spring fall/rainy/x/4/.3/.1/0/false",
+                      "700": "Albacore/60/mixed/20/40/600 1100 1800 2600/fall winter/both/x/3/.3/.4/0/false",
+                      "715": "Lobster/trap/.05/x/ocean/2/20/false"},
+        "Data/Locations": {
+            "Town": {"Fish": [{"ItemId": "(O)143", "Season": "Spring"}, {"ItemId": "(O)143", "Season": "Fall"}]},
+            "Woods": {"Fish": [{"ItemId": "(O)143"}]},  # no season: all year, whatever Data/Fish says
+            "Beach": {"Fish": [{"ItemId": "(O)700", "Condition": "LOCATION_SEASON Here fall winter"},
+                               {"Id": "Eel_Area", "ItemId": "(O)148", "CanBeInherited": False}]},
+            "Farm_Beach": {"Fish": [{"ItemId": "LOCATION_FISH Beach BOBBER_X BOBBER_Y WATER_DEPTH"}]},
+            "Default": {"Fish": [{"ItemId": "(O)143"}]},
+        }})
+
+
+def test_fish_seasons_come_from_the_location():
+    from valley_planner.facts.fish import Fish
+
+    fish = Fish(fish_data())
+    catfish = fish.by_name("Catfish")
+    summer = [s.location for s in fish.open_spots(catfish, When("summer", 1, 1, 1))]
+    assert summer == ["Woods"]  # the river only lists spring and fall; the Woods entry has no season
+    albacore = fish.by_name("Albacore")
+    assert [s.location for s in fish.open_spots(albacore, When("fall", 1, 1, 1))] == ["Beach"]
+    assert fish.open_spots(albacore, When("spring", 1, 1, 1)) == []  # LOCATION_SEASON
+
+
+def test_fish_inheritance_and_farm_type():
+    from valley_planner.facts.fish import Fish
+
+    beach_farm = Fish(fish_data(), farm_type=6)
+    assert "Farm" in [s.location for s in beach_farm.by_name("Albacore").spots]  # borrowed from the Beach
+    assert "Farm" not in [s.location for s in beach_farm.by_name("Eel").spots]  # not inheritable
+    standard = Fish(fish_data(), farm_type=0)
+    assert "Farm" not in [s.location for s in standard.by_name("Albacore").spots]  # other farm types' ponds don't count
+
+
+def test_fish_times_weather_and_traps():
+    from valley_planner.facts.fish import Fish
+
+    fish = Fish(fish_data())
+    albacore = fish.by_name("Albacore")
+    spot = albacore.spots[0]
+    assert albacore.bites(spot, season="fall", time=1900, wet=False) is True  # the second window
+    assert albacore.bites(spot, season="fall", time=1200, wet=False) is False
+    assert albacore.bites(spot, season="fall", time=1100, wet=False) is False  # end is exclusive
+    catfish = fish.by_name("Catfish")
+    woods = next(s for s in catfish.spots if s.location == "Woods")
+    assert catfish.bites(woods, season="winter", time=1000, wet=False) is False  # rainy fish: snow is dry
+    assert catfish.bites(woods, season="winter", time=1000, wet=True) is True
+    lobster = fish.by_name("Lobster")
+    assert lobster.trap and lobster.water == "ocean" and lobster.spots == []

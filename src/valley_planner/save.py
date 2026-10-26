@@ -192,6 +192,7 @@ class Save:
     cart_guarantee: int = -1  # Traveling Cart visits until the Year-1 Red Cabbage Seeds (-1 off/used)
     shipped: dict[str, int] = field(default_factory=dict)  # basicShipped: id -> count
     profit_margin: float = 1.0  # the farm's profit-margin setting (player difficultyModifier)
+    farm_type: int = 0  # whichFarm: 0 Standard, 1 Riverland, 2 Forest, 3 Hilltop, 4 Wilderness, 5 Four Corners, 6 Beach
 
     # --- questions everything else asks --------------------------------------------
 
@@ -539,6 +540,7 @@ def read_save(path: Path, data=None) -> Save:
         cart_guarantee=_int(root, "visitsUntilY1Guarantee", -1),
         shipped={_flat(k).removeprefix("(O)"): int(_flat(v) or 0) for k, v in _dict(_child(player, "basicShipped"))},
         profit_margin=float(_text(player, "difficultyModifier", "1") or 1),
+        farm_type=_int(root, "whichFarm"),
     )
 
 
