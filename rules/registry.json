@@ -592,7 +592,10 @@
     "StardewValley.GameLocation.lockedDoorWarp"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_pierre_wednesdays_and_festivals"
+   ]
   },
   {
    "id": "qos.episode-formula",
@@ -7431,7 +7434,7 @@
   {
    "id": "shop.fish-shop-hours",
    "area": "Economy & shops & selling",
-   "summary": "The door is open 9:00-17:00, or from 8:00 once the 'willyHours' mail is received. Willy has to be in the shop; there is no fallback owner.",
+   "summary": "The door is open 9:00-17:00, or from 8:00 once the 'willyHours' mail is received. Willy has to be behind his counter; there is no fallback owner. On dry Saturdays he leaves at 6:10 to fish in the Forest and Town, so the shop can't be used; on rain days his schedule is his winter one.",
    "checked_against": [
     "StardewValley.GameLocation.HandleBuyAction",
     "StardewValley.GameLocation.lockedDoorWarp",
@@ -7442,8 +7445,11 @@
     "Characters/schedules/Willy (Sat, rain, spring_9, winter)",
     "Maps/Beach LockedDoorWarp 'FishShop 900 1700'"
    ],
-   "status": "to fix",
-   "fix": "Willy has a closed weekday. On Saturdays that are not raining he leaves at 6:10 to fish in the Forest and Town, so the shop cannot be used. Rain uses his winter schedule, so he is at the counter. He is also away on Spring 9 (clinic, from 10:10). On other days he keeps the counter until about 17:00."
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_real_week_of_shops",
+    "tests/test_hours.py::test_willy_letter_and_away_days"
+   ]
   },
   {
    "id": "shop.carpenter-hours",
@@ -7491,7 +7497,11 @@
     "Data/Shops SeedShop Owners (Closed / Pierre)",
     "Maps/Town LockedDoorWarp 'SeedShop 900 2100'"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_door_and_keeper_overlap",
+    "tests/test_hours.py::test_real_week_of_shops"
+   ]
   },
   {
    "id": "shop.museum-hours",
@@ -7514,7 +7524,10 @@
     "StardewValley.Utility.HasAnyPlayerSeenEvent"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_pierre_wednesdays_and_festivals"
+   ]
   },
   {
    "id": "cart.night-market",
@@ -12155,6 +12168,46 @@
    "tests": [
     "tests/test_calendar.py::test_seeded_days_come_from_the_lists",
     "tests/test_calendar.py::test_seen_in_a_real_game"
+   ]
+  },
+  {
+   "id": "shop.doors-from-maps",
+   "area": "Economy & shops & selling",
+   "summary": "Shop door hours are tile actions on the outdoor maps ('LockedDoorWarp <x> <y> <building> <open> <close> [<villager> <friendship points>]'): you can enter from <open> until before <close>. A friendship door (Leah, Elliott, Maru's room: 500 points) ignores the friendship rule in winter. The town key opens valley doors at any hour (not Night Market ones other than the Fish Shop), and in Year 1 green rain leaves doors unlocked except on the Beach and Forest maps and the Adventurer's Guild.",
+   "checked_against": [
+    "StardewValley.GameLocation.lockedDoorWarp"
+   ],
+   "data": [
+    "Maps/Town, Mountain, Forest, Beach, Desert tile property Action LockedDoorWarp"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_door_and_keeper_overlap",
+    "tests/test_hours.py::test_pierre_wednesdays_and_festivals",
+    "tests/test_hours.py::test_real_week_of_shops",
+    "tests/test_tbin.py::test_reads_tile_properties_through_every_tile_kind"
+   ]
+  },
+  {
+   "id": "shop.keeper-at-counter",
+   "area": "Economy & shops & selling",
+   "summary": "Most shops need their keeper in place: Pierre on tile (4,17); Gus anywhere in x 9-18, y 17-18 of the Saloon; Robin within 3 tiles of (8,19); Marnie on (11-13,14) unless the Animal Catalogue has been read; Willy at y <= 5 in the Fish Shop; any villager at the clinic desk (x 4-7, y 15); Clint anywhere in the Blacksmith; Sandy anywhere in the Oasis. Marlon's shop and JojaMart need no one. Where keepers stand comes from their schedules.",
+   "checked_against": [
+    "StardewValley.GameLocation.HandleBuyAction",
+    "StardewValley.GameLocation.saloon",
+    "StardewValley.GameLocation.carpenters",
+    "StardewValley.GameLocation.animalShop",
+    "StardewValley.GameLocation.blacksmith",
+    "StardewValley.Utility.TryOpenShopMenu/2"
+   ],
+   "data": [
+    "Data/Shops Owners",
+    "Maps/SeedShop, Saloon, ScienceHouse, AnimalShop, Blacksmith, FishShop, Hospital shop tile actions"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_hours.py::test_anyone_at_the_clinic_desk_and_joja",
+    "tests/test_hours.py::test_real_week_of_shops"
    ]
   }
  ]

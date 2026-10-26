@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .lzx import decompress_xnb
 from .schema import Schema, TypeSig
+from .tbin import read_tbin
 
 XNA = "Microsoft.Xna.Framework."
 STRUCTS = {  # XNA structs: their fields, all int32 unless noted
@@ -138,6 +139,8 @@ class XnbReader:
         name = reader.name.rsplit(".", 1)[-1]
         if name == "StringReader":
             return s.string()
+        if name == "TideReader":  # a map: its tBIN bytes, kept as properties (see tbin.py)
+            return read_tbin(s.take(s.unpack("<i", 4))).as_dict()
         if name.startswith(("ListReader", "ArrayReader")):
             return self.list(s, reader.args[0])
         if name.startswith("DictionaryReader"):

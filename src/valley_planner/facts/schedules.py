@@ -51,6 +51,7 @@ class DaySchedule:
     key: str | None  # the schedule key chosen (None: no schedule — they stay home)
     stops: tuple[Stop, ...]
     chance: float = 1.0  # rain days: rain2 and rain are a 50/50 the save can't predict
+    start: Stop | None = None  # a "0 <location> x y" entry: where they begin the day (else their home)
 
 
 def time_label(t: int) -> str:
@@ -152,7 +153,12 @@ class Schedules:
             break
         if not found:
             return [DaySchedule(None, ())]
-        return [DaySchedule(k, self.parse(npc, k, s), p) for k, p in found]
+        out = []
+        for k, p in found:
+            stops = self.parse(npc, k, s)
+            start = next((st for st in stops if st.time == 0), None)
+            out.append(DaySchedule(k, tuple(st for st in stops if st.time != 0), p, start))
+        return out
 
     def parse(self, npc: str, key: str, s: Situation, _visited: tuple[str, ...] = ()) -> tuple[Stop, ...]:
         raw = self.raw(npc)
@@ -232,9 +238,8 @@ class Schedules:
                     return self.parse(npc, fallback, s, visited)
                 if swap:
                     where, x, y, facing = swap
-            if time == 0:  # sets where they start the day
+            if time == 0:  # sets where they start the day (today() splits it out)
                 loc = where
-                continue
             stops.append(Stop(time, arrive, where, x, y, facing, behavior))
             loc = where
         return tuple(stops)
