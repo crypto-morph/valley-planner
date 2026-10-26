@@ -16,6 +16,7 @@ from ..facts.gifts import Gifts
 from ..facts.hours import Hours
 from ..facts.items import Items
 from ..facts.machines import Machines
+from ..facts.places import Places
 from ..facts.schedules import Schedules
 from ..facts.sell import Farmer
 from ..facts.shops import Shops
@@ -105,6 +106,14 @@ class Farm:
         except Exception:  # noqa: BLE001 — a damaged _old file just means no comparison
             return None
         return prev if prev.days_played == self.save.days_played - 1 else None
+
+    @cached_property
+    def places(self) -> Places:
+        return Places(self.data, self.save.farm)
+
+    def place(self, location: str) -> str:
+        """A readable place name ("AnimalShop" -> "Marnie's Ranch")."""
+        return self.places.name(location)
 
     def name(self, qid: str) -> str:
         info = self.items.get(qid.removeprefix("(O)"))

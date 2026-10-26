@@ -208,6 +208,8 @@ async function searchCart() {
 }
 
 async function show(name) {
+  closeAsk();  // a tab button puts the search away, so the page you chose is what you see
+  window.scrollTo(0, 0);
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   document.querySelectorAll(".view").forEach((s) => (s.hidden = s.id !== `view-${name}`));
   try {

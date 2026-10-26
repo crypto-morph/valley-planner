@@ -21,6 +21,7 @@ from collections import defaultdict
 from ..facts.conditions import SEASONS, location_accessible
 from ..facts.crops import AGRICULTURIST, SPEED_GRO, speed_boost
 from ..facts.sell import sell_price
+from ..facts.sources import _shop_label
 from .farm import REGULAR_SEED_SHOPS, Farm, date_label
 
 SOON = 3  # days: "plant by …" turns urgent
@@ -115,7 +116,7 @@ def countdown(farm: Farm) -> dict:
         rows.append({"crop": farm.name(f"(O){c.harvest}"), "seed": farm.name(qid), "seed_id": qid, "grow": base,
                      "regrow": c.regrow or None, "carries": bool(end and end > 28), "status": status, "text": text,
                      "warn": warn, "harvests": harvests, "income": income, "sell_each": each, "held_seeds": have,
-                     "seed_price": seed_price, "where": sold[0].shop if sold else "",
+                     "seed_price": seed_price, "where": _shop_label(sold[0].shop) if sold else "",
                      "options": [o for o in options if status in ("fertilizer", "too_late") or not o["ok_today"]]})
     order = {"today": 0, "soon": 1, "fertilizer": 2, "ok": 3, "too_late": 4}
     rows.sort(key=lambda r: (order[r["status"]], r["crop"]))
@@ -167,7 +168,7 @@ def mine(farm: Farm) -> dict:
             missed[name] += 1
         thirsty = status in ("growing", "dies") and not c.watered and not (wet and rained_on)
         key = (name, c.location, status, ripens if status != "ready" else w.day)
-        g = groups.setdefault(key, {"crop": name, "location": c.location, "status": status, "count": 0,
+        g = groups.setdefault(key, {"crop": name, "location": farm.place(c.location), "status": status, "count": 0,
                                     "ripens": date_label(*_season_day(w.season, ripens))
                                     if status in ("growing", "dies") else "",
                                     "in_days": c.days_left, "thirsty": 0, "missed": 0, "fertilizer": set()})

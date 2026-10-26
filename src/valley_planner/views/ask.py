@@ -7,6 +7,7 @@ from ..facts.help_wanted import raw_pool
 from ..facts.machines import Input
 from ..facts.schedules import Situation, time_label
 from ..facts.sell import sell_price
+from ..facts.sources import _shop_label
 from .farm import Farm, date_label
 
 MAX_RESULTS = 8
@@ -52,7 +53,7 @@ def item(farm: Farm, qid: str) -> dict:
 
     today, other = [], []
     for o in farm.shops.offers(w, profit_margin=s.profit_margin, item=qid):
-        row = {"shop": o.shop, "price": o.price, "trade": farm.name(o.trade_item) if o.trade_item else "",
+        row = {"shop": _shop_label(o.shop), "price": o.price, "trade": farm.name(o.trade_item) if o.trade_item else "",
                "trade_amount": o.trade_amount, "sure": o.available is True}
         (today if o.available is not False else other).append({**row, "when": o.condition})
     card["shops_today"], card["shops_other"] = today, other[:6]
@@ -100,7 +101,7 @@ def _fish(farm: Farm, fish) -> dict:
     w = farm.when
     spots = []
     for sp in farm.fish.open_spots(fish, w, include_conditional=True):
-        where = sp.location + (f" (floor {sp.floor})" if sp.floor else "") + (f", {sp.area}" if sp.area else "")
+        where = farm.place(sp.location) + (f" (floor {sp.floor})" if sp.floor else "")
         spots.append(where)
     other = sorted({s for sp in fish.spots for s in sp.seasons} - {w.season})
     return {"trap": fish.trap, "water": fish.water,
@@ -128,7 +129,8 @@ def villager(farm: Farm, name: str) -> dict:
     days = farm.schedules.today(name, Situation(w, hearts=card["hearts"], raining=s.wet,
                                                 married=bool(f and f.status == "Married")))
     card["today"] = [{"key": d.key, "chance": d.chance,
-                      "stops": [{"time": time_label(st.time), "place": st.location} for st in d.stops]} for d in days]
+                      "stops": [{"time": time_label(st.time), "place": farm.place(st.location)} for st in d.stops]}
+                     for d in days]
     return card
 
 

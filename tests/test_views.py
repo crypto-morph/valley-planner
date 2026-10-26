@@ -50,3 +50,23 @@ def test_help_wanted_pool_and_holds():
     stacks = [_Stack(SimpleNamespace(quality=2), 3), _Stack(SimpleNamespace(quality=0), 2)]
     assert _take(stacks, 3) == [(0, 2), (2, 1)]  # the lowest quality goes first; the best stays to sell
     assert _take(stacks, 5, min_q=2) == [(2, 2)]
+
+
+def test_place_and_shop_names():
+    from valley_planner.facts.places import Places
+    from valley_planner.facts.sources import _shop_label
+
+    class Data:
+        def asset(self, name):
+            return {"AnimalShop": {"DisplayName": "Marnie's Ranch"}, "Farm_Standard": {"DisplayName": "[Token]"}}
+
+        def text(self, v):
+            return v
+
+    p = Places(Data(), "McClarkies")
+    assert p.name("AnimalShop") == "Marnie's Ranch"
+    assert p.name("Farm") == p.name("Farm_Standard") == "McClarkies Farm"
+    assert p.name("UndergroundMine") == "the Mines" and p.name("SomeNewPlace") == "Some New Place"
+    assert _shop_label("SeedShop") == "Pierre's"
+    assert _shop_label("Festival_EggFestival_Pierre") == "Pierre at the Egg Festival"
+    assert _shop_label("DesertFestival_Jas") == "Jas at the Desert Festival"

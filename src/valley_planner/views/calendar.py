@@ -13,10 +13,15 @@ def days(farm: Farm, count: int = 28) -> dict:
     for w, events in farm.calendar.days(farm.when, count):
         out.append({"date": date_label(w.season, w.day, w.year), "weekday": WEEKDAYS[w.day % 7],
                     "today": w.days_played == farm.when.days_played,
-                    "events": [{"kind": e.kind, "label": e.label, "detail": e.detail, "sure": e.sure,
+                    "events": [{"kind": e.kind, "label": e.label, "detail": _detail(farm, e), "sure": e.sure,
                                 "start": time_label(e.start) if e.start else "",
                                 "end": time_label(e.end) if e.end else ""} for e in events]})
     return {"days": out}
+
+
+def _detail(farm: Farm, e) -> str:
+    """Festival places are location names ("Town"); everything else is already words."""
+    return farm.place(e.detail) if e.kind == "festival" and e.detail else e.detail
 
 
 def shop_hours(farm: Farm, ahead: int = 0) -> dict:

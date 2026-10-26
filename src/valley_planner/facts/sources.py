@@ -27,11 +27,13 @@ Festival stalls take the festival's dates.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from functools import cached_property
 
 from .access import place_open
 from .conditions import SEASONS, When, split
+from .places import Places
 
 FESTIVAL_DAYS = {  # festival shop id part -> (season, first day, last day): the festivals' own dates
     "EggFestival": ("spring", 13, 13), "FlowerDance": ("spring", 24, 24), "Luau": ("summer", 11, 11),
@@ -89,6 +91,7 @@ class Sources:
     def __init__(self, data, *, farm_type: int = 0):
         self.data = data
         self.farm_type = farm_type
+        self.places = Places(data)
 
     def _name(self, oid: str) -> str:
         o = self.data.asset("Data/Objects").get(oid) or {}
@@ -119,7 +122,7 @@ class Sources:
                 fest = next((v for k, v in FESTIVAL_DAYS.items() if k in sid), None)
                 if fest:
                     seasons, days = frozenset({fest[0]}), (fest[1], fest[2])
-                add(oid, Source("shop", sid, seasons, days, condition=rest, needs=needs,
+                add(oid, Source("shop", _shop_label(sid), seasons, days, condition=rest, needs=needs,
                                 cost=max(0, int(e.get("Price") or -1)) if (e.get("Price") or -1) >= 0 else 0,
                                 notes=("festival stall",) if fest else ()))
 
@@ -143,13 +146,14 @@ class Sources:
                     continue
                 seasons, rest = _cond_seasons(e.get("Condition"))
                 seasons = _seasons(e.get("Season")) or seasons
-                add(oid, Source("fish", f"fish at {place}", seasons, condition=rest, needs=(f"place:{place}",)))
+                add(oid, Source("fish", f"fish at {self.places.name(place)}", seasons, condition=rest,
+                                needs=(f"place:{place}",)))
             for e in ldata.get("Forage") or []:
                 oid = _unq(e.get("ItemId"))
                 if not oid:
                     continue
                 seasons, rest = _cond_seasons(e.get("Condition"))
-                add(oid, Source("forage", f"forage at {place}", _seasons(e.get("Season")) or seasons,
+                add(oid, Source("forage", f"forage at {self.places.name(place)}", _seasons(e.get("Season")) or seasons,
                                 condition=rest, needs=(f"place:{place}",), chance=e.get("Chance")))
 
         for tree, t in self.data.asset("Data/FruitTrees").items():
@@ -261,6 +265,25 @@ class Sources:
                 if not ok:
                     missing.append(why or place)
         return not missing, missing
+
+
+SHOP_NAMES = {"SeedShop": "Pierre's", "Joja": "JojaMart", "FishShop": "Willy's Fish Shop", "AnimalShop": "Marnie's",
+              "Blacksmith": "Clint's", "Saloon": "the Saloon", "Sandy": "the Oasis", "Carpenter": "Robin's",
+              "Hospital": "Harvey's Clinic", "AdventureShop": "the Adventurer's Guild", "Traveler": "the cart",
+              "DesertTrade": "the Desert Trader", "Casino": "the Casino", "Dwarf": "the Dwarf", "Krobus": "Krobus",
+              "IceCreamStand": "the ice cream stand", "ShadowShop": "Krobus", "Bookseller": "the bookseller"}
+
+
+def _shop_label(shop_id: str) -> str:
+    """'Festival_EggFestival_Pierre' -> 'Pierre at the Egg Festival'; 'SeedShop' -> "Pierre's"."""
+    if shop_id in SHOP_NAMES:
+        return SHOP_NAMES[shop_id]
+    parts = shop_id.split("_")
+    if parts[0] == "Festival" and len(parts) >= 3:
+        return f"{' '.join(parts[2:])} at the {re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', parts[1])}"
+    if parts[0] == "DesertFestival" and len(parts) >= 2:
+        return f"{' '.join(parts[1:])} at the Desert Festival"
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", shop_id.replace("_", " "))
 
 
 def seasons_text(s: Source) -> str:
