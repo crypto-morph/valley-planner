@@ -20,14 +20,22 @@ If yours are somewhere unusual, set `VALLEY_PLANNER_GAME` (the install folder) o
 
 ## Install
 
-**Windows, the easy way:** download `ValleyPlanner.exe` from the latest release and double-click it.
-It opens the planner in your browser.
+**Windows, the easy way:** download `valley-planner.exe` from the
+[latest release](https://github.com/crypto-morph/valley-planner/releases/latest) and double-click it. A small
+window shows where it's running and the planner opens in your browser; close that window to stop it. Windows
+may warn about an unrecognised app the first time (it isn't signed): choose "More info", then "Run anyway".
+
+It finds Steam installs and your saves on its own. If yours are somewhere else, set `VALLEY_PLANNER_GAME` to
+the game folder or `VALLEY_PLANNER_SAVES` to the Saves folder. `valley-planner --check` shows what it found.
 
 **With Python ([uv](https://docs.astral.sh/uv/)):**
 
 ```bash
 uvx valley-planner
 ```
+
+Your to-do lists are kept in your own data folder (`%LOCALAPPDATA%\ValleyPlanner` on Windows); the game's
+decoded data is cached beside it, per game version. Nothing leaves your computer.
 
 ## Using it while you play
 

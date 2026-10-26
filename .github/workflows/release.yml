@@ -1,0 +1,65 @@
+name: Release
+
+# Push a tag like v0.2.0 to build the Windows .exe and the Python package and attach them to a GitHub release.
+# Publishing to PyPI also needs a trusted publisher set up on pypi.org for this repository and workflow,
+# and the repository variable PYPI_PUBLISH set to "true".
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --group build
+      - run: uv run pytest -q
+      - run: uv run pyinstaller --onefile --name valley-planner --collect-data valley_planner --collect-submodules uvicorn --paths src packaging/run.py
+      - run: dist/valley-planner.exe --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist/valley-planner.exe
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: dist/*
+
+  release:
+    needs: [exe, package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+
+  pypi:
+    needs: [package]
+    if: vars.PYPI_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

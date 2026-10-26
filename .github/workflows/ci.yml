@@ -19,3 +19,17 @@ jobs:
       - run: uv run ruff check .
       # The game isn't on CI machines: tests that need it skip themselves
       - run: uv run pytest -q
+
+  exe:
+    # The single-file Windows build, checked on every push so packaging can't quietly break
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --group build
+      - run: uv run pyinstaller --onefile --name valley-planner --collect-data valley_planner --collect-submodules uvicorn --paths src packaging/run.py
+      - run: dist/valley-planner.exe --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: valley-planner-windows
+          path: dist/valley-planner.exe

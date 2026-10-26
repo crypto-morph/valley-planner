@@ -8,6 +8,7 @@ import sys
 import threading
 import webbrowser
 
+from . import __version__
 from .discover import find_game, find_saves_root, list_saves
 
 DEFAULT_PORT = 8765
@@ -31,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--read", metavar="ASSET", help="print one content file as JSON, e.g. Data/Crops")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve on (default {DEFAULT_PORT})")
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser window")
+    parser.add_argument("--version", action="version", version=f"valley-planner {__version__}")
     args = parser.parse_args(argv)
 
     game = find_game()

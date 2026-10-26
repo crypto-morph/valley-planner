@@ -1,6 +1,6 @@
 [project]
 name = "valley-planner"
-version = "0.1.0"
+dynamic = ["version"]
 description = "An unofficial, save-driven planner for Stardew Valley: what to do today, and the path to finishing the Community Center."
 readme = "README.md"
 license = "MIT"
@@ -27,10 +27,14 @@ Source = "https://github.com/crypto-morph/valley-planner"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
+build = ["pyinstaller>=6.10"]
 
 [build-system]
 requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/valley_planner/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/valley_planner"]
