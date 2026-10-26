@@ -85,3 +85,9 @@ def test_later_reruns_assume_sunday_shows_are_watched():
     assert reruns and all(not e.sure for _, e in reruns)
     day10 = next(e for d, e in reruns if d == 10)
     assert day10.label.endswith("Recipe 1")
+
+
+def test_seen_in_a_real_game():
+    """Reported by a player on 1.6.15 (game id 452453427): green rain on Summer 18 Year 1, bookseller on Fall 4."""
+    assert green_rain_day(1, 452453427) == 18
+    assert 4 in bookseller_days("fall", 1, 452453427)

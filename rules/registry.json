@@ -12137,7 +12137,8 @@
    "data": [],
    "status": "verified",
    "tests": [
-    "tests/test_calendar.py::test_seeded_days_come_from_the_lists"
+    "tests/test_calendar.py::test_seeded_days_come_from_the_lists",
+    "tests/test_calendar.py::test_seen_in_a_real_game"
    ]
   },
   {
@@ -12152,7 +12153,8 @@
    ],
    "status": "verified",
    "tests": [
-    "tests/test_calendar.py::test_seeded_days_come_from_the_lists"
+    "tests/test_calendar.py::test_seeded_days_come_from_the_lists",
+    "tests/test_calendar.py::test_seen_in_a_real_game"
    ]
   }
  ]
