@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--read", metavar="ASSET", help="print one content file as JSON, e.g. Data/Crops")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve on (default {DEFAULT_PORT})")
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser window")
+    parser.add_argument("--dev", action="store_true", help="development: restart when the code changes")
     parser.add_argument("--version", action="version", version=f"valley-planner {__version__}")
     args = parser.parse_args(argv)
 
@@ -64,6 +65,15 @@ def main(argv: list[str] | None = None) -> int:
     if port != args.port:
         print(f"Port {args.port} is in use by something else, so using {port}")
     url = f"http://127.0.0.1:{port}/"
+    if args.dev:
+        from pathlib import Path
+
+        print(f"Valley Planner (development) at {url}: it restarts when you change the code")
+        if not args.no_browser:
+            threading.Timer(2.0, webbrowser.open, args=(url,)).start()
+        uvicorn.run("valley_planner.app:create_app", factory=True, host="127.0.0.1", port=port, reload=True,
+                    reload_dirs=[str(Path(__file__).parent)], log_level="warning")
+        return 0
     config = uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
 

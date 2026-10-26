@@ -48,8 +48,15 @@ day, go to bed, refresh the page.
 uv sync
 uv run pytest           # tests that need the game are skipped when it isn't installed
 uv run ruff check .
-uv run valley-planner   # serves on http://localhost:8766
+uv run valley-planner --dev   # http://127.0.0.1:8765, restarts when the Python changes
 ```
+
+The page, script and styles are read from disk on every request, so a browser refresh shows those changes.
+
+A Windows `.exe` is built only when asked for: run the CI workflow by hand (Actions → CI → Run workflow, or
+`gh workflow run ci.yml`) and download `valley-planner-windows` from that run. Pushing a `v*` tag builds the
+`.exe` and the Python package and attaches them to a GitHub release (a tag with a suffix, like
+`v0.1.0-beta.2`, is published as a pre-release).
 
 Rules the planner relies on are checked against the game's own behaviour, and each is described in our own
 words; no game code, text or files are kept in this repository.

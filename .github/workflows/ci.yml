@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:  # run by hand from the Actions tab to get a Windows .exe of main
 
 jobs:
   test:
@@ -21,7 +22,8 @@ jobs:
       - run: uv run pytest -q
 
   exe:
-    # The single-file Windows build, checked on every push so packaging can't quietly break
+    # The single-file Windows build: only when asked for (releases build their own on a tag)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
