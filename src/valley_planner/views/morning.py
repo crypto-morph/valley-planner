@@ -59,7 +59,7 @@ def view(farm: Farm) -> dict:
                          "sure": e.sure})
     return {"date": farm.label(w.days_played), "weather": s.weather, "tomorrow": s.weather_tomorrow,
             "money": s.money, "luck": s.daily_luck, "first": first, "week": week,
-            "cc": {"deadline": plan["deadline"], "counts": plan["counts"],
+            "cc": {"deadline": plan["deadline"], "counts": plan["counts"], "gold": plan["gold"],
                    "bundles_done": sum(b.done for b in farm.bundles.all), "bundles": len(farm.bundles.all)}}
 
 

@@ -318,7 +318,18 @@ def plan(farm: Farm, deadline: int | None = None) -> dict:
     unlocks = sorted(summary.values(), key=lambda u: (-len(u["slots"]), u["gold"]))
     bought = sum(u["gold"] for u in unlocks if not u["key"].startswith("place:Desert"))  # the bus is the Vault
     gold = {"money": farm.save.money, "vault": vault, "unlocks": bought}
-    gold["short"] = max(0, gold["vault"] + gold["unlocks"] - gold["money"])
+    from ..views.sell import view as sell_view
+    from .income import afford_day, project
+    pace = project(farm, end, sell_now=sell_view(farm)["total"])
+    need = gold["vault"] + gold["unlocks"]
+    gold["short"] = max(0, need - gold["money"])
+    gold["projected"] = pace["with_money"]
+    gold["projected_replant"] = pace["with_money"] + pace["replant"]["gold"]
+    gold["streams"] = pace["streams"]
+    gold["replant"] = pace["replant"]
+    when = afford_day(pace["by_day"], need)
+    gold["covered_by"] = farm.label(when) if when else ""
+    gold["gap"] = max(0, need - gold["projected_replant"])
     return {"deadline": farm.label(end), "today": farm.label(p.today), "slots": rows, "unlocks": unlocks,
             "gold": gold,
             "counts": {k: sum(1 for r in rows if r["status"] == k)

@@ -66,7 +66,8 @@ const views = {
     $("#m-date").textContent = v.date;
     const cc = v.cc;
     $("#m-glance").textContent = `${v.money.toLocaleString()}g · ${v.weather}, tomorrow ${v.tomorrow} · luck ${v.luck > 0.02 ? "good" : v.luck < -0.02 ? "bad" : "neutral"} · Community Center ${cc.bundles_done}/${cc.bundles} bundles, ` +
-      `${cc.counts.ok + cc.counts.have} slots on track, ${cc.counts.blocked} need an unlock, ${cc.counts.luck} on luck (by ${cc.deadline})`;
+      `${cc.counts.ok + cc.counts.have} slots on track, ${cc.counts.blocked} need an unlock, ${cc.counts.luck} on luck (by ${cc.deadline})` +
+      (cc.gold.gap ? ` · gold: about ${cc.gold.gap.toLocaleString()}g short of the plan` : " · gold: on pace");
     $("#m-first").innerHTML = v.first.length ? list(v.first.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing urgent. A good day to fish, mine or make friends.</p>';
     $("#m-week").innerHTML = list(v.week.map((e) => li(`<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`, esc(e.date))));
   },
@@ -84,8 +85,11 @@ const views = {
         `<td>${b ? esc(b.label) : ""}${b && b.blocked.length ? `<br><span class="sub">after ${esc(b.blocked.join(", "))}</span>` : ""}</td><td>${when}${b && b.earliest_after_unlock ? `<br><span class="sub">with the unlocks: ${esc(b.earliest_after_unlock)}</span>` : ""}</td><td class="sub">${also}</td></tr>`;
     }).join("");
     const g = v.gold;
-    $("#plan-gold").textContent = `You have ${g.money.toLocaleString()}g. The Vault still needs ${g.vault.toLocaleString()}g and these unlocks ${g.unlocks.toLocaleString()}g` +
-      (g.short ? `: ${g.short.toLocaleString()}g more to earn by ${v.deadline} for all of it.` : ", which you can already cover.");
+    const need = g.vault + g.unlocks;
+    $("#plan-gold").innerHTML = esc(`You have ${g.money.toLocaleString()}g. The Vault still needs ${g.vault.toLocaleString()}g and these unlocks ${g.unlocks.toLocaleString()}g (${need.toLocaleString()}g in all).`) + "<br>" +
+      esc(`By ${v.deadline}: about ${g.projected.toLocaleString()}g from ${g.streams.filter((x) => x.gold).map((x) => `${x.label} (${x.gold.toLocaleString()}g)`).join(", ")}`) +
+      (g.replant.gold ? esc(`, plus about ${g.replant.gold.toLocaleString()}g replanting your ${g.replant.tiles} tiles with ${g.replant.crop} (${g.replant.note})`) : "") + ". " +
+      (g.covered_by ? esc(`That covers it by ${g.covered_by}.`) : g.gap ? `<b>${esc(`About ${g.gap.toLocaleString()}g short`)}</b>${esc(": fishing, mining, machines or skipping the dearest unlocks would close it.")}` : esc("With replanting, that covers it."));
     $("#plan-unlocks").innerHTML = "<tr><th>Unlock</th><th>Cost</th><th>Takes</th><th>Opens</th></tr>" + v.unlocks.map((u) =>
       `<tr><td>${esc(u.label)}${u.how ? `<br><span class="sub">${esc(u.how)}</span>` : ""}</td><td>${u.gold ? `${u.gold.toLocaleString()}g` : ""}${u.materials.length ? `${u.gold ? " + " : ""}${esc(u.materials.map((m) => `${m.count} ${m.name}`).join(", "))}` : ""}</td>` +
       `<td>${u.days ? `${u.days} day${u.days > 1 ? "s" : ""}` : ""}</td><td>${esc(u.slots.join(", "))}</td></tr>`

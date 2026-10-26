@@ -65,3 +65,13 @@ def test_unlock_rules_from_data():
     steel = u.get("tool:Axe@2")
     assert (steel.gold, steel.materials, steel.days, steel.done) == (5000, [("335", 5)], 2, False)
     assert u.get("tool:Axe@1").done and u.get("kitchen").gold == 10000
+
+
+def test_income_helpers():
+    from valley_planner.engine.income import Stream, _cumulative, _season_end, afford_day
+    assert _season_end(60, ("fall",)) == 84  # dies at the end of fall
+    assert _season_end(40, ("summer", "fall")) == 84  # corn carries on into fall
+    crops = Stream("crops", 300, {10: 100, 12: 200})
+    run = _cumulative([crops], 50, 10, 20)
+    assert run[0] == {"day": 10, "gold": 150} and run[-1] == {"day": 20, "gold": 350}
+    assert afford_day(run, 300) == 17 and afford_day(run, 1000) is None
