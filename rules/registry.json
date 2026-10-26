@@ -1166,9 +1166,11 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "to fix",
-   "fix": "Count items matched by loved context tags as loved (Penny: books; Jas: dolls/toys), or say they are excluded on purpose.",
-   "derive_from": "{\"asset_field\": \"Data/NPCGiftTastes personal love field + Data/Objects ContextTags\", \"consumed_by\": \"NPC.getGiftTasteForThisItem\"}"
+   "status": "verified",
+   "derive_from": "{\"asset_field\": \"Data/NPCGiftTastes personal love field + Data/Objects ContextTags\", \"consumed_by\": \"NPC.getGiftTasteForThisItem\"}",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gift.hearts-field",
@@ -1394,8 +1396,10 @@
     "Data/NPCGiftTastes",
     "Data/Objects (Category, Type, Price, Edibility, ContextTags, CanBeGivenAsGift)"
    ],
-   "status": "to fix",
-   "fix": "Implement all nine steps. With true categories, the planner's simplified rules disagree with the game on about 9,000 NPC x object pairs (mostly missing step 6 and the universal-hate match on category 0)."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.universal-cat-order",
@@ -1407,7 +1411,10 @@
    "data": [
     "Data/NPCGiftTastes Universal_*"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.universal-id-order",
@@ -1419,7 +1426,10 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.part3-skipped",
@@ -1431,8 +1441,10 @@
    "data": [
     "Data/Objects (Category, Type, Price, Edibility, ContextTags, CanBeGivenAsGift) Type/Edibility/Price"
    ],
-   "status": "to fix",
-   "fix": "Implement it from Data/Objects; it changes thousands of results (e.g. all Stone/Wood-type cheap items become disliked)."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.personal-order",
@@ -1446,8 +1458,10 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "to fix",
-   "fix": "Do ID, tag and category passes separately. Examples the per-taste loop gets wrong: Harvey likes cooking (-7) but dislikes Pizza/Pancakes/etc. by ID (game: dislike); Sebastian hates artisan (-26) but likes Green Tea by ID (game: like); Willy dislikes cooking but is neutral to Sashimi/Maki Roll by ID (game: neutral); Evelyn hates fish (-4) but likes forage_item_beach (Clam etc.: like)."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.personal-cat-vs-universal-id",
@@ -1457,7 +1471,10 @@
     "StardewValley.NPC.getGiftTasteForThisItem"
    ],
    "data": [],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.default-neutral",
@@ -1467,8 +1484,10 @@
     "StardewValley.NPC.getGiftTasteForThisItem"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "An unmatched object isn't always neutral: category 0 is universally hated, artifacts are disliked, negative-edibility items are hated and items priced under 20g are disliked."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.personal-field-index",
@@ -1480,7 +1499,10 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.universal-keys",
@@ -1492,7 +1514,10 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "verified"
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.negative-is-category",
@@ -1506,8 +1531,10 @@
    "data": [
     "Data/NPCGiftTastes"
    ],
-   "status": "to fix",
-   "fix": "Also treat '0' as a category token in the universal lists (it matches category-0 objects as well as item 0), and evaluate context tags (book_item, edible_mushroom, forage_item_beach, toy_item, doll_item, ancient_item, category_trinket) against the item's tags."
+   "status": "verified",
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
+   ]
   },
   {
    "id": "gifttaste.category-ids",
@@ -1517,11 +1544,13 @@
    "data": [
     "Data/Objects (Category, Type, Price, Edibility, ContextTags, CanBeGivenAsGift) Category"
    ],
-   "status": "to fix",
-   "fix": "Read each item's Category straight from Data/Objects. Fixes: Egg -5 (not -2), Flower -80 (not -5), Fruit -79 (not -6), Milk -6 (not -7), Monster Loot -28 (not -8), Artifact = Type Arch (not -21, which is Bait), Cooking -7 (not -22, which is Tackle), Bait -21 (not -25), Tackle -22 (not -26), Decor -24 (not -27, which is Syrup), Ring -96 (not -28), Artisan -26 (not -79).",
+   "status": "verified",
    "derive_from": "{\"asset_field\": \"Data/Objects <id>.Category\", \"consumed_by\": \"NPC.getGiftTasteForThisItem\"}",
    "refs": [
     "StardewValley.Object"
+   ],
+   "tests": [
+    "tests/test_facts.py::test_gift_taste_resolution"
    ]
   },
   {
@@ -1557,9 +1586,11 @@
    "data": [
     "Data/Objects (Category, Type, Price, Edibility, ContextTags, CanBeGivenAsGift) CanBeGivenAsGift"
    ],
-   "status": "to fix",
-   "fix": "Filter on CanBeGivenAsGift (plus object-only) instead of type labels. Quest items such as Lost Book or Trimmed Lucky Purple Shorts are giftable by that flag, even if odd.",
-   "derive_from": "{\"asset_field\": \"Data/Objects CanBeGivenAsGift\", \"consumed_by\": \"Object.canBeGivenAsGift\"}"
+   "status": "verified",
+   "derive_from": "{\"asset_field\": \"Data/Objects CanBeGivenAsGift\", \"consumed_by\": \"Object.canBeGivenAsGift\"}",
+   "tests": [
+    "tests/test_facts.py::test_giftable_flag"
+   ]
   },
   {
    "id": "gifttaste.joja-cola-hated",

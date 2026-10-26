@@ -166,3 +166,49 @@ def test_fish_times_weather_and_traps():
     assert catfish.bites(woods, season="winter", time=1000, wet=True) is True
     lobster = fish.by_name("Lobster")
     assert lobster.trap and lobster.water == "ocean" and lobster.spots == []
+
+
+def gift_data():
+    objects = {
+        "24": {"Name": "Parsnip", "Category": -75, "Price": 35, "Edibility": 10},
+        "92": {"Name": "Sap", "Category": -81, "Price": 2, "Edibility": -1},
+        "330": {"Name": "Clay", "Category": -16, "Price": 20, "Edibility": -300},
+        "388": {"Name": "Wood", "Category": -16, "Price": 2, "Edibility": -300},
+        "96": {"Name": "Dwarf Scroll I", "Category": 0, "Price": 1, "Type": "Arch"},
+        "Raisins": {"Name": "Raisins", "Category": 0, "Price": 600, "Edibility": 50},
+        "102": {"Name": "Book", "Category": 0, "Price": 50, "Edibility": -300, "ContextTags": ["book_item"]},
+        "206": {"Name": "Pizza", "Category": -7, "Price": 300, "Edibility": 60},
+    }
+    tastes = {
+        "Universal_Love": "Raisins", "Universal_Like": "-7", "Universal_Neutral": "", "Universal_Dislike": "",
+        "Universal_Hate": "92",
+        "Harvey": "//x/ /x/206/x/ /x/ /x/",  # dislikes Pizza by item, beating the universal Cooking like
+        "Penny": "/book_item/x/-75/x/ /x/ /x/ /x/",  # loves anything tagged book_item, likes vegetables
+        "Abigail": "/-7/x/ /x/ /x/ /x/ /x/",  # loves Cooking — but Pizza is named universally? no: category, not item
+    }
+    return Data(**{"Data/Objects": objects, "Data/NPCGiftTastes": tastes})
+
+
+def test_gift_taste_resolution():
+    from valley_planner.facts.gifts import Gifts
+
+    g = Gifts(gift_data())
+    assert g.taste("Abigail", "Raisins") == "love"  # universal item
+    assert g.taste("Abigail", "92") == "hate"  # universal item (Sap)
+    assert g.taste("Abigail", "388") == "dislike"  # neutral and worth under 20g
+    assert g.taste("Abigail", "330") == "neutral"  # worth 20g
+    assert g.taste("Abigail", "96") == "dislike" and g.taste("Penny", "96") == "like"  # artifacts
+    assert g.taste("Harvey", "206") == "dislike"  # his own item list beats the universal category like
+    assert g.taste("Abigail", "206") == "love"  # her own category beats the universal category
+    assert g.taste("Penny", "102") == "love"  # her own context tag
+    assert g.taste("Penny", "24") == "like"  # her own category
+    assert g.taste("Penny", "StardropTea") == "love"
+
+
+def test_giftable_flag():
+    from valley_planner.facts.gifts import Gifts
+
+    data = gift_data()
+    data.tables["Data/Objects"]["999"] = {"Name": "Quest item", "Category": 0, "Price": 0, "CanBeGivenAsGift": False}
+    g = Gifts(data)
+    assert g.giftable("24") and not g.giftable("999") and not g.giftable("nope")
