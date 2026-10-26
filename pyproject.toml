@@ -1,0 +1,47 @@
+[project]
+name = "valley-planner"
+version = "0.1.0"
+description = "An unofficial, save-driven planner for Stardew Valley: what to do today, and the path to finishing the Community Center."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Morph" }]
+requires-python = ">=3.11"
+dependencies = [
+    "dnfile>=0.18",      # reads the game's own .NET data classes, to decode its content files
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+]
+
+[project.scripts]
+valley-planner = "valley_planner.cli:main"
+
+[project.urls]
+Source = "https://github.com/crypto-morph/valley-planner"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/valley_planner"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["game: needs a local Stardew Valley install (skipped when none is found)"]

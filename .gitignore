@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Never commit anything from the game: content files, unpacked data, decompiled code, saves
+*.xnb
+Content/
+Content (unpacked)/
+unpacked/
+decompiled/
+Saves/
+*_old
+
+# Local caches and settings
+.valley-planner/
