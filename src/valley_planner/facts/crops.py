@@ -17,6 +17,8 @@ From StardewValley.Crop.harvest / newDay and HoeDirt (checked against 1.6.15):
 
 from __future__ import annotations
 
+import math
+import struct
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -45,6 +47,40 @@ def quality_odds(farming: int, fertilizer: int = 0, min_quality: int = 0, max_qu
     return clamped
 
 
+SPEED_GRO = {"465": 0.1, "466": 0.25, "918": 0.33}  # fertilizer -> growth boost
+AGRICULTURIST = 5
+PADDY_BOOST = 0.25
+
+
+def _f32(x: float) -> float:
+    return struct.unpack("<f", struct.pack("<f", x))[0]
+
+
+def boosted_phases(phases: list[int], boost: float) -> list[int]:
+    """The phase lengths after the game trims them for `boost`."""
+    days = list(phases)
+    cut = math.ceil(_f32(sum(days) * _f32(boost))) if boost else 0
+    passes = 0
+    while cut > 0 and passes < 3:
+        for i, d in enumerate(days):
+            if (i > 0 or d > 1) and d > 0:
+                days[i] -= 1
+                cut -= 1
+            if cut <= 0:
+                break
+        passes += 1
+    return days
+
+
+def speed_boost(fertilizer: str | None = None, *, agriculturist: bool = False, paddy: bool = False) -> float:
+    b = _f32(SPEED_GRO.get((fertilizer or "").removeprefix("(O)"), 0.0))
+    if paddy:
+        b = _f32(b + PADDY_BOOST)
+    if agriculturist:
+        b = _f32(b + 0.1)
+    return b
+
+
 @dataclass(frozen=True)
 class CropInfo:
     seed: str  # unqualified seed id
@@ -65,6 +101,10 @@ class CropInfo:
     @property
     def grow(self) -> int:
         return sum(self.phases)
+
+    def grow_with(self, boost: float) -> int:
+        """Days from planting to the first harvest with this growth boost."""
+        return sum(boosted_phases(self.phases, boost))
 
     def max_harvest(self, farming: int) -> int:
         top = max(self.min_stack, self.max_stack)

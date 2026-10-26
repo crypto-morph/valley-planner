@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Valley Planner</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="top wood">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><rect x="7" y="6" width="2" height="9" fill="#3F7A2E"/><rect x="9" y="3" width="2" height="2" fill="#7CC04F"/><rect x="11" y="2" width="2" height="2" fill="#7CC04F"/><rect x="9" y="5" width="4" height="2" fill="#5E9C3F"/><rect x="3" y="5" width="2" height="2" fill="#7CC04F"/><rect x="5" y="7" width="2" height="2" fill="#5E9C3F"/><rect x="1" y="4" width="2" height="2" fill="#7CC04F"/></svg>
+      <h1>Valley Planner</h1>
+    </div>
+    <div id="status" class="pill">Reading your save…</div>
+  </header>
+
+  <nav id="tabs" class="tabs" aria-label="Views">
+    <button type="button" class="active" data-view="today">Today</button>
+    <button type="button" data-view="crops">Crops</button>
+    <button type="button" data-view="cart">Cart</button>
+  </nav>
+
+  <main>
+    <section id="view-today" class="view">
+      <div class="two">
+        <section class="parch panel">
+          <h2 class="sign">Shops today</h2>
+          <div id="hours"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">Coming up</h2>
+          <div id="days"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="view-crops" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">What you can still plant</h2>
+        <p class="sub" id="countdown-head"></p>
+        <div class="table-wrap"><table class="sell-table" id="countdown"></table></div>
+      </section>
+      <section class="parch panel">
+        <h2 class="sign">In the ground</h2>
+        <p class="sub" id="mine-head"></p>
+        <div class="table-wrap"><table class="sell-table" id="mine"></table></div>
+      </section>
+    </section>
+
+    <section id="view-cart" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">When is it at the cart?</h2>
+        <div class="askbox-field">
+          <input id="cart-q" type="search" autocomplete="off" placeholder="Red Cabbage, Rare Seed, Truffle…" />
+        </div>
+        <div id="cart-hits"></div>
+      </section>
+      <section class="parch panel">
+        <h2 class="sign">The next visits</h2>
+        <div id="cart-days"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="sub foot">Reads your own save and your own copy of the game. Not affiliated with ConcernedApe.</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

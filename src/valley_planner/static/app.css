@@ -1,0 +1,20 @@
+/* Layout for the views; colours and the pixel look come from styles.css. */
+main { display: grid; gap: 1rem; }
+.view { display: grid; gap: 1rem; }
+.panel { padding: 1rem 1.2rem; }
+.two { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.foot { text-align: center; margin-top: 2rem; color: var(--bg); }
+.list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
+.list li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px dashed var(--line); padding-bottom: 0.3rem; }
+.day { margin: 0.5rem 0; }
+.day h3 { font-size: 1rem; margin: 0 0 0.2rem; }
+.day.today h3::after { content: " · today"; color: var(--accent); }
+.unsure { color: var(--muted); font-style: italic; }
+.status-today, .status-soon { color: var(--bad); font-weight: 700; }
+.status-fertilizer { color: var(--warn); font-weight: 700; }
+.status-too_late, .status-dead { color: var(--muted); }
+.status-ready { color: var(--accent); font-weight: 700; }
+.status-dies { color: var(--bad); font-weight: 700; }
+table.sell-table { width: 100%; border-collapse: collapse; }
+table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+#cart-q { width: 100%; padding: 0.5rem; font: inherit; border: 3px solid var(--wood-dark); background: var(--panel-2); }
