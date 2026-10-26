@@ -52,6 +52,11 @@ def _text(el: ET.Element | None, name: str, default: str = "") -> str:
     return (c.text or "").strip() if c is not None and c.text else default
 
 
+def _or(el: ET.Element | None, default):
+    """`el`, or `default` when it's missing (an element with no children is still there)."""
+    return el if el is not None else default
+
+
 def _int(el: ET.Element | None, name: str, default: int = 0) -> int:
     raw = _text(el, name)
     try:
@@ -274,7 +279,7 @@ def _containers(root: ET.Element, player: ET.Element, parents: dict):
         elif _tag(el) == "heldObject" and _type(el) == "Chest":  # auto-grabbers
             yield f"{_location_name(el, parents)} auto-grabber", _child(el, "items")
     for _k, v in _dict(_child(root, "globalInventories")):  # Junimo chests share one inventory
-        yield "Junimo chest", _child(v, "ArrayOfItem") or v
+        yield "Junimo chest", _or(_child(v, "ArrayOfItem"), v)
 
 
 def _weather(root: ET.Element) -> tuple[str, str, bool]:
@@ -284,7 +289,7 @@ def _weather(root: ET.Element) -> tuple[str, str, bool]:
     for k, v in _dict(_child(root, "locationWeather")):
         if _flat(k) != "Default":
             continue
-        lw = _child(v, "LocationWeather") or v
+        lw = _or(_child(v, "LocationWeather"), v)
         today = _flat(_child(lw, "weather")) if _child(lw, "weather") is not None else ""
         tomorrow = _flat(_child(lw, "weatherForTomorrow")) if _child(lw, "weatherForTomorrow") is not None else ""
         green = _flat(_child(lw, "isGreenRain")) == "true" if _child(lw, "isGreenRain") is not None else False
@@ -356,7 +361,7 @@ def read_save(path: Path, data=None) -> Save:
     root = ET.parse(path).getroot()  # noqa: S314 — the player's own local save
     player = _child(root, "player")
     parents = {c: p for p in root.iter() for c in p}
-    locations = {_text(loc, "name"): loc for loc in _child(root, "locations") or []}
+    locations = {_text(loc, "name"): loc for loc in _or(_child(root, "locations"), [])}
 
     objects = data.asset("Data/Objects") if data else {}
     crops_data = data.asset("Data/Crops") if data else {}
@@ -396,7 +401,7 @@ def read_save(path: Path, data=None) -> Save:
     mail = set(_strings(_child(player, "mailReceived")))
     friends = {}
     for k, v in _dict(_child(player, "friendshipData")):
-        fr = _child(v, "Friendship") or v
+        fr = _or(_child(v, "Friendship"), v)
         friends[_flat(k)] = Friend(_int(fr, "Points"), _int(fr, "GiftsThisWeek"), _int(fr, "GiftsToday"),
                                    _bool(fr, "TalkedToToday"), _text(fr, "Status", "Friendly"),
                                    _bool(fr, "RoommateMarriage"))
@@ -418,14 +423,14 @@ def read_save(path: Path, data=None) -> Save:
             bundle_slots[int(_flat(k))] = [c.text == "true" for c in v.iter() if _tag(c) == "boolean"]
         except ValueError:
             continue
-    areas = [c.text == "true" for c in (_child(cc, "areasComplete") or [])]
+    areas = [c.text == "true" for c in _or(_child(cc, "areasComplete"), [])]
     bundle_data = {_flat(k): _flat(v) for k, v in _dict(_child(root, "bundleData"))}
 
     farm = locations.get("Farm")
     flags = {"beachBridgeFixed"} if _bool(locations.get("Beach"), "bridgeFixed") else set()
     buildings: Counter = Counter()
     animals = []
-    for b in (_child(farm, "buildings") or []):
+    for b in _or(_child(farm, "buildings"), []):
         btype = _text(b, "buildingType")
         if not btype:
             continue
@@ -485,7 +490,7 @@ def read_save(path: Path, data=None) -> Save:
         dirt = parents.get(el)
         if dirt is None or (_type(dirt) != "HoeDirt" and _tag(dirt) != "hoeDirt"):
             continue
-        phases = [int(c.text) for c in (_child(el, "phaseDays") or []) if c.text and c.text.lstrip("-").isdigit()]
+        phases = [int(c.text) for c in _or(_child(el, "phaseDays"), []) if c.text and c.text.lstrip("-").isdigit()]
         cur, day_in = _int(el, "currentPhase"), _int(el, "dayOfCurrentPhase")
         full, dead = _bool(el, "fullGrown"), _bool(el, "dead")
         if phases and cur < len(phases) - 1:  # the last phase is the "grown" marker
@@ -509,14 +514,14 @@ def read_save(path: Path, data=None) -> Save:
             forage=forage, in_pot=in_pot))
 
     quests = []
-    for q in _child(player, "questLog") or []:
+    for q in _or(_child(player, "questLog"), []):
         quests.append({"id": _text(q, "id"), "type": _type(q) or "Quest", "title": _text(q, "questTitle"),
                        "completed": _bool(q, "completed"), "daily": _bool(q, "dailyQuest"),
                        "days_left": _int(q, "daysLeft"), "target": _text(q, "target"),
                        "item_id": (_text(q, "ItemId") or _text(q, "item")).removeprefix("(O)"),
                        "count": _int(q, "number", 1), "reward": max(_int(q, "moneyReward"), _int(q, "reward"))})
 
-    board = [_order(o) for o in _child(root, "availableSpecialOrders") or [] if _tag(o) == "SpecialOrder"]
+    board = [_order(o) for o in _or(_child(root, "availableSpecialOrders"), []) if _tag(o) == "SpecialOrder"]
 
     skills = {s: _int(player, f"{s}Level") for s in ("farming", "fishing", "foraging", "mining", "combat")}
     spouse = _text(player, "spouse") or None
@@ -548,7 +553,7 @@ def read_save(path: Path, data=None) -> Save:
         fish_caught=fish, museum=museum, bundle_data=bundle_data, bundle_slots=bundle_slots, areas_complete=areas,
         buildings=buildings, animals=animals, hay=_int(farm, "piecesOfHay"), fruit_trees=fruit_trees,
         machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
-        special_orders=[_order(o) for o in _child(root, "specialOrders") or [] if _tag(o) == "SpecialOrder"],
+        special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
         special_orders_board=[o for o in board if o["type"] != "QiChallenge"],
         qi_orders_board=[o for o in board if o["type"] == "QiChallenge"],
         cart_guarantee=_int(root, "visitsUntilY1Guarantee", -1),
