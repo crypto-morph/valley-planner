@@ -20,12 +20,23 @@
     <button type="button" class="active" data-view="morning">Morning</button>
     <button type="button" data-view="todo">To-do</button>
     <button type="button" data-view="today">Today</button>
-    <button type="button" data-view="ask">Ask</button>
     <button type="button" data-view="crops">Crops</button>
     <button type="button" data-view="sell">Sell</button>
     <button type="button" data-view="plan">Plan</button>
     <button type="button" data-view="cart">Cart</button>
   </nav>
+
+  <section class="askbar parch" aria-label="Ask about anything">
+    <div class="askbox-field">
+      <input id="ask-q" type="search" autocomplete="off" aria-label="Ask about an item, a villager or a fish"
+             placeholder="Ask about anything: an item, a villager or a fish (Hot Pepper, Maru, Sturgeon…)" />
+    </div>
+    <div id="ask-results" class="chip-row"></div>
+    <section class="ask-card" id="ask-card" hidden>
+      <button type="button" class="ghost ask-close" id="ask-close" aria-label="Close">×</button>
+      <div id="ask-card-body"></div>
+    </section>
+  </section>
 
   <main>
     <section id="view-morning" class="view">
@@ -69,17 +80,6 @@
           <div id="days"></div>
         </section>
       </div>
-    </section>
-
-    <section id="view-ask" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">Ask about anything</h2>
-        <div class="askbox-field">
-          <input id="ask-q" type="search" autocomplete="off" placeholder="An item, a villager or a fish: Hot Pepper, Maru, Sturgeon…" />
-        </div>
-        <div id="ask-results" class="chip-row"></div>
-      </section>
-      <section class="parch panel" id="ask-card" hidden></section>
     </section>
 
     <section id="view-crops" class="view" hidden>

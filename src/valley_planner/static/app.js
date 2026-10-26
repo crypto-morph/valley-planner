@@ -46,12 +46,19 @@ function villagerCard(c) {
 
 async function showCard(kind, id) {
   const c = await get(`/api/ask/${kind}/${encodeURIComponent(id)}`);
-  $("#ask-card").innerHTML = kind === "item" ? itemCard(c) : villagerCard(c);
+  $("#ask-card-body").innerHTML = kind === "item" ? itemCard(c) : villagerCard(c);
   $("#ask-card").hidden = false;
+}
+
+function closeAsk() {
+  $("#ask-card").hidden = true;
+  $("#ask-results").innerHTML = "";
+  $("#ask-q").value = "";
 }
 
 async function searchAsk() {
   const q = $("#ask-q").value.trim();
+  if (!q) { closeAsk(); return; }
   const v = await get(`/api/ask?q=${encodeURIComponent(q)}`);
   $("#ask-results").innerHTML = v.results.map((r) => `<button type="button" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}">${esc(r.name)}</button>`).join("");
   document.querySelectorAll("#ask-results button").forEach((b) => b.addEventListener("click", () => showCard(b.dataset.kind, b.dataset.id)));
@@ -117,7 +124,6 @@ const views = {
     ).join("");
   },
 
-  async ask() { $("#ask-q").focus(); },
 
   async today() {
     const [hours, cal] = await Promise.all([get("/api/hours"), get("/api/calendar?days=14")]);
@@ -221,7 +227,13 @@ async function start() {
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
   let timer;
   $("#cart-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchCart, 250); });
-  $("#ask-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchAsk, 200); });
+  let askTimer;
+  $("#ask-q").addEventListener("input", () => { clearTimeout(askTimer); askTimer = setTimeout(searchAsk, 200); });
+  $("#ask-close").addEventListener("click", closeAsk);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAsk();
+    if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("#ask-q").focus(); }
+  });
   show("morning");
 }
 

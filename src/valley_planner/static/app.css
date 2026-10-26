@@ -23,3 +23,11 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 .status-blocked, .status-stuck { color: var(--bad); font-weight: 700; }
 .status-luck, .status-maybe { color: var(--warn); font-weight: 700; }
 .status-ok, .status-have { color: var(--accent); font-weight: 700; }
+/* The Ask bar: on every page, under the tabs */
+.askbar { position: sticky; top: 0; z-index: 10; padding: 0.6rem 1rem; margin-bottom: 1rem; }
+.askbar input { width: 100%; padding: 0.5rem; font: inherit; border: 3px solid var(--wood-dark); background: var(--panel-2); }
+.askbar #ask-results:empty { display: none; }
+.askbar #ask-results { margin-top: 0.5rem; }
+.ask-card { position: relative; margin-top: 0.6rem; max-height: 70vh; overflow-y: auto; background: var(--panel-2);
+            border: 3px solid var(--wood-dark); padding: 0.8rem 1rem; }
+.ask-close { position: absolute; top: 0.4rem; right: 0.5rem; font-size: 1.2rem; line-height: 1; }
