@@ -88,6 +88,8 @@ def test_later_reruns_assume_sunday_shows_are_watched():
 
 
 def test_seen_in_a_real_game():
-    """Reported by a player on 1.6.15 (game id 452453427): green rain on Summer 18 Year 1, bookseller on Fall 4."""
+    """Reported by a player on 1.6.15 (game id 452453427): green rain on Summer 18 Year 1, bookseller on Fall 4,
+    and Tortilla (episode 9) on the Queen of Sauce on Sunday Fall 7 (day 63)."""
     assert green_rain_day(1, 452453427) == 18
+    assert qos_sunday_episode(63) == 9
     assert 4 in bookseller_days("fall", 1, 452453427)
