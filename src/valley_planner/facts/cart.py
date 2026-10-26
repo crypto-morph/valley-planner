@@ -36,7 +36,7 @@ import copy
 from dataclasses import dataclass
 from functools import cached_property
 
-from .conditions import SEASONS, When, check, split
+from .conditions import When, check, date_of, split
 from .items import FIXED_SALE_PRICE
 from .rng import NetRandom, day_save_random
 
@@ -66,11 +66,6 @@ class CartDay:
     @property
     def label(self) -> str:
         return f"{self.season.capitalize()} {self.day}, Year {self.year}"
-
-
-def date_of(days_played: int) -> tuple[str, int, int]:
-    d = days_played - 1
-    return SEASONS[d // 28 % 4], d % 28 + 1, d // 112 + 1
 
 
 def _forest_day(day: int) -> bool:
@@ -310,11 +305,7 @@ class Cart:
             forest = _forest_day(day)
             if not today and g >= 0 and (forest or fest == "NightMarket"):
                 g -= 1
-            w = When(season, day, year, dp, mail=when.mail, mailbox=when.mailbox, mail_tomorrow=when.mail_tomorrow,
-                     events_seen=when.events_seen, crafting_recipes=when.crafting_recipes,
-                     cooking_recipes=when.cooking_recipes, skills=when.skills, house_upgrade=when.house_upgrade,
-                     mine_lowest=when.mine_lowest, museum_count=when.museum_count, hearts=when.hearts,
-                     game_id=when.game_id, legacy_random=when.legacy_random, world_fields={GUARANTEE_FIELD: g})
+            w = when.on(dp, world_fields={**when.world_fields, GUARANTEE_FIELD: g})
             places = (["Forest"] if forest else []) + ([fest] if fest else [])
             if fest:
                 cond = self.data.asset("Data/PassiveFestivals")[fest].get("Condition")

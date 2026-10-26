@@ -10,7 +10,7 @@ position…), never a guess. Checked against StardewValley.GameStateQuery.
 from __future__ import annotations
 
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .rng import synced_random
 
@@ -57,6 +57,11 @@ class When:
             game_id=int(save.unique_id) if str(save.unique_id or "").isdigit() else None,
             legacy_random=save.legacy_random)
 
+    def on(self, days_played: int, **changes) -> When:
+        """The same farm on another day (what the save knows stays as it is)."""
+        season, day, year = date_of(days_played)
+        return replace(self, season=season, day=day, year=year, days_played=days_played, **changes)
+
     @property
     def weekday(self) -> int:
         """0 Sunday … 6 Saturday; the 1st of every season is a Monday."""
@@ -64,6 +69,12 @@ class When:
 
     def has_or_will_get_mail(self, key: str) -> bool:
         return key in self.mail or key in self.mailbox or key in self.mail_tomorrow
+
+
+def date_of(days_played: int) -> tuple[str, int, int]:
+    """Days played (1 = Spring 1, Year 1) -> (season, day, year)."""
+    d = days_played - 1
+    return SEASONS[d // 28 % 4], d % 28 + 1, d // 112 + 1
 
 
 CC_RESTORED_EVENT = "191393"

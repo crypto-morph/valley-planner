@@ -3,8 +3,8 @@
 import pytest
 
 from valley_planner.discover import find_game
-from valley_planner.facts.cart import Cart, date_of
-from valley_planner.facts.conditions import When, check
+from valley_planner.facts.cart import Cart
+from valley_planner.facts.conditions import When, check, date_of
 from valley_planner.facts.rng import NetRandom, random_seed, xxhash32
 
 

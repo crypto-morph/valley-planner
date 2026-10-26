@@ -81,18 +81,24 @@
   {
    "id": "cal.festival-names",
    "area": "Calendar & events & access",
-   "summary": "The festival keyword list catches titles containing 'festival', so Egg Festival, Festival of Ice and Desert Festival match; but 'Feast of the Winter Star', 'Trout Derby' and 'SquidFest' contain none of the keywords, and 'fair' can match unrelated text.",
-   "checked_against": [],
+   "summary": "Festival names and dates come from Data/Festivals/FestivalDates (8 festivals, each file giving its map and hours as '<Location>/<start> <end>') and Data/PassiveFestivals (Night Market, Desert Festival with its desert condition; the Trout Derby and SquidFest are added to the calendar by the calendar's own code).",
+   "checked_against": [
+    "StardewValley.Menus.Billboard.GetEventsForDay",
+    "StardewValley.Utility.isFestivalDay/4"
+   ],
    "data": [
     "Data/Festivals/FestivalDates + Data/Festivals/<season><day>.conditions",
     "Data/PassiveFestivals (Season, StartDay, EndDay, StartTime, Condition)"
    ],
-   "status": "to fix",
-   "fix": "Derive festival names/dates from Data/Festivals/FestivalDates (8 active festivals) and Data/PassiveFestivals (NightMarket, DesertFestival, TroutDerby, SquidFest) instead of keywords.",
+   "status": "verified",
    "derive_from": "{\"asset_field\": \"Data/Festivals/FestivalDates (key -> display name) + Data/PassiveFestivals (DisplayName)\", \"consumed_by\": \"Utility.isFestivalDay / Game1.UpdatePassiveFestivalStates\"}",
    "refs": [
     "(planner text heuristic",
     "compared"
+   ],
+   "tests": [
+    "tests/test_calendar.py::test_festivals_birthdays_and_who_is_shown",
+    "tests/test_calendar.py::test_passive_festivals_and_derbies"
    ]
   },
   {
@@ -332,7 +338,7 @@
   {
    "id": "cal.queen-of-sauce-schedule",
    "area": "Calendar & events & access",
-   "summary": "On Sundays the episode is (DaysPlayed % 224) / 7 (with 224 mapping to 32), so episodes 1-16 air on the Sundays of Year 1 and 17-32 in Year 2 (Sunday N*7). The game has no fixed 'reruns' after Year 2: the 32-episode cycle repeats from episode 1 in Year 3, Year 5, and so on. Wednesday reruns are a random earlier episode.",
+   "summary": "The Sunday Queen of Sauce episode is (DaysPlayed % 224) / 7, with a remainder of 0 meaning 32: the 32 episodes air on Year 1-2 Sundays and the same cycle restarts every two years (Year 3 Spring 7 is episode 1 again), so a Year-N Sunday matches Year ((N-1) mod 2)+1.",
    "checked_against": [
     "StardewValley.Objects.TV.getRerunWeek",
     "StardewValley.Objects.TV.getWeeklyRecipe"
@@ -340,9 +346,11 @@
    "data": [
     "Data/TV/CookingChannel"
    ],
-   "status": "to fix",
-   "fix": "Say 'repeats every two years (episode = DaysPlayed mod 224 / 7)' instead of 'reruns later'; the Sunday recipe in Year N equals the one in Year ((N-1) mod 2)+1.",
-   "derive_from": "{\"asset_field\": \"Data/TV/CookingChannel (key = episode, field 0 = recipe)\", \"consumed_by\": \"TV.getWeeklyRecipe\"}"
+   "status": "verified",
+   "derive_from": "{\"asset_field\": \"Data/TV/CookingChannel (key = episode, field 0 = recipe)\", \"consumed_by\": \"TV.getWeeklyRecipe\"}",
+   "tests": [
+    "tests/test_calendar.py::test_queen_of_sauce"
+   ]
   },
   {
    "id": "cal.night-market-winter-15-17",
@@ -589,39 +597,49 @@
   {
    "id": "qos.episode-formula",
    "area": "Calendar & events & access",
-   "summary": "Matches Years 1-2. The game computes the Sunday episode from Game1.stats.DaysPlayed as (DaysPlayed % 224) / 7, with a remainder of 0 meaning 32.",
+   "summary": "The Sunday Queen of Sauce episode is (DaysPlayed % 224) / 7, with a remainder of 0 meaning 32: the 32 episodes air on Year 1-2 Sundays and the same cycle restarts every two years (Year 3 Spring 7 is episode 1 again), so a Year-N Sunday matches Year ((N-1) mod 2)+1.",
    "checked_against": [
     "StardewValley.Objects.TV.getWeeklyRecipe"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Use ep = ((DaysPlayed % 224) // 7) or 32 when DaysPlayed % 224 == 0. From Year 3 the formula gives 1-32 again instead of >32."
+   "status": "verified",
+   "tests": [
+    "tests/test_calendar.py::test_queen_of_sauce"
+   ]
   },
   {
    "id": "qos.two-year-cycle",
    "area": "Calendar & events & access",
-   "summary": "There are 32 episodes, but after Year 2 the Sunday show is not a rerun: the same 32-episode cycle restarts (Year 3 Spring 7 = episode 1 Stir Fry, and so on), and it still teaches the recipe if unknown. Only Wednesdays are random reruns.",
+   "summary": "The Sunday Queen of Sauce episode is (DaysPlayed % 224) / 7, with a remainder of 0 meaning 32: the 32 episodes air on Year 1-2 Sundays and the same cycle restarts every two years (Year 3 Spring 7 is episode 1 again), so a Year-N Sunday matches Year ((N-1) mod 2)+1.",
    "checked_against": [
     "StardewValley.Objects.TV.getWeeklyRecipe"
    ],
    "data": [
     "Data/TV/CookingChannel"
    ],
-   "status": "to fix",
-   "fix": "For Sundays, look up CookingChannel[(DaysPlayed % 224)/7 or 32]. Don't label Year 3+ Sundays 'rerun'.",
-   "derive_from": "{\"asset_field\": \"Data/TV/CookingChannel key count (32)\", \"consumed_by\": \"TV.getWeeklyRecipe (DaysPlayed % 224)\"}"
+   "status": "verified",
+   "derive_from": "{\"asset_field\": \"Data/TV/CookingChannel key count (32)\", \"consumed_by\": \"TV.getWeeklyRecipe (DaysPlayed % 224)\"}",
+   "tests": [
+    "tests/test_calendar.py::test_queen_of_sauce"
+   ]
   },
   {
    "id": "qos.wednesday-rerun",
    "area": "Calendar & events & access",
-   "summary": "The TV offers the cooking channel on Wednesday only when DaysPlayed > 7 (so not Spring 3 Y1). The rerun episode is picked once per day by a day-save seeded random from episodes 1..min((DaysPlayed-3)/7, 32), preferring ones whose recipe some player still lacks; it teaches that recipe too.",
+   "summary": "The TV offers the cooking channel on Wednesday only when DaysPlayed > 7 (so not Spring 3 Y1). The rerun episode is picked once per day by a day-save seeded random from episodes 1..min((DaysPlayed-3)/7, 32), preferring ones whose recipe some player still lacks; it teaches that recipe too. With nothing unknown it takes 1 + Next(count) over all aired weeks.",
    "checked_against": [
     "StardewValley.Objects.TV.checkForAction",
     "StardewValley.Objects.TV.getRerunWeek",
     "StardewValley.Objects.TV.getWeeklyRecipe"
    ],
-   "data": [],
-   "status": "verified"
+   "data": [
+    "Data/TV/CookingChannel"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_calendar.py::test_queen_of_sauce",
+    "tests/test_calendar.py::test_later_reruns_assume_sunday_shows_are_watched"
+   ]
   },
   {
    "id": "qos.recipe-field0",
@@ -12093,6 +12111,49 @@
    ],
    "status": "to fix",
    "fix": "Fix in food.energy/health; answers.py follows."
+  },
+  {
+   "id": "cal.birthdays-shown",
+   "area": "Calendar & events & access",
+   "summary": "The calendar lists a villager's birthday (Data/Characters BirthSeason/BirthDay) only if they exist (UnlockConditions: Kent from Year 2, Leo once he's moved to the valley) and their Calendar setting allows it: HiddenAlways never, HiddenUntilMet once you've met them (the Dwarf, Sandy, Krobus).",
+   "checked_against": [
+    "StardewValley.Menus.Billboard.GetBirthdays"
+   ],
+   "data": [
+    "Data/Characters BirthSeason, BirthDay, Calendar, UnlockConditions"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_calendar.py::test_festivals_birthdays_and_who_is_shown"
+   ]
+  },
+  {
+   "id": "cal.bookseller-days",
+   "area": "Calendar & events & access",
+   "summary": "The bookseller visits on two days a season: candidate days Spring 11,12,21,22,25 / Summer 9,12,18,25,27 / Fall 4,7,8,9,12,19,22,25 / Winter 5,11,12,19,22,24; one is picked with Next(count) from a generator seeded (year×11, game id, season index), the other is half the list further on (wrapping).",
+   "checked_against": [
+    "StardewValley.Utility.getDaysOfBooksellerThisSeason"
+   ],
+   "data": [],
+   "status": "verified",
+   "tests": [
+    "tests/test_calendar.py::test_seeded_days_come_from_the_lists"
+   ]
+  },
+  {
+   "id": "cal.green-rain-day",
+   "area": "Calendar & events & access",
+   "summary": "Green rain falls on one summer day every year, picked from 5, 6, 7, 14, 15, 16, 18, 23 with a generator seeded (year×777, game id); the weather data puts GreenRain first (IS_GREEN_RAIN_DAY).",
+   "checked_against": [
+    "StardewValley.Utility.isGreenRainDay/2"
+   ],
+   "data": [
+    "Data/LocationContexts Default.WeatherConditions GreenRain"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_calendar.py::test_seeded_days_come_from_the_lists"
+   ]
   }
  ]
 }
