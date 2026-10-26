@@ -36,3 +36,32 @@ def test_place_gates():
     assert place_open("BeachTidePools", w)[0] is False
     assert place_open("BeachTidePools", When("fall", 1, 1, 57, flags={"beachBridgeFixed"}))[0]
     assert place_open("Desert", When("fall", 1, 1, 57, mail={"ccVault"}))[0]
+
+
+GAME_SAVES = None
+
+
+def test_unlock_rules_from_data():
+    from types import SimpleNamespace
+
+    from valley_planner.engine.unlocks import Unlocks
+
+    class Data:
+        tables = {"Data/Buildings": {"Coop": {"BuildCost": 4000, "BuildDays": 3},
+                                     "Big Coop": {"BuildCost": 10000, "BuildDays": 2, "BuildingToUpgrade": "Coop",
+                                                  "BuildMaterials": [{"ItemId": "(O)388", "Amount": 400}]}},
+                  "Data/FarmAnimals": {"Duck": {"PurchasePrice": 600, "RequiredBuilding": "Big Coop",
+                                                "DaysToMature": 5, "DaysToProduce": 2}}}
+
+        def asset(self, name):
+            return self.tables[name]
+
+    save = SimpleNamespace(buildings={"Coop": 1}, animals=[], axe_level=1, house_upgrade=0, machines={},
+                           crafting_recipes=set(), cooking_recipes=set(), skills={})
+    u = Unlocks(SimpleNamespace(data=Data(), save=save))
+    duck = u.get("animal:Duck")
+    assert (duck.gold, duck.days, duck.after) == (1200, 7, ["building:Big Coop"])
+    assert [x.key for x in u.chain("animal:Duck")] == ["building:Big Coop", "animal:Duck"]  # the Coop is done
+    steel = u.get("tool:Axe@2")
+    assert (steel.gold, steel.materials, steel.days, steel.done) == (5000, [("335", 5)], 2, False)
+    assert u.get("tool:Axe@1").done and u.get("kitchen").gold == 10000

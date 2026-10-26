@@ -81,8 +81,15 @@ const views = {
       const also = r.others.slice(0, 3).map((o) => `${esc(o.label)}${o.odds != null ? ` (${Math.round(o.odds * 100)}%)` : ""}${o.blocked.length ? ` <span class="sub">after ${esc(o.blocked.join(", "))}</span>` : ""}`).join("<br>");
       return `<tr><td>${esc(r.name)}${r.count > 1 ? ` ×${r.count}` : ""}${r.quality ? ` <span class="sub">(quality ${r.quality}+)</span>` : ""}<br><span class="sub">${esc(r.bundle)} · ${esc(r.room)}</span></td>` +
         `<td class="status-${esc(r.status)}">${esc(STATUS_TEXT[r.status] || r.status)}</td>` +
-        `<td>${b ? esc(b.label) : ""}${b && b.blocked.length ? `<br><span class="sub">after ${esc(b.blocked.join(", "))}</span>` : ""}</td><td>${when}</td><td class="sub">${also}</td></tr>`;
+        `<td>${b ? esc(b.label) : ""}${b && b.blocked.length ? `<br><span class="sub">after ${esc(b.blocked.join(", "))}</span>` : ""}</td><td>${when}${b && b.earliest_after_unlock ? `<br><span class="sub">with the unlocks: ${esc(b.earliest_after_unlock)}</span>` : ""}</td><td class="sub">${also}</td></tr>`;
     }).join("");
+    const g = v.gold;
+    $("#plan-gold").textContent = `You have ${g.money.toLocaleString()}g. The Vault still needs ${g.vault.toLocaleString()}g and these unlocks ${g.unlocks.toLocaleString()}g` +
+      (g.short ? `: ${g.short.toLocaleString()}g more to earn by ${v.deadline} for all of it.` : ", which you can already cover.");
+    $("#plan-unlocks").innerHTML = "<tr><th>Unlock</th><th>Cost</th><th>Takes</th><th>Opens</th></tr>" + v.unlocks.map((u) =>
+      `<tr><td>${esc(u.label)}${u.how ? `<br><span class="sub">${esc(u.how)}</span>` : ""}</td><td>${u.gold ? `${u.gold.toLocaleString()}g` : ""}${u.materials.length ? `${u.gold ? " + " : ""}${esc(u.materials.map((m) => `${m.count} ${m.name}`).join(", "))}` : ""}</td>` +
+      `<td>${u.days ? `${u.days} day${u.days > 1 ? "s" : ""}` : ""}</td><td>${esc(u.slots.join(", "))}</td></tr>`
+    ).join("");
   },
 
   async ask() { $("#ask-q").focus(); },

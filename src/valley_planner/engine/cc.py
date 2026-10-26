@@ -26,6 +26,7 @@ from ..facts.bundles import JOJA, VAULT
 from ..facts.conditions import When, check
 from ..facts.sources import Source, Sources, seasons_text
 from ..views.farm import Farm
+from .unlocks import Unlock, Unlocks
 
 YEAR = 112
 CART_WEEKDAYS = (5, 0)  # Friday, Sunday (day % 7)
@@ -39,6 +40,7 @@ class Way:
     blocked: list[str] = field(default_factory=list)  # what has to happen first
     odds: float | None = None  # random sources: chance of at least one by the deadline
     sure: bool = True  # False: a condition we can't decide, or a source whose odds aren't modelled
+    unlocks: list[str] = field(default_factory=list)  # unlock keys behind `blocked` (engine/unlocks.py)
 
 
 @dataclass
@@ -86,26 +88,39 @@ class Planner:
         self.sources = Sources(farm.data, farm_type=farm.save.farm_type)
         self.today = farm.save.days_played
         self.held = farm.held()
+        self.unlocks = Unlocks(farm)
 
     def way(self, src: Source, item: str) -> Way:
-        f, w, today, end = self.farm, self.farm.when, self.today, self.deadline
-        blocked = []
+        f, w = self.farm, self.farm.when
+        blocked, keys = [], []
         for need in src.needs:
             kind, _, what = need.partition(":")
             if kind == "place":
                 ok, why = place_open("IslandSouth" if what == "Island" else what, w)
                 if not ok:
                     blocked.append(why or what)
+                    keys.append(need)
             elif kind == "machine" and not f.save.machines.get(self._bc_name(what)):
                 blocked.append(f"a {self._bc_display(what)}")
+                keys.append(need)
             elif kind == "recipe" and what not in f.save.crafting_recipes and what not in f.save.cooking_recipes:
                 blocked.append(f"the {what} recipe")
+                keys.append(need)
             elif kind == "animal" and not any(a["type"] == what for a in f.save.animals):
                 blocked.append(f"a {what}")
-            elif kind == "building" and not f.save.buildings.get(what):
+                keys.append(need)
+            elif kind == "building" and not f.save.buildings.get(what) and not self.unlocks.get(need).done:
                 blocked.append(f"a {what}")
+                keys.append(need)
             elif kind == "kitchen" and f.save.house_upgrade < 1:
                 blocked.append("a kitchen (the first house upgrade)")
+                keys.append("kitchen")
+        way = self._way(src, item, blocked)
+        way.unlocks = keys
+        return way
+
+    def _way(self, src: Source, item: str, blocked: list[str]) -> Way:
+        f, w, today, end = self.farm, self.farm.when, self.today, self.deadline
         if src.chance is not None and src.kind in ("cart", "monster", "forage"):
             if src.kind == "cart":
                 tries = sum(1 for d in range(today, end + 1) if (d - 1) % 28 % 7 % 5 == 0)
@@ -199,7 +214,32 @@ class Planner:
                 cands.append(slot)
             cands.sort(key=_slot_order)
             out += cands[:b.still_needed]
+        self._share_unlocks(out)
         return out
+
+    def _share_unlocks(self, slots: list[Slot]) -> None:
+        """For slots waiting on an unlock, pick the way whose unlocks add the least gold, counting the ones
+        another slot already needs as free (a Deluxe Coop and a rabbit give both Wool and a Rabbit's Foot).
+        A planning choice; two passes let early picks benefit from later ones."""
+        def chain(x: Way) -> list[Unlock]:
+            return [u for k in x.unlocks for u in self.unlocks.chain(k)]
+
+        waiting = [s for s in slots if s.status == "blocked"]
+        for _ in range(2):
+            chosen: dict[str, int] = {}
+            for s in waiting:
+                if s.best:
+                    for u in chain(s.best):
+                        chosen[u.key] = chosen.get(u.key, 0) + 1
+            for s in waiting:
+                for u in chain(s.best) if s.best else []:  # don't count this slot's own pick as shared
+                    chosen[u.key] -= 1
+                gated = [x for x in s.ways if x.blocked and x.earliest is not None and x.source.kind != "monster"]
+                if gated:
+                    s.best = min(gated, key=lambda x: (sum(u.gold for u in chain(x) if chosen.get(u.key, 0) <= 0),
+                                                       x.earliest))
+                for u in chain(s.best) if s.best else []:
+                    chosen[u.key] = chosen.get(u.key, 0) + 1
 
 
 LIKELY = 0.8  # a random way this likely by the deadline counts as the plan
@@ -231,8 +271,34 @@ def plan(farm: Farm, deadline: int | None = None) -> dict:
     p = Planner(farm, end)
     slots = p.slots()
 
-    def way_json(x: Way) -> dict:
+    summary: dict[str, dict] = {}
+
+    def chain(x: Way) -> list[Unlock]:
+        out, seen = [], set()
+        for k in x.unlocks:
+            for u in p.unlocks.chain(k):
+                if u.key not in seen:
+                    seen.add(u.key)
+                    out.append(u)
+        return out
+
+    def way_json(x: Way, slot_name: str = "") -> dict:
+        steps = chain(x)
+        lead = sum(u.days for u in steps)
+        if slot_name:
+            for u in steps:
+                row = summary.setdefault(u.key, {"key": u.key, "label": u.label, "gold": u.gold, "days": u.days,
+                                                 "how": u.how, "materials": [{"name": farm.name(f"(O){m}"), "count": n}
+                                                               for m, n in u.materials], "slots": []})
+                row["slots"].append(slot_name)
+        earliest = x.earliest
+        if earliest is not None and steps:
+            earliest = max(earliest, p.today + lead)
         return {"kind": x.source.kind, "label": x.source.label, "seasons": seasons_text(x.source),
+                "unlock": [{"label": u.label, "gold": u.gold, "days": u.days, "how": u.how,
+                            "materials": [f"{n} {farm.name('(O)' + m)}" for m, n in u.materials]} for u in steps],
+                "unlock_gold": sum(u.gold for u in steps),
+                "earliest_after_unlock": farm.label(earliest) if earliest and steps else "",
                 "earliest": farm.label(x.earliest) if x.earliest else "",
                 "last_start": farm.label(x.latest_start) if x.latest_start else "",
                 "blocked": x.blocked, "odds": round(x.odds, 3) if x.odds is not None else None, "sure": x.sure,
@@ -241,13 +307,19 @@ def plan(farm: Farm, deadline: int | None = None) -> dict:
     rows = []
     for s in slots:
         rows.append({"bundle": s.bundle, "room": s.room, "item": s.item, "name": s.name, "count": s.count,
-                     "quality": s.quality, "status": s.status, "best": way_json(s.best) if s.best else None,
+                     "quality": s.quality, "status": s.status, "best": way_json(s.best, s.name) if s.best else None,
                      "others": [way_json(x) for x in s.ways if x is not s.best][:5],
                      "_last": s.best.latest_start if s.best and s.best.latest_start else math.inf})
     order = {"stuck": 0, "blocked": 1, "luck": 2, "maybe": 3, "ok": 4, "have": 5}
     rows.sort(key=lambda r: (order[r["status"]], r["_last"]))
     for r in rows:
         r.pop("_last")
-    return {"deadline": farm.label(end), "today": farm.label(p.today), "slots": rows,
+    vault = sum(b.gold or 0 for b in farm.bundles.in_area(4) if not b.done)
+    unlocks = sorted(summary.values(), key=lambda u: (-len(u["slots"]), u["gold"]))
+    bought = sum(u["gold"] for u in unlocks if not u["key"].startswith("place:Desert"))  # the bus is the Vault
+    gold = {"money": farm.save.money, "vault": vault, "unlocks": bought}
+    gold["short"] = max(0, gold["vault"] + gold["unlocks"] - gold["money"])
+    return {"deadline": farm.label(end), "today": farm.label(p.today), "slots": rows, "unlocks": unlocks,
+            "gold": gold,
             "counts": {k: sum(1 for r in rows if r["status"] == k)
                        for k in ("have", "ok", "maybe", "luck", "blocked", "stuck")}}
