@@ -429,11 +429,17 @@ def read_save(path: Path, data=None) -> Save:
             continue
         upgrading = _text(b, "upgradeName") if _int(b, "daysUntilUpgrade") > 0 else ""
         buildings[upgrading or btype] += 1  # Robin finishes construction and upgrades on her own
-    for el in root.iter():
-        if _tag(el) == "FarmAnimal":
-            animals.append({"type": _text(el, "type"), "name": _text(el, "name"),
+    seen_animals = set()
+    for el in root.iter():  # each animal is stored twice (its building's list and its home's), once by id
+        if _tag(el) == "FarmAnimal" and _text(el, "myID") not in seen_animals:
+            seen_animals.add(_text(el, "myID"))
+            animals.append({"id": _text(el, "myID"), "type": _text(el, "type"), "name": _text(el, "name"),
                             "friendship": _int(el, "friendshipTowardFarmer"), "happiness": _int(el, "happiness"),
-                            "age": _int(el, "age"), "home": _text(el, "buildingTypeILiveIn")})
+                            "fullness": _int(el, "fullness"), "age": _int(el, "age"),
+                            "days_owned": _int(el, "daysOwned"), "days_since_lay": _int(el, "daysSinceLastLay"),
+                            "produce_quality": _int(el, "produceQuality"), "produce": _text(el, "currentProduce"),
+                            "was_pet": _bool(el, "wasPet"), "cracker": _bool(el, "hasEatenAnimalCracker"),
+                            "home": _text(el, "buildingTypeILiveIn")})
 
     fruit_trees = []
     for el in root.iter():

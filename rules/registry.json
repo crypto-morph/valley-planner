@@ -3552,18 +3552,22 @@
   {
    "id": "animals.large-produce",
    "area": "Animals",
-   "summary": "On a day the animal produces, the deluxe item replaces the normal one if three things hold: random < happiness/150, friendship >= DeluxeProduceMinimumFriendship (200), and random < (friendship + h)/DeluxeProduceCareDivisor (1200) + luck x DeluxeProduceLuckMultiplier (0 for chicken, cow, goat). Here h = 1.5 x happiness when happiness > 200, happiness - 100 when it is 100 or less, and 0 in between. At 200 friendship and full happiness (255) this gives (200+382.5)/1200 = 48.5%.",
+   "summary": "On a night the animal produces, a roll under happiness/150 opens the deluxe and quality rolls: the deluxe item replaces the normal one if friendship >= the deluxe minimum and a roll falls under (friendship + care)/divisor + luck x multiplier, care = 1.5 x happiness above 200, happiness - 100 at 100 or below, else 0. For chickens and cows (divisor 1200, minimum 200) at full happiness that is (F + 382.5)/1200, certain from about F = 818.",
    "checked_against": [
     "StardewValley.FarmAnimal.Eat",
+    "StardewValley.FarmAnimal.GetProduceID",
     "StardewValley.FarmAnimal.dayUpdate",
     "StardewValley.FarmAnimal.pet"
    ],
    "data": [
     "Data/FarmAnimals DeluxeProduceMinimumFriendship, DeluxeProduceCareDivisor, DeluxeProduceLuckMultiplier"
    ],
-   "status": "to fix",
-   "fix": "The chance is not fixed at 49%. It rises with friendship, (F+382.5)/1200, and is certain from about F=818 when happiness is full. On days happiness is 200 or less (indoors on rain or in winter without enough petting) it drops to F/1200 or below. Friendship 200 takes about 9 days with daily petting (+15) and grazing (+8), and about 14 days with petting only. Large Goat Milk rolls only every 2nd day.",
-   "derive_from": "Data/FarmAnimals <animal>.DeluxeProduceMinimumFriendship / DeluxeProduceCareDivisor / DeluxeProduceLuckMultiplier; consumed by FarmAnimal.dayUpdate"
+   "status": "verified",
+   "derive_from": "Data/FarmAnimals <animal>.DeluxeProduceMinimumFriendship / DeluxeProduceCareDivisor / DeluxeProduceLuckMultiplier; consumed by FarmAnimal.dayUpdate",
+   "tests": [
+    "tests/test_animals.py::test_odds_and_price",
+    "tests/test_animals.py::test_tonight_matches_the_draws"
+   ]
   },
   {
    "id": "animals.large-egg-id",
@@ -3609,16 +3613,18 @@
   {
    "id": "animals.duck-feather",
    "area": "Animals",
-   "summary": "Duck Feather is the duck's deluxe produce. It needs friendship >= 200, and the duck produces every 2 days.",
+   "summary": "Duck Feather is the duck's deluxe produce (friendship >= 200, every 2 days): at full happiness the chance per produce night is (F + 382.5)/4750 + 1.01 x daily luck, 12.3% at F = 200, behind the happiness/150 gate.",
    "checked_against": [
     "StardewValley.FarmAnimal.dayUpdate"
    ],
    "data": [
     "Data/FarmAnimals Duck.DeluxeProduceMinimumFriendship 200, DeluxeProduceCareDivisor 4750, DeluxeProduceLuckMultiplier 1.01"
    ],
-   "status": "to fix",
-   "fix": "At 200 friendship and full happiness the chance per produce day is (200+382.5)/4750 = 12.3%, plus 1.01 x daily luck (about +/-10 points), all times the happiness/150 gate (certain at full happiness). It is 15% only at about 330 friendship and reaches 29% at 1000. Use (F+382.5)/4750 + 1.01 x luck, not a flat 15%.",
-   "derive_from": "Data/FarmAnimals Duck DeluxeProduce* fields; consumed by FarmAnimal.dayUpdate"
+   "status": "verified",
+   "derive_from": "Data/FarmAnimals Duck DeluxeProduce* fields; consumed by FarmAnimal.dayUpdate",
+   "tests": [
+    "tests/test_animals.py::test_odds_and_price"
+   ]
   },
   {
    "id": "animals.duck-friendship",
@@ -3635,7 +3641,7 @@
   {
    "id": "animals.rabbits-foot",
    "area": "Animals",
-   "summary": "Rabbit's Foot is the rabbit's deluxe produce, and the rabbit produces every 4 days. The Cart chance of about 3% per visit matches 10 picks from the 334-object pool.",
+   "summary": "Rabbit's Foot is the rabbit's deluxe produce (no friendship minimum, every 4 days): (F + 382.5)/5000 + 1.02 x daily luck at full happiness, 7.7% at F = 0 and 27.7% at F = 1000.",
    "checked_against": [
     "StardewValley.FarmAnimal.dayUpdate"
    ],
@@ -3643,9 +3649,11 @@
     "Data/FarmAnimals Rabbit.DeluxeProduceMinimumFriendship 0, DeluxeProduceCareDivisor 5000, DeluxeProduceLuckMultiplier 1.02",
     "Data/Shops Traveler"
    ],
-   "status": "to fix",
-   "fix": "There is no friendship minimum (0). The chance per produce day is (F+382.5)/5000 + 1.02 x daily luck at full happiness: 7.7% at F=0, 15% at about F=370, 27.7% at F=1000. Daily luck swings it by about +/-10 points.",
-   "derive_from": "Data/FarmAnimals Rabbit DeluxeProduce* fields"
+   "status": "verified",
+   "derive_from": "Data/FarmAnimals Rabbit DeluxeProduce* fields",
+   "tests": [
+    "tests/test_animals.py::test_odds_and_price"
+   ]
   },
   {
    "id": "animals.truffle",
@@ -12285,6 +12293,25 @@
    "tests": [
     "tests/test_hours.py::test_anyone_at_the_clinic_desk_and_joja",
     "tests/test_hours.py::test_real_week_of_shops"
+   ]
+  },
+  {
+   "id": "animals.overnight-roll",
+   "area": "Animals & produce",
+   "summary": "Each animal's night is rolled with a generator seeded (animal id / 2, days played of the new day), so tomorrow's produce follows from tonight's state: petting (+15 friendship, + max(5, 30 + drain) happiness, doubled with the coop/barn profession), not petting (friendship - (10 - F/200), happiness - 50), door shut (+2 x drain), hay if fullness < 200, growing a day if full, hunger (-100 happiness, -20 friendship), then the produce gate (days since last >= DaysToProduce minus the faster-produce friendship/profession, rolls under fullness/200 and happiness/70, not a baby). Quality is rerolled only in the happiness/150 branch (q = F/1000 - (1 - H/225), +0.33 with the quality profession; iridium needs q >= 0.95); otherwise the last quality carries over.",
+   "checked_against": [
+    "StardewValley.FarmAnimal.dayUpdate",
+    "StardewValley.FarmAnimal.pet",
+    "StardewValley.FarmAnimal.growFully",
+    "StardewValley.FarmAnimal.updatePerTenMinutes"
+   ],
+   "data": [
+    "Data/FarmAnimals"
+   ],
+   "status": "verified",
+   "tests": [
+    "tests/test_animals.py::test_tonight_matches_the_draws",
+    "tests/test_animals.py::test_babies_hunger_and_slow_producers"
    ]
   }
  ]
