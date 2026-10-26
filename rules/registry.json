@@ -3665,80 +3665,98 @@
   {
    "id": "machine.mayo-egg",
    "area": "Animals",
-   "summary": "Mayonnaise Machine (BC)24 Default_Egg (tag egg_item) gives Mayonnaise 306, sell price 190.",
+   "summary": "Mayonnaise Machine: an egg (tag egg_item) gives Mayonnaise 306 (price 190) in 180 minutes, ready the same day.",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)24",
     "Data/Objects 306.Price"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 180 minutes (0.125 day), not 0.1 day. It is ready the same day either way.",
-   "derive_from": "Data/Machines (BC)24 OutputRules[].MinutesUntilReady; Data/Objects 306.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)24 OutputRules[].MinutesUntilReady; Data/Objects 306.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.mayo-large-egg",
    "area": "Animals",
-   "summary": "Default_LargeEgg (tag large_egg_item) gives gold-quality Mayonnaise, 190 x 1.5 = 285. Both 174 and 182 carry the tag.",
+   "summary": "Large eggs (tags large_egg_item and egg_item, both 174 and 182) give gold-quality Mayonnaise (190 x 1.5 = 285) in 180 minutes.",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)24 Default_LargeEgg",
     "Data/Objects 174/182 ContextTags"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 180 minutes (0.125 day), not 0.1.",
-   "derive_from": "Data/Machines (BC)24 OutputItem Quality 2; Data/Objects 306.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)24 OutputItem Quality 2; Data/Objects 306.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.duck-mayo",
    "area": "Animals",
-   "summary": "Default_DuckEgg gives Duck Mayonnaise 307, price 375.",
+   "summary": "A Duck Egg gives Duck Mayonnaise 307 (375) in 180 minutes.",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)24 Default_DuckEgg",
     "Data/Objects 307.Price"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 180 minutes (0.125 day), not 0.1.",
-   "derive_from": "Data/Machines (BC)24; Data/Objects 307.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)24; Data/Objects 307.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.cheese",
    "area": "Animals",
-   "summary": "Milk gives Cheese 424 (230); Large Milk gives gold Cheese (345).",
+   "summary": "Milk gives Cheese 424 (230) in 200 minutes; Large Milk gives gold Cheese (345).",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)16",
     "Data/Objects 424.Price"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 200 minutes (about 0.139 day), not 0.1.",
-   "derive_from": "Data/Machines (BC)16; Data/Objects 424.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)16; Data/Objects 424.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.goat-cheese",
    "area": "Animals",
-   "summary": "Goat Milk gives Goat Cheese 426 (400); L. Goat Milk gives gold Goat Cheese (600).",
+   "summary": "Goat Milk gives Goat Cheese 426 (400) in 200 minutes; L. Goat Milk gives gold Goat Cheese (600).",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)16",
     "Data/Objects 426.Price"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 200 minutes (about 0.139 day), not 0.1.",
-   "derive_from": "Data/Machines (BC)16; Data/Objects 426.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)16; Data/Objects 426.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.loom",
    "area": "Animals",
-   "summary": "Wool gives Cloth 428 (470).",
+   "summary": "Wool gives Cloth 428 (470) in 240 minutes.",
    "checked_against": [],
    "data": [
     "Data/Machines (BC)17",
     "Data/Objects 428.Price"
    ],
-   "status": "to fix",
-   "fix": "Processing takes 240 minutes (about 0.167 day), not 0.2.",
-   "derive_from": "Data/Machines (BC)17; Data/Objects 428.Price"
+   "status": "verified",
+   "derive_from": "Data/Machines (BC)17; Data/Objects 428.Price",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.oil-maker-truffle",
@@ -6393,7 +6411,7 @@
   {
    "id": "sell.price-formula",
    "area": "Economy & shops & selling",
-   "summary": "In the main case the game does what the planner does. It takes the item's own price, multiplies it by (1 + 0.25 x quality) and truncates to an int, then multiplies by the profession factor and truncates again.",
+   "summary": "Sale price = int(price x (1 + 0.25 x quality)) x the farmer's bonus multiplier, halved for Cranberry Seeds, then x the profit-margin setting (1, 0.75, 0.5 or 0.25) and at least 1 if positive, cut to a whole number; all in 32-bit float steps. Tackle sells by wear instead.",
    "checked_against": [
     "StardewValley.Object.getPriceAfterMultipliers",
     "StardewValley.Object.sellToStorePrice"
@@ -6402,8 +6420,10 @@
     "save: item price",
     "save: player/difficultyModifier"
    ],
-   "status": "to fix",
-   "fix": "Missing pieces: (1) The result is also multiplied by the save's profit-margin setting (MasterPlayer.difficultyModifier: 1, 0.75, 0.5 or 0.25) and clamped to at least 1 when positive. (2) Cranberry Seeds (O)493 sell for half. (3) Fences sell for their raw price. Tackle (-22) uses quality and remaining uses instead. (4) The arithmetic is single-precision float, so rare edge values can truncate differently from Python doubles."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_sell_prices"
+   ]
   },
   {
    "id": "sell.rancher-bonus",
@@ -6441,13 +6461,15 @@
   {
    "id": "sell.fisher-angler-bonus",
    "area": "Economy & shops & selling",
-   "summary": "Fisher (6) gives x1.25 on fish (-4), or x1.5 if the farmer also has Angler (8). That is right.",
+   "summary": "Fisher (6) gives x1.25 on fish (-4) and on Smoked Fish, or x1.5 with Angler (8); Smoked Fish, being artisan, also gets Artisan's x1.4.",
    "checked_against": [
     "StardewValley.Object.getPriceAfterMultipliers"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "The bonus also applies to Smoked Fish: category -26 with preserve type SmokedFish, which therefore stacks Artisan x1.4 with Fisher/Angler."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_sell_prices"
+   ]
   },
   {
    "id": "sell.tapper-bonus",
@@ -6472,15 +6494,17 @@
   {
    "id": "sell.bonuses-multiply",
    "area": "Economy & shops & selling",
-   "summary": "Both readings are partly right. For one farmer, every applicable profession factor multiplies together, as the code does (e.g. Rancher x Artisan = 1.68 on cheese or mayonnaise). Across farmers the game works out that product for each one and keeps the largest, which is the docstring's 'best farmer'. With a shared wallet that is every active farmer; with separate wallets it is only the seller. So the code is right for single player and the docstring describes the multiplayer step.",
+   "summary": "For one farmer every applicable factor multiplies: the profession ones (Rancher, Tiller except foraged fruit, Artisan, Fisher/Angler, Tapper, Blacksmith on bars, Gemologist) and Bear's Knowledge (x3 Salmonberry/Blackberry), Spring Onion Mastery (x5), the artifact book (x3 artifacts). With several farmers on a shared wallet the best farmer's multiplier is used.",
    "checked_against": [
     "StardewValley.Object.getPriceAfterMultipliers"
    ],
    "data": [
     "save: player professions, eventsSeen, stats"
    ],
-   "status": "to fix",
-   "fix": "The same multiplier also has non-profession factors the planner leaves out: Blacksmith (20) x1.5 on metal bars; event 2120303 (Bear's Knowledge) x3 on Salmonberry and Blackberry; event 3910979 (Spring Onion Mastery) x5 on Spring Onion; stat Book_Artifact x3 on Arch-type items. All of them multiply into the same per-farmer product."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_sell_prices"
+   ]
   },
   {
    "id": "sell.saved-item-price",
@@ -6555,7 +6579,7 @@
   {
    "id": "seedmaker.output-1-3",
    "area": "Economy & shops & selling",
-   "summary": "The usual output is 1-3 of the crop's seed.",
+   "summary": "The Seed Maker takes 20 minutes. It gives the seed of the first crop (Data/Crops order) that harvests the item: 1-3 of it, or (0.5%) one Ancient Seed, then (2%) 1-4 Mixed Seeds; the roll is seeded by the machine's tile and the time.",
    "checked_against": [
     "StardewValley.Object.OutputMachine",
     "StardewValley.Object.OutputSeedMaker"
@@ -6563,8 +6587,10 @@
    "data": [
     "Data/Machines (BC)25 MinutesUntilReady 20"
    ],
-   "status": "to fix",
-   "fix": "It takes 20 game minutes, not overnight. Each load has a 0.5% chance of 1 Ancient Seeds instead, then a 2% chance of 1-4 Mixed Seeds, and otherwise 1-3 seeds (uniform). The roll is seeded by the machine's tile and the time of day."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines"
+   ]
   },
   {
    "id": "crafting.keep-materials",
@@ -6585,7 +6611,7 @@
   {
    "id": "machine.keg-days",
    "area": "Economy & shops & selling",
-   "summary": "A Keg makes wine in 10,000 machine minutes. The planner's 7 days is a ready-by ceiling, not the real length.",
+   "summary": "Wine takes 10,000 machine minutes: loaded at 6:00 it's ready at 12:40 six days later (6 x 1,600 + 400).",
    "checked_against": [
     "StardewValley.Object.OutputMachine",
     "StardewValley.Object.minutesElapsed",
@@ -6594,13 +6620,15 @@
    "data": [
     "Data/Machines (BC)12 Default_Wine MinutesUntilReady"
    ],
-   "status": "to fix",
-   "fix": "Machines age 1,600 minutes from one 6am to the next (1,200 awake minutes plus a 400-minute overnight jump), so wine takes 6.25 day-cycles. Loaded at 6:00, it is ready at 12:40 six days later. Loaded in the evening, it is ready on the morning of the 7th day."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock"
+   ]
   },
   {
    "id": "machine.jar-days",
    "area": "Economy & shops & selling",
-   "summary": "Jelly and pickles take 4,000 machine minutes.",
+   "summary": "Jelly and pickles take 4,000 machine minutes: loaded at 6:00 they're ready at 19:20 two days later (2 x 1,600 + 800).",
    "checked_against": [
     "StardewValley.Object.minutesElapsed",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -6608,13 +6636,15 @@
    "data": [
     "Data/Machines (BC)15 Default_Jelly/Default_Pickled MinutesUntilReady"
    ],
-   "status": "to fix",
-   "fix": "That is 2.5 day-cycles of 1,600 minutes. Loaded at 6:00, it is ready at 14:00 two days later. Loaded late, it is usually ready by the third morning (if loaded near 2am, by midday on day 3). 3 days is a ceiling, not the duration."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock"
+   ]
   },
   {
    "id": "machine.juice-days",
    "area": "Economy & shops & selling",
-   "summary": "Juice takes 6,000 machine minutes.",
+   "summary": "Juice takes 6,000 machine minutes: loaded at 6:00 it's ready at 2:00 AM on the third night (3 x 1,600 + 1,200), so in practice the fourth morning.",
    "checked_against": [
     "StardewValley.Object.minutesElapsed",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -6622,8 +6652,10 @@
    "data": [
     "Data/Machines (BC)12 Default_Juice MinutesUntilReady"
    ],
-   "status": "to fix",
-   "fix": "That is 3.75 day-cycles. Loaded at 6:00, it is ready at 22:00 three days later. Loaded later, it is ready on day 4."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock"
+   ]
   },
   {
    "id": "machine.wine-price",
@@ -6669,32 +6701,39 @@
   {
    "id": "machine.keg-fruit-veg-only",
    "area": "Economy & shops & selling",
-   "summary": "Every fruit (-79) and vegetable (-75) is accepted.",
+   "summary": "A machine's rules are tried in order and specific ones come first: in a Keg, Wheat makes Beer, Hops Pale Ale, Tea Leaves Green Tea (180 minutes), Honey Mead, 5 Coffee Beans Coffee, Rice Vinegar; then vegetables (and edible greens that aren't mushrooms) make Juice and fruit makes Wine. In a Jar, Roe makes Aged Roe (Sturgeon Roe makes Caviar) before vegetables make Pickles and fruit Jelly.",
    "checked_against": [
+    "StardewValley.MachineDataUtility.CanApplyOutput",
+    "StardewValley.MachineDataUtility.TryGetMachineOutputRule",
     "StardewValley.Object.OutputMachine"
    ],
    "data": [
     "Data/Machines (BC)12/(BC)15 OutputRules Triggers RequiredTags/Condition (rules apply in order)"
    ],
-   "status": "to fix",
-   "fix": "(1) Rules apply in order, and specific ones come first. In a Keg, Wheat makes Beer, Hops Pale Ale, Tea Leaves Green Tea (in 180 minutes), Honey Mead, 5 Coffee Beans Coffee and Rice Vinegar. In a Jar, Roe makes Aged Roe and Sturgeon Roe makes Caviar. None of those are juice, pickles or jelly. (2) Forage (-81) is accepted too. A Keg makes juice from any edible forage that is not a mushroom. A Jar pickles any edible forage, mushrooms included, and also Ginger (tag preserves_pickle).",
+   "status": "verified",
    "refs": [
     "StardewValley.ItemContextTagManager",
     "StardewValley.Machines.MachineDataUtility.TryGetMachineOutputRule"
+   ],
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
    ]
   },
   {
    "id": "machine.products-artisan",
    "area": "Economy & shops & selling",
-   "summary": "Every product the planner models is category -26: Wine, Juice, Jelly, Pickles, Mayonnaise (and Duck/Void/Dinosaur), Cheese, Goat Cheese, Cloth, Truffle Oil.",
+   "summary": "Machine products take their category from Data/Objects: most are artisan goods (-26), but Oil, Vinegar and Coffee are 0 and Roe is -23. Mayonnaise, Cheese and Cloth also get Rancher's x1.2 (matched by name) on top of Artisan.",
    "checked_against": [
     "StardewValley.Object.getPriceAfterMultipliers"
    ],
    "data": [
     "Data/Objects Category"
    ],
-   "status": "to fix",
-   "fix": "Not every machine product is -26: Oil and Vinegar are category 0, Coffee is 0, and Roe is -23. Mayonnaise, Cheese and Cloth also get the Rancher x1.2 on top of Artisan, by name. The planner gets that right because it passes the product name."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_sell_prices"
+   ]
   },
   {
    "id": "sell.process-threshold",
@@ -6999,7 +7038,7 @@
   {
    "id": "machine.keg-wine-minutes",
    "area": "Economy & shops & selling",
-   "summary": "10,000 minutes and the 3x price are right.",
+   "summary": "Wine: 10,000 minutes, price 3 x the fruit's data price; 6.25 machine days.",
    "checked_against": [
     "StardewValley.Object.minutesElapsed",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -7007,13 +7046,17 @@
    "data": [
     "Data/Machines (BC)12 Default_Wine MinutesUntilReady 10000"
    ],
-   "status": "to fix",
-   "fix": "The day figure is wrong. Machine minutes run at 1,600 per day (6am to 6am), so it is 6.25 days, not 6.94."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock",
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.keg-juice-minutes",
    "area": "Economy & shops & selling",
-   "summary": "6,000 minutes and int(2.25 x price) are right.",
+   "summary": "Juice: 6,000 minutes, price int(2.25 x the vegetable's data price); 3.75 machine days.",
    "checked_against": [
     "StardewValley.Object.minutesElapsed",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -7021,13 +7064,17 @@
    "data": [
     "Data/Machines (BC)12 Default_Juice MinutesUntilReady 6000"
    ],
-   "status": "to fix",
-   "fix": "It is 3.75 days at 1,600 minutes per day, not 4.17."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock",
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.jar-minutes",
    "area": "Economy & shops & selling",
-   "summary": "4,000 minutes and 2 x price + 50 are right.",
+   "summary": "Jelly and pickles: 4,000 minutes, price 2 x the data price + 50; 2.5 machine days.",
    "checked_against": [
     "StardewValley.Object.minutesElapsed",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -7035,21 +7082,28 @@
    "data": [
     "Data/Machines (BC)15 MinutesUntilReady 4000"
    ],
-   "status": "to fix",
-   "fix": "It is 2.5 days at 1,600 minutes per day, not 2.78."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock",
+    "tests/test_machines_sell.py::test_real_machines",
+    "tests/test_machines_sell.py::test_rules_in_order_tags_and_flavors"
+   ]
   },
   {
    "id": "machine.day-minutes",
    "area": "Economy & shops & selling",
-   "summary": "Machine timers count down 10 minutes per 10-minute tick while awake (6:00 to 2:00 is 1,200 minutes). At day end they also get the minutes from bedtime to 6:00, counted as if 2:00 to 6:00 lasts 400 minutes.",
+   "summary": "Machine clocks lose 10 minutes per 10-minute tick while you're awake (6:00 to 2:00 is 1,200 minutes) and overnight jump by what's left until 2 AM plus 400, so every 6 AM-to-6 AM day is 1,600 machine minutes. DaysUntilReady machines are set to be ready at 6 AM that many mornings later.",
    "checked_against": [
     "StardewValley.GameLocation.DayUpdate",
     "StardewValley.Object.minutesElapsed",
-    "StardewValley.Utility.CalculateMinutesUntilMorning"
+    "StardewValley.Utility.CalculateMinutesUntilMorning",
+    "StardewValley.Utility.CalculateMinutesUntilMorning/2"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "A full day (6am to 6am) is 1,600 machine minutes, not 1,440. The 'days until morning N' helper adds 1,600 per extra day. To get days, divide by 1,600; for a ready time, simulate from the load time. Machines with DaysUntilReady (Bee House, 4) are ready at 6:00 on that morning."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock"
+   ]
   },
   {
    "id": "shop.id-owner-map",
@@ -7268,7 +7322,7 @@
   {
    "id": "src.cheese",
    "area": "Economy & shops & selling",
-   "summary": "Milk becomes Cheese, Large Milk becomes gold-quality Cheese, and the Cheese Press unlocks at Farming 6.",
+   "summary": "Milk becomes Cheese, Large Milk becomes gold-quality Cheese, and the Cheese Press unlocks at Farming 6; it takes 200 minutes (3h20m).",
    "checked_against": [
     "StardewValley.Object.OutputMachine"
    ],
@@ -7276,21 +7330,25 @@
     "Data/CraftingRecipes Cheese Press",
     "Data/Machines (BC)16 MinutesUntilReady 200"
    ],
-   "status": "to fix",
-   "fix": "It takes 200 minutes (3h20m), not 3h."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines"
+   ]
   },
   {
    "id": "src.goat-cheese",
    "area": "Economy & shops & selling",
-   "summary": "Goat Milk becomes Goat Cheese, and L. Goat Milk becomes gold Goat Cheese.",
+   "summary": "Goat Milk becomes Goat Cheese, and L. Goat Milk becomes gold Goat Cheese; it takes 200 minutes (3h20m).",
    "checked_against": [
     "StardewValley.Object.OutputMachine"
    ],
    "data": [
     "Data/Machines (BC)16 Default_GoatMilk MinutesUntilReady 200"
    ],
-   "status": "to fix",
-   "fix": "It takes 200 minutes (3h20m), not 3h."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_real_machines"
+   ]
   },
   {
    "id": "src.honey",
@@ -7337,7 +7395,7 @@
   {
    "id": "src.wine",
    "area": "Economy & shops & selling",
-   "summary": "Any fruit makes wine, and the Keg unlocks at Farming 8.",
+   "summary": "Any fruit makes wine in a Keg (from Farming 8); it takes 10,000 minutes, 6.25 machine days: ready 6-7 days after loading.",
    "checked_against": [
     "StardewValley.Object.OutputMachine",
     "StardewValley.Utility.CalculateMinutesUntilMorning"
@@ -7345,8 +7403,10 @@
    "data": [
     "Data/Machines (BC)12 Default_Wine MinutesUntilReady 10000"
    ],
-   "status": "to fix",
-   "fix": "It takes 10,000 minutes, which is 6.25 day-cycles: ready 6-7 days after loading, not a flat 7."
+   "status": "verified",
+   "tests": [
+    "tests/test_machines_sell.py::test_machine_clock"
+   ]
   },
   {
    "id": "src.truffle-oil",

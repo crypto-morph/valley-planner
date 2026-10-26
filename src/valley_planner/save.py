@@ -97,6 +97,8 @@ class Item:
     big: bool = False  # big craftable (machines, chests…)
     preserve: str = ""  # Wine / Jelly / Pickle / Juice / … for artisan goods
     preserved_id: str = ""  # what went in
+    spawned: bool = False  # found as forage (the Tiller bonus skips foraged fruit)
+    uses: int = 0  # tackle wear
 
     @property
     def qualified_id(self) -> str:
@@ -159,6 +161,7 @@ class Save:
     mail_tomorrow: set[str] = field(default_factory=set)  # arrives tomorrow morning
     world_state: set[str] = field(default_factory=set)
     events_seen: set[str] = field(default_factory=set)
+    stats: dict[str, int] = field(default_factory=dict)  # the named stats (books read, etc.)
     skills: dict[str, int] = field(default_factory=dict)
     professions: list[int] = field(default_factory=list)
     max_stamina: int = 270
@@ -255,6 +258,7 @@ def _item(el: ET.Element, where: str, names: dict[str, str]) -> Item | None:
         price=price if price >= 0 else None, category=int(category) if category.lstrip("-").isdigit() else None,
         type=_text(el, "type"), big=big, preserve=_text(el, "preserve"),
         preserved_id=_text(el, "preservedParentSheetIndex").removeprefix("(O)"),
+        spawned=_bool(el, "isSpawnedObject"), uses=_int(el, "uses"),
     )
 
 
@@ -385,6 +389,8 @@ def read_save(path: Path, data=None) -> Save:
             if _flat(k) == "daysPlayed":
                 days_played = int(_flat(v) or 0)
     luck = float(_text(root, "dailyLuck", "0") or 0)
+    stat_values = {_flat(k): int(_flat(v) or 0) for k, v in _dict(_child(stats, "Values"))
+                   if (_flat(v) or "0").lstrip("-").isdigit()}
 
     mail = set(_strings(_child(player, "mailReceived")))
     friends = {}
@@ -522,7 +528,7 @@ def read_save(path: Path, data=None) -> Save:
         mail_tomorrow=set(_strings(_child(player, "mailForTomorrow"))),
         mine_lowest=_int(root, "mine_lowestLevelReached"),
         world_state=set(_strings(_child(root, "worldStateIDs"))),
-        events_seen=set(_strings(_child(player, "eventsSeen"))),
+        events_seen=set(_strings(_child(player, "eventsSeen"))), stats=stat_values,
         skills=skills, professions=[int(x) for x in _strings(_child(player, "professions")) if x.isdigit()],
         max_stamina=_int(player, "maxStamina", 270), max_items=_int(player, "maxItems", 12),
         house_upgrade=house_upgrade, deepest_mine_level=_int(player, "deepestMineLevel"),
