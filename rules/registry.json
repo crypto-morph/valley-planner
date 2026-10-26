@@ -2241,20 +2241,24 @@
   {
    "id": "cc.gold-item-id",
    "area": "Community Center & bundles & route",
-   "summary": "In the Vault, ingredient id -1 is a gold amount, paid with the purchase button.",
+   "summary": "A negative ingredient id is an item category (remixed bundles use -5 eggs, -6 milk, etc.). Gold is decided by the area: Vault bundles (area 4) are bought with the purchase button for the stack of their last ingredient.",
    "checked_against": [
     "StardewValley.Menus.Bundle.IsValidItemForThisIngredientDescription",
+    "StardewValley.Menus.BundleIngredientDescription.BundleIngredientDescription",
     "StardewValley.Menus.JunimoNoteMenu.receiveLeftClick"
    ],
    "data": [
     "Data/Bundles Vault/N",
     "Data/RandomBundles items \"10 EggCategory, 10 MilkCategory\""
    ],
-   "status": "to fix",
-   "fix": "The game treats any negative ingredient id as an item category, not as gold. Gold is decided by the area (Vault, whichArea 4). Remixed bundles use category ingredients (EggCategory -5, MilkCategory -6), and the planner would label those \"#-5\"/\"#-6\" and never match stock. Category matching also has one special case: Dinosaur Egg (O)107 counts for category -5.",
+   "status": "verified",
    "derive_from": "Data/Bundles field [2] id token; negative = category (BundleIngredientDescription ctor)",
    "refs": [
-    "StardewValley.Menus.BundleIngredientDescription..ctor"
+    "StardewValley.Menus.BundleIngredientDescription.BundleIngredientDescription"
+   ],
+   "tests": [
+    "tests/test_bundles.py::test_done_versus_counted_and_notes",
+    "tests/test_bundles.py::test_parse_and_match"
    ]
   },
   {
@@ -2366,29 +2370,36 @@
   {
    "id": "cc.item-match-by-name",
    "area": "Community Center & bundles & route",
-   "summary": "The game matches by exact qualified item id (ItemRegistry.HasItemId), by category for negative ids, and by flavor (preservesId) for flavored-item ingredients. It never matches by display name.",
+   "summary": "Bundles match by exact qualified item id (unqualified ids are objects), by category for negative ids (a Dinosaur Egg also counts for -5 eggs), and need at least the asked quality. Names are never used, so shared display names (Egg 176/180, Large Egg 174/182) can't be confused.",
    "checked_against": [
+    "StardewValley.ItemRegistry.HasItemId",
     "StardewValley.Menus.Bundle.IsValidItemForThisIngredientDescription"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Match stock on the qualified item id (and the category for negative ids). Display names collide: \"Egg\" is 176 and 180, \"Large Egg\" is 174 and 182, and every Jelly/Wine/Juice flavor shares one name pattern. A brown Large Egg (182) cannot fill the white Large Egg (174) slot. Dinosaur Egg (107) fills an EggCategory slot.",
+   "status": "verified",
    "refs": [
-    "StardewValley.Menus.BundleIngredientDescription..ctor"
+    "StardewValley.Menus.BundleIngredientDescription.BundleIngredientDescription"
+   ],
+   "tests": [
+    "tests/test_bundles.py::test_fits_and_plan",
+    "tests/test_bundles.py::test_parse_and_match"
    ]
   },
   {
    "id": "cc.room-unlock-counts",
    "area": "Community Center & bundles & route",
-   "summary": "Thresholds match shouldNoteAppearInArea: Crafts Room always, Pantry and Fish Tank need >0 complete bundles, Boiler Room >1, Bulletin Board >2 (its board tile 1799 also checks >2), Vault >3. A note does not appear in a finished area.",
+   "summary": "Notes appear: Crafts Room always, Pantry and Fish Tank after 1 complete bundle, Boiler Room after 2, Bulletin Board after 3, Vault after 4, the Joja 'Missing' bundle after the CC ceremony (event 191393); never once each bundle's ingredient flags in the room are all set. A bundle counts as complete only when every entry of its save list (3 per ingredient) is true, so paid Vault bundles (only entry 0 set) don't count.",
    "checked_against": [
     "StardewValley.Locations.CommunityCenter.checkAction",
     "StardewValley.Locations.CommunityCenter.numberOfCompleteBundles",
-    "StardewValley.Locations.CommunityCenter.shouldNoteAppearInArea"
+    "StardewValley.Locations.CommunityCenter.shouldNoteAppearInArea",
+    "StardewValley.Network.NetWorldState.SetBundleData"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "numberOfCompleteBundles counts a bundle only if every flag in its save array is true. A paid Vault bundle sets only flag [0] (real saves show \"100\"), so paid Vault bundles are NOT counted. This changes nothing in practice, since the Vault note only appears after 4 other bundles are done. The finished-area test inside the function reads only the first third of each array."
+   "status": "verified",
+   "tests": [
+    "tests/test_bundles.py::test_done_versus_counted_and_notes"
+   ]
   },
   {
    "id": "cc.room-done-unlocked",
@@ -10492,17 +10503,20 @@
   {
    "id": "save.bundle-data-1.6",
    "area": "Save file",
-   "summary": "SaveGame.bundleData holds this farm's bundle definitions keyed 'Room/index' in Data/Bundles format (name/reward/ingredients/color/slots/texture/displayName), remixed or not.",
+   "summary": "SaveGame.bundleData holds this farm's bundle definitions keyed 'Room/index' in Data/Bundles format (name/reward/ingredients/colour/slots/sprite/display name). It has been in saves since remixed bundles arrived (1.5); a save without it uses Data/Bundles.",
    "checked_against": [
     "StardewValley.Network.NetWorldState.SetBundleData"
    ],
    "data": [
     "real 1.6.15 save (McClarkies) + 1.5.6 save (Morphic)"
    ],
-   "status": "to fix",
-   "fix": "Not 1.6-only: the 1.5.6 save also has bundleData (it arrived with remixed bundles in 1.5). Treat absence as 'pre-1.5 save, use Data/Bundles'.",
+   "status": "verified",
    "refs": [
     "StardewValley.SaveGame"
+   ],
+   "tests": [
+    "tests/test_bundles.py::test_done_versus_counted_and_notes",
+    "tests/test_bundles.py::test_parse_and_match"
    ]
   },
   {
@@ -11151,8 +11165,9 @@
   {
    "id": "save.bundle-slot-bools",
    "area": "Save file",
-   "summary": "While a bundle is open, slot i true means ingredient i (0-based, in the bundle's ingredient order) was donated. When the bundle completes, the game sets EVERY bool in its array true, including ingredients never donated in 'pick N of M' bundles and the padding. Vault (gold) bundles set only index 0 when bought. A bundle counts complete when the number of true slots among its ingredients >= the slot count (field 4).",
+   "summary": "Each bundle's save list is 3 entries per ingredient; entry i (0-based, in ingredient order) is true once ingredient i was given. A bundle shows as done when that many entries meet its slot count; completing it by donation sets every entry true, buying a Vault bundle sets only entry 0. Decide 'done' first; a done bundle's other entries say nothing about what was given.",
    "checked_against": [
+    "StardewValley.Menus.Bundle.Bundle/2",
     "StardewValley.Menus.Bundle.tryToDepositThisItem",
     "StardewValley.Menus.JunimoNoteMenu.checkIfBundleIsComplete",
     "StardewValley.Menus.JunimoNoteMenu.receiveLeftClick"
@@ -11160,10 +11175,12 @@
    "data": [
     "save bundleData field 4 (number of slots)"
    ],
-   "status": "to fix",
-   "fix": "Decide completion first (true count >= required slots); for completed bundles don't read individual slots as 'this item was donated'.",
+   "status": "verified",
    "refs": [
     "StardewValley.Menus.Bundle"
+   ],
+   "tests": [
+    "tests/test_bundles.py::test_done_versus_counted_and_notes"
    ]
   },
   {
