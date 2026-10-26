@@ -24,8 +24,10 @@ def test_score_kinds_and_empty_slots():
 
 
 def test_best_trades_kinds_against_points():
-    great = e("Bass", 4, -4, 250)  # 8 points
-    veg = e("Parsnip", 0, -75, 35)  # 2 points, but a second kind
-    picked = best([(great, 20), (veg, 5)])
-    assert picked.count(veg) == 1 and picked.count(great) == 8  # one parsnip for its +5, the rest bass
-    assert score(picked) == 14 + 8 * 8 + 2 + 10 + 9
+    carp = e("Carp", 0, -4, 30)  # 2 points
+    veg = e("Parsnip", 0, -75, 35)  # 2 points, and a second kind (+5)
+    picked = best([(carp, 20), (veg, 5)])
+    assert picked.count(veg) == 1 and picked.count(carp) == 8  # one parsnip for its +5
+    assert score(picked) == 14 + 9 * 2 + 10 + 9
+    bass = e("Bass", 4, -4, 250)  # 8 points: worth more than a new kind's 5 + a 2-point item
+    assert best([(bass, 20), (veg, 5)]).count(veg) == 0
