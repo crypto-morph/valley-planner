@@ -159,6 +159,8 @@ class XnbReader:
             return False
         if t.value_type or t.name in VALUE_NAMES or t.name == "System.Nullable`1":
             return True
+        if t.name.startswith("System."):
+            return False  # other System types (Object, collections) are references
         info = self.schema.classes.get(t.name)
         return bool(info and (info.enum is not None or info.value_type))
 

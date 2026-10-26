@@ -210,10 +210,16 @@ class Schema:
     """All the data classes the content files may name, from the game's assemblies."""
 
     def __init__(self, dlls: list[Path]):
-        self.classes: dict[str, ClassInfo] = {}
-        for dll in dlls:
+        self.dlls = list(dlls)
+
+    @cached_property
+    def classes(self) -> dict[str, ClassInfo]:
+        """Loaded on first use: plain string tables never need them."""
+        out: dict[str, ClassInfo] = {}
+        for dll in self.dlls:
             if dll.is_file():
-                self.classes.update(Assembly(dll).classes())
+                out.update(Assembly(dll).classes())
+        return out
 
     def members(self, name: str) -> list[tuple[str, TypeSig]]:
         """Serialized members, base class first."""
