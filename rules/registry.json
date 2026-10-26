@@ -145,6 +145,10 @@
    "status": "verified",
    "refs": [
     "StardewValley.Locations.DesertFestival"
+   ],
+   "tests": [
+    "tests/test_cart.py::test_guarantee_counts_down_on_cart_and_night_market_days",
+    "tests/test_cart.py::test_real_cart_seen_in_a_game"
    ]
   },
   {
@@ -2119,7 +2123,7 @@
   {
    "id": "cc.cart-guarantee-y1",
    "area": "Community Center & bundles & route",
-   "summary": "In 1.6, a new game with the \"Year One Completable\" option whose bundles contain item 266 (Red Cabbage) sets VisitsUntilY1Guarantee = random.Next(2, 31), seeded from the game id. The counter goes down by 1 on every Forest cart day (day-of-month %7 %5 == 0, i.e. 5,7,12,14,19,21,26,28) and on every Night Market day, while it is >= 0. The Traveler shop stocks Red Cabbage Seeds (O)485 only on the visit when it equals 0. The shop condition does not check the year, but 30 visits always run out within Year 1.",
+   "summary": "In 1.6, a new game with the \"Year One Completable\" option whose bundles contain item 266 (Red Cabbage) sets VisitsUntilY1Guarantee = random.Next(2, 31), seeded from the game id. The counter goes down by 1 on every Forest cart day (day-of-month %7 %5 == 0, i.e. 5,7,12,14,19,21,26,28) and on every Night Market day, while it is >= 0. The Traveler shop stocks Red Cabbage Seeds (O)485 only on the visit when it equals 0. The shop condition does not check the year, but 30 visits always run out within Year 1. The save's value already includes today's decrement, so 0 means today; it goes down on each later Forest cart day and Night Market day (not Desert Festival days) while >= 0, and -1 means off or used.",
    "checked_against": [
     "StardewValley.Locations.Forest.DayUpdate",
     "StardewValley.Locations.Forest.ShouldTravelingMerchantVisitToday"
@@ -2128,10 +2132,12 @@
     "Data/Shops Traveler item (O)485 Condition \"WORLD_STATE_FIELD VisitsUntilY1Guarantee 0\"",
     "save: visitsUntilY1Guarantee"
    ],
-   "status": "to fix",
-   "fix": "Also count Night Market days (Winter 15-17) as decrements; the Night Market cart opens the same Traveler shop, so the guaranteed seeds can appear there. Desert Festival cart days are not decrements. The value in a save already includes today's decrement (Forest.DayUpdate runs before the save), so 0 means today, and only if today is a cart or Night Market day. -1 means used up, or not applicable.",
+   "status": "verified",
    "refs": [
     "StardewValley.Game1"
+   ],
+   "tests": [
+    "tests/test_cart.py::test_guarantee_counts_down_on_cart_and_night_market_days"
    ]
   },
   {
@@ -6004,7 +6010,7 @@
   {
    "id": "econ.cart-y1-guarantee",
    "area": "Economy & shops & selling",
-   "summary": "visitsUntilY1Guarantee is a world-state counter. The cart's guaranteed Red Cabbage Seeds entry (stock 1, random price) only shows while it equals 0.",
+   "summary": "visitsUntilY1Guarantee is a world-state counter. The cart's guaranteed Red Cabbage Seeds entry (stock 1, random price) only shows while it equals 0. The save's value already includes today's decrement, so 0 means today; it goes down on each later Forest cart day and Night Market day (not Desert Festival days) while >= 0, and -1 means off or used.",
    "checked_against": [
     "StardewValley.Game1._newDayAfterFade",
     "StardewValley.Locations.Forest.DayUpdate"
@@ -6012,11 +6018,13 @@
    "data": [
     "Data/Shops Traveler item (O)485 Condition 'WORLD_STATE_FIELD VisitsUntilY1Guarantee 0 0'"
    ],
-   "status": "to fix",
-   "fix": "The counter is set only when the 'Year 1 completable' new-game option is on AND the generated bundles actually contain Red Cabbage (266). With remixed bundles the Dye slot can be Iridium Bar, and then it stays -1. The start value is random from 2 to 30. It goes down by 1 at the start of each Friday or Sunday forest-cart day and each Night Market day, but not on Desert Festival days. The seeds are offered by every cart that opens while the value is 0: the forest cart on the day it reaches 0, and also a Desert Festival or Night Market cart that comes before the next decrement. -1 therefore means the option is off, there is no cabbage in the bundles, or the guarantee has passed.",
+   "status": "verified",
    "refs": [
     "StardewValley.Game1",
     "StardewValley.GameStateQuery"
+   ],
+   "tests": [
+    "tests/test_cart.py::test_guarantee_counts_down_on_cart_and_night_market_days"
    ]
   },
   {
@@ -6288,6 +6296,10 @@
    "status": "verified",
    "refs": [
     "StardewValley.GameStateQuery"
+   ],
+   "tests": [
+    "tests/test_cart.py::test_guarantee_counts_down_on_cart_and_night_market_days",
+    "tests/test_cart.py::test_real_cart_seen_in_a_game"
    ]
   },
   {
@@ -6776,17 +6788,25 @@
   {
    "id": "shop.cart-random",
    "area": "Economy & shops & selling",
-   "summary": "Most of the cart's stock is random: 10 random objects, 1 random furniture item, and items gated by daily synced random rolls.",
+   "summary": "Most of the cart's stock is random, but seeded: one generator per day from (days played, game id / 2) is shared by the whole Traveler shop, entry by entry: 10 random objects, 1 random furniture item, then entries gated by SYNCED_RANDOM rolls (separately seeded from the key, the game id and days played), the Rare Seed in spring and summer, and a random skill book. So the stock can be worked out from the save ahead of time.",
    "checked_against": [
     "StardewValley.Internal.ItemQueryResolver.DefaultResolvers.RANDOM_ITEMS",
+    "StardewValley.Internal.ItemQueryResolver.TryResolve/2",
     "StardewValley.Internal.ShopBuilder.GetShopStock",
-    "StardewValley.Utility.CreateDaySaveRandom"
+    "StardewValley.Utility.ApplyQuantityModifiers",
+    "StardewValley.Utility.CreateDaySaveRandom",
+    "StardewValley.Utility.CreateRandomSeed",
+    "StardewValley.Utility.TryCreateIntervalRandom"
    ],
    "data": [
     "Data/Shops Traveler"
    ],
-   "status": "to fix",
-   "fix": "It is random but deterministic: it is seeded from the save's game ID and days played, so in principle it can be worked out from the save. A planner that does not re-implement .NET Random and the item ordering cannot know it, though. Some slots are fully predictable: Rare Seed (1,000g) every spring and summer visit, and the Year-1 Red Cabbage Seeds when the counter is 0."
+   "status": "verified",
+   "tests": [
+    "tests/test_cart.py::test_an_undecidable_entry_is_left_out_and_casts_doubt",
+    "tests/test_cart.py::test_random_objects_follow_the_game_order",
+    "tests/test_cart.py::test_real_cart_seen_in_a_game"
+   ]
   },
   {
    "id": "tool.upgrades-need-bars-mines",

@@ -12,6 +12,8 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass, field
 
+from .rng import synced_random
+
 SEASONS = ("spring", "summer", "fall", "winter")
 WEEKDAYS = {"mon": 1, "monday": 1, "tue": 2, "tuesday": 2, "wed": 3, "wednesday": 3, "thu": 4, "thursday": 4,
             "fri": 5, "friday": 5, "sat": 6, "saturday": 6, "sun": 0, "sunday": 0}
@@ -37,6 +39,9 @@ class When:
     mine_lowest: int = 0
     museum_count: int = 0
     hearts: dict[str, int] = field(default_factory=dict)
+    game_id: int | None = None  # seeds SYNCED_RANDOM rolls
+    legacy_random: bool = False
+    world_fields: dict[str, int] = field(default_factory=dict)  # WORLD_STATE_FIELD values known for this day
 
     @classmethod
     def from_save(cls, save, *, season: str | None = None, day: int | None = None, year: int | None = None,
@@ -48,7 +53,9 @@ class When:
             crafting_recipes=set(save.crafting_recipes), cooking_recipes=set(save.cooking_recipes),
             skills=dict(save.skills), house_upgrade=save.house_upgrade,
             mine_lowest=max(getattr(save, "mine_lowest", 0), save.deepest_mine_level),
-            museum_count=len(save.museum), hearts={k: f.hearts for k, f in save.friends.items()})
+            museum_count=len(save.museum), hearts={k: f.hearts for k, f in save.friends.items()},
+            game_id=int(save.unique_id) if str(save.unique_id or "").isdigit() else None,
+            legacy_random=save.legacy_random)
 
     @property
     def weekday(self) -> int:
@@ -143,6 +150,20 @@ def _query(key: str, args: list[str], w: When) -> bool | None:
         if len(args) > 2 or (len(args) == 2 and not args[1].lstrip("-").isdigit()):
             return None  # filtered by item type: needs each piece's data
         return _range(args, 0, w.museum_count)
+    if key == "SYNCED_RANDOM":  # <interval> <key> <chance> [@addDailyLuck]
+        if w.game_id is None or len(args) < 3 or any(a.lower() == "@adddailyluck" for a in args[3:]):
+            return None
+        rng = synced_random(args[0], args[1], game_id=w.game_id, days_played=w.days_played, season=w.season,
+                            year=w.year, legacy=w.legacy_random)
+        try:
+            chance = float(args[2])
+        except ValueError:
+            return None
+        return None if rng is None else rng.next_double() < chance
+    if key == "WORLD_STATE_FIELD" and len(args) >= 2:
+        if args[0] not in w.world_fields or not args[1].lstrip("-").isdigit():
+            return None
+        return _range(args, 1, w.world_fields[args[0]])
     # Player queries: single player, so Current/Host/Any/All all mean the farmer in the save
     if not args:
         return None
