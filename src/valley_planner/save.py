@@ -178,6 +178,8 @@ class Save:
     cave_choice: int = 0  # 0 not chosen yet, 1 fruit bats, 2 mushrooms
     axe_level: int = 0
     rod_level: int = -1  # -1 no rod; 0 Bamboo, 1 Training, 2 Fiberglass, 3 Iridium, 4 Advanced Iridium
+    tool_levels: dict[str, int] = field(default_factory=dict)  # Axe, Pickaxe, Hoe, WateringCan, Pan -> level
+    tool_at_clint: str = ""  # the tool type being upgraded, if any
     friends: dict[str, Friend] = field(default_factory=dict)
     spouse: str | None = None
     cooking_recipes: set[str] = field(default_factory=set)
@@ -319,6 +321,12 @@ def _tool_level(player: ET.Element, xtype: str, root: ET.Element) -> int:
     if not _nil(upgrading) and _type(upgrading) == xtype:
         level = max(level, _int(upgrading, "upgradeLevel") - 1)
     return level
+
+
+def _upgrading(player: ET.Element) -> str:
+    """The type of tool at Clint's, if any."""
+    el = _child(player, "toolBeingUpgraded")
+    return _type(el) if not _nil(el) else ""
 
 
 def _regrow_days(crop: ET.Element, seed: str, harvest: str, forage: bool, crops_data: dict) -> int | None:
@@ -547,6 +555,8 @@ def read_save(path: Path, data=None) -> Save:
         house_upgrade=house_upgrade, deepest_mine_level=_int(player, "deepestMineLevel"),
         cave_choice=_int(player, "caveChoice"),
         axe_level=max(0, _tool_level(player, "Axe", root)), rod_level=_tool_level(player, "FishingRod", root),
+        tool_levels={t: _tool_level(player, t, root) for t in ("Axe", "Pickaxe", "Hoe", "WateringCan", "Pan")},
+        tool_at_clint=_upgrading(player),
         friends=friends, spouse=spouse,
         cooking_recipes={_flat(k) for k, _v in _dict(_child(player, "cookingRecipes"))},
         crafting_recipes={_flat(k) for k, _v in _dict(_child(player, "craftingRecipes"))},

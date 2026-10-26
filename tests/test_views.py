@@ -31,7 +31,7 @@ def test_app_end_to_end():
     client = TestClient(create_app())
     meta = client.get("/api/meta").json()
     assert meta["game_version"] and meta["save"]
-    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/api/sell", "/api/sell?liked=true&seeds=false", "/api/ask?q=mar", "/api/ask/item/(O)266", "/api/ask/item/(O)142", "/api/ask/villager/Abigail", "/api/morning", "/api/plan", "/"):
+    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/api/sell", "/api/sell?liked=true&seeds=false", "/api/ask?q=mar", "/api/ask/item/(O)266", "/api/ask/item/(O)142", "/api/ask/villager/Abigail", "/api/morning", "/api/plan", "/api/errand/gunther", "/api/errand/clint", "/api/errand/cc", "/api/errand/birthdays", "/"):
         assert client.get(url).status_code == 200, url
     crops = client.get("/api/crops").json()
     assert {"countdown", "mine"} <= set(crops)

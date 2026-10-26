@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from .discover import find_game, find_saves_root, list_saves
 from .engine import cc, todo
 from .gamedata import GameData
-from .views import ask, calendar, cart, crops, morning, sell
+from .views import ask, calendar, cart, crops, errands, morning, sell
 from .views.farm import Farm
 
 STATIC = Path(__file__).parent / "static"
@@ -138,6 +138,12 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         if rec is None:
             raise HTTPException(404, "No list for today yet")
         return {"ticks": rec["ticks"]}
+
+    @app.get("/api/errand/{name}")
+    def errand(name: str) -> dict:
+        if name not in errands.ERRANDS:
+            raise HTTPException(404, f"No errand called {name}")
+        return errands.ERRANDS[name](p().farm())
 
     @app.get("/api/ask")
     def ask_search(q: str = "") -> dict:
