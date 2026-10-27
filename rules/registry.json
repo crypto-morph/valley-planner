@@ -12714,6 +12714,20 @@
    "data": [],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "mines.prismatic-slime",
+   "area": "Quests & requests",
+   "summary": "While the Wizard's 'Prismatic Jelly' special order (Wizard2) is active, each slime placed when a Mines floor is populated has a max(1%, 1.2% + average daily luck / 10) chance to be made prismatic, at most one per floor; a prismatic slime always drops the Prismatic Jelly. A special order's progress is its objectives' currentCount / maxCount, due by dueDate (days played).",
+   "checked_against": [
+    "StardewValley.Locations.MineShaft.populateLevel",
+    "StardewValley.Monsters.GreenSlime.getExtraDropItems"
+   ],
+   "data": [
+    "Strings/SpecialOrderStrings"
+   ],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

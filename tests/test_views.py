@@ -101,3 +101,26 @@ def test_morning_cart_line():
         pytest.skip("no save here")
     line = morning._cart(farm)
     assert line["kind"] == "cart" and "6 AM to 8 PM" in line["title"]
+
+
+def test_special_orders_on_the_morning():
+    """A running special order shows what's next and the days left; the prismatic slime hunt gives the odds."""
+    from valley_planner.app import Planner
+    from valley_planner.views import morning
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    today = farm.when.days_played
+    farm.save.special_orders = [{"key": "Wizard2", "requester": "Wizard", "name": "[Wizard2_Name]", "type": "",
+                                 "state": "InProgress", "due_date": today + 3, "money": 0, "objectives": [
+                                     {"type": "SlayObjective", "text": "[Wizard2_Objective_0_Text]", "current": 0,
+                                      "max": 1},
+                                     {"type": "DeliverObjective", "text": "[Wizard2_Objective_1_Text]", "current": 0,
+                                      "max": 1}]}]
+    (o,) = morning.special_orders(farm)
+    assert o["name"] == "Prismatic Jelly" and o["days_left"] == 3 and "chance today" in o["hunt"]
+    assert not o["deliver"]
+    farm.save.special_orders[0]["objectives"][0]["current"] = 1
+    (o,) = morning.special_orders(farm)
+    assert not o["hunt"] and o["deliver"].startswith("the Wizard's tower")

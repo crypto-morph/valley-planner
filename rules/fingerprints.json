@@ -183,6 +183,7 @@
  "StardewValley.Menus.JunimoNoteMenu.setUpBundleSpecificPage": "6724c3f194511681ab60b0be49a682db519fa376bdcbdcb726ae3e3e097f88f2",
  "StardewValley.Menus.JunimoNoteMenu.setUpMenu": "aeb2d5c7a9168790df52b7600d4c395267be773c594f48776a415c30b9f1f68e",
  "StardewValley.Menus.ShopMenu.BuyBuybackItem": "fcec067f51f335d61ade485b022269e885700a8f162fb5348ef1be02c61434db",
+ "StardewValley.Monsters.GreenSlime.getExtraDropItems": "bf8f97b5e5a8ecaa4a4c93a538af6c4f8526f6b57847eace8afd3f5615eedb5e",
  "StardewValley.NPC.CheckTaste": "50594a7897f52810d42d28c49a01664518de985c271d8c37f3a8f152c5f18467",
  "StardewValley.NPC.CheckTasteContextTags": "39ad44ff63fe68346f78b3f18aec9141dbc8c59d8d858e7a7c20f8982cd1f27d",
  "StardewValley.NPC.SplitScheduleCommands": "cb045d704faa46f4192e9e79a8f6b297d087491099662c02d38d35a8d5203714",

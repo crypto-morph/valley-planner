@@ -115,6 +115,11 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
     for t in crops.fruit_trees(farm):
         if t["first_n"] and 0 < t["first_n"] - w.days_played <= SOON and not t["on_tree"]:
             do.append({"kind": "tree", "title": f"Your {t['fruit']} tree: {t['text']}", "text": t["where"]})
+    orders = special_orders(farm)
+    for o in orders:
+        today.append({"kind": "order", "title": f"Special order: {o['name']} ({o['who']})", "text": o["text"]})
+        if o["hunt"]:
+            do.append({"kind": "order", "title": "Hunt the prismatic slime in the Mines", "text": o["hunt"]})
     plan = cc.plan(farm)
     for slot in plan["slots"]:
         b = slot["best"]
@@ -149,6 +154,10 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
             week.append({"date": farm.label(d.days_played).rsplit(",", 1)[0], "kind": e.kind, "label": e.label,
                          "sure": e.sure})
     todays = [a for a in agenda or [] if a["n"] == w.days_played]
+    todays += [{"kind": "deliver", "text": o["deliver"], "shop": "", "n": w.days_played}
+               for o in orders if o["deliver"]]
+    todays += [{"kind": "mine", "text": "the Mines: hunt the prismatic slime on slime floors (1–29, 41–79)",
+                "shop": "", "n": w.days_played} for o in orders if o["hunt"]]
     events = farm.calendar.day(w, today_days_played=w.days_played)
     return {"date": farm.label(w.days_played), "weekday": WEEKDAYS[(w.days_played - 1) % 7],
             "day": _schedule(farm, do, todays, events), "route": todays,
@@ -219,12 +228,14 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
     spare_end = min(evening, _minutes(fest.start)) if fest and _minutes(fest.start) > t else evening
     if spare_end - t >= 60:
         picked = any(c.startswith("Pick: ") for c in chores)  # the farm block already picks your own trees
-        busy = [a["text"] for a in todays if a["kind"] in ("chop", "mine", "fish", "get")
+        busy = [a["text"] for a in todays if a["kind"] in ("chop", "mine", "fish", "get", "deliver")
                 and not (picked and " tree" in a["text"])]
         save = next((a for a in todays if a["kind"] == "save"), None)
         lines = busy or ["fish, forage or mine for gold" + (f": {save['text'][0].lower()}{save['text'][1:]}"
                                                            if save else "")]
-        blocks.append({"start": _clock(t), "end": _clock(spare_end), "title": "The route" if busy else "Spare",
+        title = "Spare" if not busy else "The route" if any(a["kind"] != "deliver" for a in todays
+                                                             if a["text"] in busy) else "Errands"
+        blocks.append({"start": _clock(t), "end": _clock(spare_end), "title": title,
                        "lines": lines, "urgency": "soon" if busy else "spare"})
     if dish and _minutes(((hours.get("Saloon") or {}).get("spans") or [[0, 0]])[-1][1]) > _minutes(EVENING):
         blocks.append({"start": EVENING, "end": EVENING + 100, "title": "The Saloon",
@@ -234,6 +245,43 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
     closed = [{"name": x["shop"], "why": x["closed"]} for x in hours.values() if not x["spans"] and x["closed"]]
     blocks.sort(key=lambda b: (b["start"] is None, b["start"] or 0))
     return {"from": DAY_START, "to": DAY_END, "blocks": blocks, "shops": shops, "closed": closed}
+
+
+PRISMATIC_ORDER = "Wizard2"  # its slimes only turn prismatic while this order is active
+PRISMATIC_BASE, PRISMATIC_FLOOR = 0.012, 0.01  # MineShaft.populateLevel: per slime, + luck / 10, at least 1%
+HOMES = {"Wizard": "the Wizard's tower", "Lewis": "Mayor Lewis's house", "Robin": "Robin's", "Pierre": "Pierre's",
+         "Clint": "Clint's", "Willy": "Willy's shop", "Demetrius": "Robin's", "Gus": "the Saloon",
+         "Caroline": "Pierre's", "Emily": "the Saloon", "Evelyn": "1 River Road", "Gunther": "the museum"}
+
+
+def special_orders(farm: Farm) -> list[dict]:
+    """The special orders you've taken that are still running: what's next, and the days left."""
+    strings = farm.data.asset("Strings/SpecialOrderStrings") or {}
+
+    def text(token: str) -> str:
+        return strings.get(token.strip("[]"), token) if token.startswith("[") else token
+    out, today = [], farm.when.days_played
+    for o in getattr(farm.save, "special_orders", []):
+        if o["state"] != "InProgress":
+            continue
+        left = o["due_date"] - today
+        nxt = next((ob for ob in o["objectives"] if ob["current"] < ob["max"]), None)
+        step = text(nxt["text"]) if nxt else "everything's done: hand it in"
+        if nxt and nxt["max"] > 1:
+            step += f" ({nxt['current']} of {nxt['max']})"
+        who = o["requester"]
+        place = HOMES.get(who, who)
+        hunt = ""
+        if o["key"] == PRISMATIC_ORDER and nxt and nxt["type"] == "SlayObjective":
+            chance = max(PRISMATIC_FLOOR, PRISMATIC_BASE + farm.save.daily_luck / 10)
+            hunt = (f"each slime on a floor you enter has a {chance:.1%} chance today (luck moves it), one per floor "
+                    "at most; re-entering a floor rolls again, and slime infestations are the best bet")
+        deliver = f"{place}: {step[0].lower()}{step[1:]}" if nxt and nxt["type"] == "DeliverObjective" else ""
+        when = "last day today" if left <= 0 else f"{left} days left"
+        out.append({"key": o["key"], "name": text(o["name"]), "who": f"the {who}" if who == "Wizard" else who,
+                    "text": f"next: {step} · {when} (until {farm.label(o['due_date'])})",
+                    "hunt": hunt, "deliver": deliver, "days_left": left})
+    return out
 
 
 def _cart(farm: Farm) -> dict:
