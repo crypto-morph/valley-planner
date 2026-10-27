@@ -74,6 +74,7 @@ class Step:
     how: str = ""  # the way it's got (a shop, a fishing spot, an animal)
     act: int | None = None  # a day spent getting it (fishing), if any
     shared: str = ""  # already planned for this other objective
+    last: int | None = None  # the last day it can start and still be in time
 
 
 @dataclass
@@ -474,7 +475,10 @@ class Router:
             elif req.activity in ("forage", "social"):
                 act = max(ready, req.earliest)  # picked up on the way: no day of its own
             needs = self.needs(req.chain, b, chop)
-            return Step(req.label, b, act or ready, gold, chop, mine, needs, req.season, act), ""
+            first_day = min([b, *chop, *mine])
+            last_start = latest_ready - lead - (b - first_day)  # chopping and mining come before it
+            return Step(req.label, b, act or ready, gold, chop, mine, needs, req.season, act,
+                        last=last_start), ""
         last = max(1, latest_ready - lead)
         if gold and why["cash"] < why["days"] and self.would_go_negative(last, gold, []):
             why["cash"] = why["days"]  # even with every day free, the gold isn't there
@@ -795,7 +799,8 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
                                    "gold": st.gold, "chop_days": len(st.chop_days),
                                    "mine_days": len(st.mine_days), "chop": _span(farm, st.chop_days),
                                    "mine": _span(farm, st.mine_days), "needs": st.needs, "how": st.how,
-                                   "act": label(st.act), "n": st.day,
+                                   "act": label(st.act), "n": st.day, "last": label(st.last),
+                                   "slack": (st.last - r.today) if st.last is not None else None,
                                    "shared": CATALOG.get(st.shared, (st.shared,))[0] if st.shared else ""}
                                   for st in o.steps],
                         "misses": [{"what": w, "why": y} for w, y in o.misses], "notes": o.notes,
