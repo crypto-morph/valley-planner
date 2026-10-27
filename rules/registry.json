@@ -12399,6 +12399,43 @@
     "tests/test_grange.py::test_item_points",
     "tests/test_grange.py::test_score_kinds_and_empty_slots"
    ]
+  },
+  {
+   "id": "skill.farming-xp",
+   "area": "Skills",
+   "summary": "Harvesting a crop gives farming XP once per harvest, however many items drop: round(16·ln(0.018·price + 1)) with the harvest's base price. Levels need 100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000 and 15000 XP in all.",
+   "checked_against": [
+    "StardewValley.Crop.harvest",
+    "StardewValley.Farmer.getBaseExperienceForLevel"
+   ],
+   "data": [],
+   "status": "verified",
+   "tests": [
+    "tests/test_route.py::test_xp_rules"
+   ]
+  },
+  {
+   "id": "shop.clint-ore-year1",
+   "area": "Economy & shops & selling",
+   "summary": "In Year 1 Clint sells Copper Ore 75g, Iron Ore 150g, Coal 150g and Gold Ore 400g; from Year 2, 150 / 250 / 250 / 750g. A bar is 5 ore and 1 coal in a Furnace, so in Year 1 a Gold Bar can be bought for about 2,150g.",
+   "checked_against": [],
+   "data": [
+    "Data/Shops Blacksmith (conditions !YEAR 2 / YEAR 2)",
+    "Data/Machines (BC)13"
+   ],
+   "status": "verified",
+   "tests": []
+  },
+  {
+   "id": "craft.seed-maker-recipe",
+   "area": "Crafting",
+   "summary": "The Seed Maker recipe is learned at Farming 9 and takes 25 Wood, 10 Coal and 1 Gold Bar.",
+   "checked_against": [],
+   "data": [
+    "Data/CraftingRecipes Seed Maker"
+   ],
+   "status": "verified",
+   "tests": []
   }
  ]
 }

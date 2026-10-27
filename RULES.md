@@ -627,6 +627,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `shop.doors-from-maps` | Shop door hours are tile actions on the outdoor maps ('LockedDoorWarp <x> <y> <building> <open> <close> [<villager> <friendship points>]'): you can enter from <open> until before <close>. A friendship door (Leah, Elliott, Maru's room: 500 points) ignores the friendship rule in winter. The town key opens valley doors at any hour (not Night Market ones other than the Fish Shop), and in Year 1 green rain leaves doors unlocked except on the Beach and Forest maps and the Adventurer's Guild. | `StardewValley.GameLocation.lockedDoorWarp`<br>`Maps/Town, Mountain, Forest, Beach, Desert tile property Action LockedDoorWarp` | verified |
 | `shop.keeper-at-counter` | Most shops need their keeper in place: Pierre on tile (4,17); Gus anywhere in x 9-18, y 17-18 of the Saloon; Robin within 3 tiles of (8,19); Marnie on (11-13,14) unless the Animal Catalogue has been read; Willy at y <= 5 in the Fish Shop; any villager at the clinic desk (x 4-7, y 15); Clint anywhere in the Blacksmith; Sandy anywhere in the Oasis. Marlon's shop and JojaMart need no one. Where keepers stand comes from their schedules. | `StardewValley.GameLocation.HandleBuyAction`<br>`StardewValley.GameLocation.saloon`<br>`StardewValley.GameLocation.carpenters`<br>`StardewValley.GameLocation.animalShop`<br>`StardewValley.GameLocation.blacksmith`<br>`StardewValley.Utility.TryOpenShopMenu/2`<br>`Data/Shops Owners`<br>`Maps/SeedShop, Saloon, ScienceHouse, AnimalShop, Blacksmith, FishShop, Hospital shop tile actions` | verified |
 | `shop.recipe-entries` | A shop entry with IsRecipe sells the recipe for the item, not the item: the Saloon's (O)228 at 300g is the Maki Roll recipe. The Saloon's only cooked dish for sale is DISH_OF_THE_DAY, the save's dishOfTheDay (chosen when the day starts), sold at its standard sale price (price x 2) with the stack as the stock. | `StardewValley.Internal.ItemQueryResolver.DefaultResolvers.DISH_OF_THE_DAY`<br>`StardewValley.Internal.ShopBuilder.GetShopStock`<br>`Data/Shops Saloon` | verified |
+| `shop.clint-ore-year1` | In Year 1 Clint sells Copper Ore 75g, Iron Ore 150g, Coal 150g and Gold Ore 400g; from Year 2, 150 / 250 / 250 / 750g. A bar is 5 ore and 1 coal in a Furnace, so in Year 1 a Gold Bar can be bought for about 2,150g. | `Data/Shops Blacksmith (conditions !YEAR 2 / YEAR 2)`<br>`Data/Machines (BC)13` | verified |
 
 ## Fishing
 
@@ -991,3 +992,15 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 |---|---|---|---|
 | `src.tide-pools` | Every night the Beach scatters items on the tide pools (tiles 65-89 x 11-22, east of the broken bridge): a run of rolls that keeps going while a roll falls under a shrinking chance, each item a Sea Urchin 1 time in 5, else Coral. They're only reachable once the bridge is repaired (Beach bridgeFixed, 300 Wood). | `StardewValley.Locations.Beach.DayUpdate`<br>`save: Beach bridgeFixed` | verified |
 | `src.winter-digging` | In winter, hoeing soil outdoors off the farm (not in the Desert) has an 8% chance a tile to turn up a Winter Root or a Snow Yam (half each), twice with a Generous hoe at 50%. | `StardewValley.GameLocation.checkForBuriedItem` | verified |
+
+## Skills
+
+| Rule | What the game does | Checked against | Status |
+|---|---|---|---|
+| `skill.farming-xp` | Harvesting a crop gives farming XP once per harvest, however many items drop: round(16·ln(0.018·price + 1)) with the harvest's base price. Levels need 100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000 and 15000 XP in all. | `StardewValley.Crop.harvest`<br>`StardewValley.Farmer.getBaseExperienceForLevel` | verified |
+
+## Crafting
+
+| Rule | What the game does | Checked against | Status |
+|---|---|---|---|
+| `craft.seed-maker-recipe` | The Seed Maker recipe is learned at Farming 9 and takes 25 Wood, 10 Coal and 1 Gold Bar. | `Data/CraftingRecipes Seed Maker` | verified |

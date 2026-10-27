@@ -49,6 +49,7 @@
  "StardewValley.Farmer.dayupdate": "a2047bb8f8f5e4e1b6f482afe2f4c3f94b846c7e671877768c5bcf6cbf132327",
  "StardewValley.Farmer.doneEating": "df4359921e2af1d9a55cfc8ba3cdc90963675f6388ef426d625283514183f218",
  "StardewValley.Farmer.eatObject": "ac7fd75a278100dc70e1ae7ba99ecc52cead48fec79f765aa5a3ebdae5dc0c43",
+ "StardewValley.Farmer.getBaseExperienceForLevel": "96d9f8b5ec40cd8d76bf93f5db0108e197c05b82124bb72fb25459eca2ee0957",
  "StardewValley.Farmer.getFriendshipHeartLevelForNPC": "b6cd19f8616a7af3e81305be6557ba31f498a6a3ceff05bbf1b548c74b33996d",
  "StardewValley.Farmer.hasCompletedCommunityCenter": "d32b56059116b145b1aa529d33abf71df231e099d53c76b823426d778e1067d8",
  "StardewValley.Farmer.hasOrWillReceiveMail": "f61b8a6b87f1f4b768eb04eaf2dd272b519ed9d4646f413f983cc79d763c4af6",
