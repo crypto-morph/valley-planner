@@ -644,6 +644,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `shop.recipe-entries` | A shop entry with IsRecipe sells the recipe for the item, not the item: the Saloon's (O)228 at 300g is the Maki Roll recipe. The Saloon's only cooked dish for sale is DISH_OF_THE_DAY, the save's dishOfTheDay (chosen when the day starts), sold at its standard sale price (price x 2) with the stack as the stock. | `StardewValley.Internal.ItemQueryResolver.DefaultResolvers.DISH_OF_THE_DAY`<br>`StardewValley.Internal.ShopBuilder.GetShopStock`<br>`Data/Shops Saloon` | verified |
 | `shop.clint-ore-year1` | In Year 1 Clint sells Copper Ore 75g, Iron Ore 150g, Coal 150g and Gold Ore 400g; from Year 2, 150 / 250 / 250 / 750g. A bar is 5 ore and 1 coal in a Furnace, so in Year 1 a Gold Bar can be bought for about 2,150g. | `Data/Shops Blacksmith (conditions !YEAR 2 / YEAR 2)`<br>`Data/Machines (BC)13` | verified |
 | `house.upgrade-costs` | House upgrades from Robin: first 10,000g + 450 Wood, second 65,000g + 100 Hardwood, third 100,000g; three days each. | `StardewValley.GameLocation.houseUpgradeAccept` | verified |
+| `robin.one-job` | Robin's carpenter menu (buildings, upgrades, the house) is only offered while no house upgrade is under way and no building is under construction (Game1.IsThereABuildingUnderConstruction), so she does one job at a time. A house upgrade under way is the player's daysUntilHouseUpgrade. | `StardewValley.GameLocation.carpenters`<br>`StardewValley.Game1.IsThereABuildingUnderConstruction` | verified |
 
 ## Fishing
 

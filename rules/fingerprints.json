@@ -59,6 +59,7 @@
  "StardewValley.Game1.ApplyWeatherForNewDay": "b7e57a778d5412c45863f53a129997b48df0a6667e353b8a0280f5bd8bf6ac76",
  "StardewValley.Game1.GenerateBundles": "42c9e64659fed1ff956cb801420cbf1cb507a3172755c0019c0706bf2f7fc5dd",
  "StardewValley.Game1.GetSeasonForLocation": "44842bd3db5cd606500b82d6f6f6ab96e06154ba9568b2d4e4e8c6892f86117b",
+ "StardewValley.Game1.IsThereABuildingUnderConstruction": "a97a5ca52362b91a85ef5d2b2698bedd57cf2b965cc8d52ed6dc40667d59ff23",
  "StardewValley.Game1.UpdatePassiveFestivalStates": "6a0d06adecd6f163a82f58699f7287db2bb7e529c34ee8d7722c1958432e5bae",
  "StardewValley.Game1.UpdateWeatherForNewDay": "bcccaaff2880c3f4868c5355453c0d0685774bf60bc080febce2d72ce72e680e",
  "StardewValley.Game1._newDayAfterFade": "7b3f444c94a68a68fbb8620ce1934a9c81d819623caf5af0e061f4ee0dc27a39",

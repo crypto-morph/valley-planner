@@ -268,3 +268,19 @@ def test_qi_notes():
     desert = next(q for q in reqs if "sand dragon" in q.label) if any("sand dragon" in q.label for q in reqs) else None
     assert desert is None or any(u.key == "place:Desert" for u in desert.chain)
     assert len(QI_STEPS) == 4
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_robin_one_job_at_a_time():
+    """With Robin still building, the kitchen isn't ordered until she's done."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    farm.save.money = 50000
+    farm.save.buildings["Coop"] = 1
+    farm.save.building_days["Coop"] = 3
+    v = route(farm, ["kitchen"], [], tiles=80, cave="bats")
+    step = v["objectives"][0]["steps"][0]
+    assert step["n"] >= farm.save.days_played + 3

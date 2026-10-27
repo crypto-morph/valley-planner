@@ -12690,6 +12690,18 @@
    ],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "robin.one-job",
+   "area": "Economy & shops & selling",
+   "summary": "Robin's carpenter menu (buildings, upgrades, the house) is only offered while no house upgrade is under way and no building is under construction (Game1.IsThereABuildingUnderConstruction), so she does one job at a time. A house upgrade under way is the player's daysUntilHouseUpgrade.",
+   "checked_against": [
+    "StardewValley.GameLocation.carpenters",
+    "StardewValley.Game1.IsThereABuildingUnderConstruction"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

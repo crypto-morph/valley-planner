@@ -106,6 +106,11 @@ class Unlocks:
         if kind == "floor":
             deepest = max(getattr(s, "mine_lowest", 0), getattr(s, "deepest_mine_level", 0))
             return Unlock(key, f"reach Mines floor {what}", how="mining", done=deepest >= int(what))
+        upgrading = getattr(s, "house_upgrade_days", 0)
+        level = 1 if kind == "kitchen" else int(what) if kind == "house" else 0
+        if level and upgrading and level == s.house_upgrade + 1:
+            return Unlock(key, "Robin finishes the house upgrade", 0, [], upgrading,
+                          how=f"{upgrading} more day{'s' if upgrading != 1 else ''} of building")
         if kind == "kitchen":
             gold, mats, days = KITCHEN
             return Unlock(key, "the kitchen (house upgrade)", gold, list(mats), days, done=s.house_upgrade >= 1)

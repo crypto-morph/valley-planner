@@ -176,6 +176,7 @@ class Save:
     max_stamina: int = 270
     max_items: int = 12
     house_upgrade: int = 0
+    house_upgrade_days: int = 0  # days until Robin finishes a house upgrade under way
     deepest_mine_level: int = 0
     mine_lowest: int = 0  # lowest Mines level anyone reached (shop conditions use this)
     cave_choice: int = 0  # 0 not chosen yet, 1 fruit bats, 2 mushrooms
@@ -591,7 +592,8 @@ def read_save(path: Path, data=None) -> Save:
         events_seen=set(_strings(_child(player, "eventsSeen"))), stats=stat_values, flags=flags,
         skills=skills, professions=[int(x) for x in _strings(_child(player, "professions")) if x.isdigit()],
         max_stamina=_int(player, "maxStamina", 270), max_items=_int(player, "maxItems", 12),
-        house_upgrade=house_upgrade, deepest_mine_level=_int(player, "deepestMineLevel"),
+        house_upgrade=house_upgrade, house_upgrade_days=max(0, _int(player, "daysUntilHouseUpgrade")),
+        deepest_mine_level=_int(player, "deepestMineLevel"),
         cave_choice=_int(player, "caveChoice"),
         experience=dict(zip(("farming", "fishing", "foraging", "mining", "combat", "luck"),
                             (int(c.text or 0) for c in _or(_child(player, "experiencePoints"), [])), strict=False)),
