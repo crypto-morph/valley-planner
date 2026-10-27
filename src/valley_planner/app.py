@@ -158,8 +158,15 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     @app.get("/api/route/objectives")
     def route_objectives() -> dict:
         from .engine.route.plan import CATALOG, Settings
+        try:
+            farm = p().farm()
+            chars, friends = farm.data.asset("Data/Characters"), farm.save.friends
+        except HTTPException:
+            chars, friends = p().data.asset("Data/Characters"), {}
+        spouses = [{"name": k, "hearts": friends[k].points // 250 if k in friends else 0}
+                   for k, c in chars.items() if c.get("CanBeRomanced")]
         return {"objectives": [{"id": k, "label": v[0]} for k, v in CATALOG.items()],
-                "settings": Settings().__dict__}
+                "settings": Settings().__dict__, "spouses": spouses}
 
     @app.post("/api/route")
     def route_view(ask: RouteAsk) -> dict:
@@ -169,7 +176,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         from .engine.route.start import new_farm
         known = set(CATALOG)
         allowed = {k for k in Settings().__dict__}
-        settings = Settings(**{k: int(v) for k, v in ask.settings.items() if k in allowed})
+        kinds = {k: type(v) for k, v in Settings().__dict__.items()}
+        settings = Settings(**{k: kinds[k](v) for k, v in ask.settings.items() if k in allowed})
         cave = ask.cave if ask.cave in ("best", "bats", "mushrooms") else "best"
         farm = p().farm() if ask.start == "save" and p().path() is not None else new_farm(p().data)
         return route(farm, [t for t in ask.targets if t in known],

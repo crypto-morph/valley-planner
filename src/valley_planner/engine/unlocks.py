@@ -28,6 +28,7 @@ TOOL_PRICES = {1: 2000, 2: 5000, 3: 10000, 4: 25000}
 TOOL_BARS = {1: "334", 2: "335", 3: "336", 4: "337"}
 TOOL_DAYS = 2
 KITCHEN = (10000, (("388", 450),), 3)
+HOUSE_2 = (65000, (("709", 100),), 3)  # GameLocation.houseUpgradeAccept: 65,000g and 100 Hardwood, 3 days
 BRIDGE_WOOD = 300
 SKILLS = ("farming", "fishing", "foraging", "mining", "combat")
 
@@ -99,6 +100,10 @@ class Unlocks:
         if kind == "kitchen":
             gold, mats, days = KITCHEN
             return Unlock(key, "the kitchen (house upgrade)", gold, list(mats), days, done=s.house_upgrade >= 1)
+        if kind == "house" and what == "2":
+            gold, mats, days = HOUSE_2
+            return Unlock(key, "the second house upgrade", gold, list(mats), days, ["kitchen"],
+                          done=s.house_upgrade >= 2)
         if kind == "machine":
             bc = self.data.asset("Data/BigCraftables").get(what.removeprefix("(BC)")) or {}
             name = bc.get("Name") or what

@@ -70,3 +70,23 @@ def test_route_agenda():
     v = route(new_farm(GameData(GAME)), ["greenhouse", "seed_maker"], [], tiles=80, cave="bats")
     assert v["agenda"] and all(1 <= a["n"] < 1 + AGENDA_DAYS and a["goal"] and a["text"] for a in v["agenda"])
     assert [a["n"] for a in v["agenda"]] == sorted(a["n"] for a in v["agenda"])
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_more_goals():
+    """A horse, sprinklers and marriage on a fresh farm: the wedding comes three days after the Pendant, which
+    waits for the kitchen and the beach bridge; the Stable waits for a Steel Axe."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    v = route(new_farm(GameData(GAME)), ["stable", "marriage"], ["sprinklers"], tiles=80, cave="bats")
+    by = {o["id"]: o for o in v["objectives"]}
+    stable = by["stable"]["steps"][0]
+    assert by["stable"]["status"] == "ok" and stable["needs"][0]["label"].startswith("a Copper Axe")
+    m = by["marriage"]
+    assert m["status"] == "ok"
+    labels = [st["what"] for st in m["steps"]]
+    assert labels[-1].startswith("the wedding with") and "the Mermaid's Pendant" in labels
+    pendant = next(st for st in m["steps"] if st["what"] == "the Mermaid's Pendant")
+    assert {n["label"] for n in pendant["needs"]} >= {"the kitchen (house upgrade)", "repair the beach bridge"}

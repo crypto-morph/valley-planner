@@ -15,6 +15,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from ...facts import romance
 from ...facts.bundles import VAULT
 from ...facts.cave import EARNINGS_TRIGGER, gives, nights_for
 from ..cc import Planner, Slot, Way
@@ -32,6 +33,9 @@ class Settings:
     fish_gold: int = 300  # a spare day spent fishing, sold at normal quality
     mine_gold: int = 200  # ore, gems, geodes and minerals sold from a day in the Mines
     float: int = 500  # cash never spent on seeds
+    quartz_per_day: int = 6  # Quartz found in a day in the Mines (for Refined Quartz)
+    gift_points: int = 80  # friendship from each gift to your sweetheart (loved 80, liked 45)
+    spouse: str = ""  # who to marry; empty: whoever you're closest to
 
 
 WOOD_PER_DAY = Settings.wood_per_day
@@ -49,7 +53,13 @@ CATALOG = {  # id -> (label, default deadline as days played in Year 1)
     "seed_maker": ("A Seed Maker", 112),
     "kitchen": ("The kitchen", 112),
     "cc": ("The Community Center", 112),
+    "stable": ("A horse", 112),
+    "sprinklers": ("Quality Sprinklers for the field", 112),
+    "house_2": ("The second house upgrade", 112),
+    "marriage": ("Marriage", 112),
 }
+QUARTZ, REFINED_QUARTZ, SPRINKLER = "80", "338", "621"
+SPRINKLER_TILES = 8  # a Quality Sprinkler waters the eight tiles around it
 
 
 @dataclass
@@ -78,6 +88,7 @@ class Outcome:
     problems: list[str] = field(default_factory=list)
     misses: list[tuple[str, str]] = field(default_factory=list)  # (requirement, why it can't be planned)
     notes: list[str] = field(default_factory=list)  # problems that aren't one requirement's
+    info: list[str] = field(default_factory=list)  # how it's been planned, worth knowing
 
 
 @dataclass
@@ -112,6 +123,7 @@ class Router:
         self.got: dict[str, tuple[Step, str]] = {}  # requirement -> its step, and the objective that planned it
         self.wood_left = farm.held().get(f"(O){WOOD}", 0)  # Wood in hand, used before any chopping
         self.fish_days: dict[str, int] = {}
+        self.wedding: str | None = None  # who the route marries, once the Pendant is placed
         self.planner = Planner(farm, self.end)
         save = farm.save
         if self.cave is None or save.cave_choice:  # a choice already made in the save wins
@@ -193,8 +205,24 @@ class Router:
     def done(self, oid: str) -> bool:
         s = self.farm.save
         cc = bool(s.areas_complete) and all(s.areas_complete)
+        if oid == "marriage":
+            return any(f.status in ("Married", "Engaged") for f in s.friends.values())
         return {"greenhouse": "ccPantry" in s.mail, "seed_maker": bool(s.machines.get("Seed Maker")),
-                "kitchen": s.house_upgrade >= 1, "cc": cc}.get(oid, False)
+                "kitchen": s.house_upgrade >= 1, "cc": cc, "stable": bool(s.buildings.get("Stable")),
+                "house_2": s.house_upgrade >= 2,
+                "sprinklers": self.farm.held().get(f"(O){SPRINKLER}", 0) >= self.sprinklers()}.get(oid, False)
+
+    def sprinklers(self) -> int:
+        return math.ceil(self.s.tiles / SPRINKLER_TILES)
+
+    def sweetheart(self) -> str | None:
+        """Who to marry: the setting, or the romanceable villager you're closest to."""
+        chars = self.farm.data.asset("Data/Characters")
+        can = [k for k, v in chars.items() if v.get("CanBeRomanced")]
+        if self.s.spouse in can:
+            return self.s.spouse
+        friends = self.farm.save.friends
+        return max(can, key=lambda k: friends[k].points if k in friends else -1, default=None)
 
     def cave_day(self) -> int | None:
         """The morning Demetrius makes his offer: lifetime earnings past 25,000g (today if it's been made)."""
@@ -263,7 +291,75 @@ class Router:
             u = self.planner.unlocks.get("machine:(BC)25")
             u.how = "Farming level 9"
             return [Req("a Seed Maker", self.today, self.end, [u], 0)], 0, []
+        if oid == "stable":
+            u = self.planner.unlocks.chain("building:Stable")
+            return [Req("the Stable", self.today, self.end, u, sum(x.days for x in u))], 0, []
+        if oid == "house_2":
+            u = self.planner.unlocks.chain("house:2")
+            return [Req("the second house upgrade", self.today, self.end, u, sum(x.days for x in u))], 0, []
+        if oid == "sprinklers":
+            n = self.sprinklers() - self.farm.held().get(f"(O){SPRINKLER}", 0)
+            recipe = self.planner.unlocks.chain("recipe:Quality Sprinkler")
+            craft = Unlock("craft:sprinklers", f"craft {n} Quality Sprinklers", 0,
+                           [("335", n), ("336", n), (REFINED_QUARTZ, n)],
+                           after=[u.key for u in recipe])
+            self.info.append("Bars are priced as ore bought from Clint (Year 1); mining your own saves gold "
+                             "but costs days")
+            return [Req(f"{n} Quality Sprinklers", self.today, self.end, recipe + [craft], 0)], 0, []
+        if oid == "marriage":
+            return self.courtship()
         return [], 0, [f"unknown objective {oid}"]
+
+    def _later(self, day: int | None) -> str:
+        return f"not this year: about {self.farm.label(day)}" if day else "not within two years at this pace"
+
+    def courtship(self) -> tuple[list[Req], int, list[str]]:
+        """Hearts by talking every day and two gifts a week, the Bouquet at 8 hearts, the Mermaid's Pendant at
+        10 on a rainy day (after the first house upgrade, past the beach bridge); the wedding comes after."""
+        name = self.sweetheart()
+        if not name:
+            return [], 0, ["no one to marry"]
+        info = self.farm.data.asset("Data/Characters")[name]
+        f = self.farm.save.friends.get(name)
+        points, status = (f.points, f.status) if f else (0, "Friendly")
+        seasons = ["spring", "summer", "fall", "winter"]
+        bseason = (info.get("BirthSeason") or "").lower()
+        birthday = seasons.index(bseason) * 28 + int(info.get("BirthDay") or 0) if bseason in seasons else None
+        gift, notes, reqs = self.s.gift_points, [], []
+        how = f"talk to {name} every day and give two gifts a week"
+        day8 = self.today
+        if status != "Dating":
+            day8 = romance.points_day(points, 8 * romance.HEART, self.today, birthday=birthday, gift=gift,
+                                      cap=romance.CAP_FRIEND)
+            if day8 is None or day8 > self.end:
+                self.misses = [(f"8 hearts with {name}", self._later(day8))]
+                return [], 0, []
+            price = 2 * int((self.farm.data.asset("Data/Objects").get(romance.BOUQUET) or {}).get("Price") or 100)
+            reqs.append(Req(f"8 hearts with {name}", day8, self.end, [], 0, "social", season=how))
+            reqs.append(Req(f"a Bouquet for {name}", day8, self.end,
+                            [Unlock("bouquet", "buy a Bouquet from Pierre", price)], 0, season=f"give it to {name}"))
+            points = 8 * romance.HEART
+        day10 = romance.points_day(points, 10 * romance.HEART, day8 + 1, birthday=birthday, gift=gift)
+        if day10 is None or day10 > self.end:
+            self.misses = [(f"10 hearts with {name}", self._later(day10))]
+            return reqs, 0, []
+        reqs.append(Req(f"10 hearts with {name}", day10, self.end, [], 0, "social", season=how))
+        rain = romance.rain_by(day10)
+        if rain is None or rain > self.end:
+            first = next((d for d in range(day10, day10 + romance.YEAR) if romance.rain_chance(d)), day10)
+            self.misses = [("the Mermaid's Pendant",
+                            f"the Old Mariner only comes when it rains, and it doesn't rain in winter: "
+                            f"10 hearts on {self.farm.label(day10)}, the next chance of rain from "
+                            f"{self.farm.label(first)}")]
+            return reqs, 0, []
+        pendant = 2 * int((self.farm.data.asset("Data/Objects").get(romance.PENDANT) or {}).get("Price") or 2500)
+        chain = self.planner.unlocks.chain("kitchen") + self.planner.unlocks.chain("place:BeachTidePools") + \
+            [Unlock("pendant", "buy the Mermaid's Pendant from the Old Mariner", pendant)]
+        lead = sum(u.days for u in chain)
+        reqs.append(Req("the Mermaid's Pendant", rain or day10, self.end, chain, lead, "social",
+                        season=f"on a rainy day, the Old Mariner past the beach bridge; propose to {name}"))
+        self.wedding = name
+        return reqs, 0, notes
 
     # ----- placing -----
     def cost(self, chain: list[Unlock]) -> tuple[int, int, list[str], list[str]]:
@@ -298,6 +394,9 @@ class Router:
                     gold += BOUGHT[mat] * n
                 elif mat == HARDWOOD:
                     pass  # counted above: the axe and stump days
+                elif mat == REFINED_QUARTZ:  # a Quartz and a Coal through the Furnace: Quartz from the Mines
+                    gold += BOUGHT["382"] * n
+                    gates.append(f"Mine {math.ceil(n / self.s.quartz_per_day)}")
                 elif mat != STONE:
                     wood += 0  # other materials: a gathering day each, below
             m = SKILL_RE.match(u.how or "")
@@ -324,6 +423,8 @@ class Router:
         res = self.result()
         start = req.earliest
         floor_need = max((int(g.split()[1]) for g in gates if g.startswith("Floor")), default=0)
+        extra_mine = sum(int(g.split()[1]) for g in gates if g.startswith("Mine "))
+        axe_days = sum(u.days for u in self.cost_extras(req.chain))
         for g in gates:
             skill, level = g.split()
             if skill == "Day":
@@ -346,11 +447,12 @@ class Router:
             return None, f"{req.label}: too late, the last day to start was {self.farm.label(latest_ready - lead)}"
         why = {"days": 0, "cash": 0}
         for b in range(first, latest_ready - lead + 1):
-            chop = self.free_days(1, b - 1)[-chops:] if chops else []  # the latest free days before it
+            # the latest free days before it (after the Steel Axe, if Hardwood needs it)
+            chop = self.free_days(self.today + axe_days, b - 1)[-chops:] if chops else []
             if len(chop) < chops:
                 why["days"] += 1
                 continue
-            mine = self.mining_days(floor_need, b)
+            mine = self.mining_days(floor_need, b, extra_mine)
             if mine is None:
                 why["days"] += 1
                 continue
@@ -369,10 +471,13 @@ class Router:
                     if not options:
                         continue
                     act = options[0]
-            elif req.activity == "forage":
+            elif req.activity in ("forage", "social"):
                 act = max(ready, req.earliest)  # picked up on the way: no day of its own
-            return Step(req.label, b, act or ready, gold, chop, mine, self.needs(req.chain, b), req.season, act), ""
+            needs = self.needs(req.chain, b, chop)
+            return Step(req.label, b, act or ready, gold, chop, mine, needs, req.season, act), ""
         last = max(1, latest_ready - lead)
+        if gold and why["cash"] < why["days"] and self.would_go_negative(last, gold, []):
+            why["cash"] = why["days"]  # even with every day free, the gold isn't there
         if why["cash"] >= why["days"]:
             short = min(x.cash for x in self.result([(last, gold)] if gold else []).days) if gold else 0
             if gold and short < 0:
@@ -382,10 +487,15 @@ class Router:
             return None, f"{req.label}: Mines floor {floor_need} isn't reached by {self.farm.label(last)}"
         return None, f"{req.label}: not enough Wood chopped by {self.farm.label(last)}"
 
-    def needs(self, chain: list[Unlock], day: int) -> list[dict]:
+    def needs(self, chain: list[Unlock], day: int, chop: list[int] = ()) -> list[dict]:
         """The unlocks behind a step as the tree shows them: done already, planned for an earlier step, or new."""
-        out, t, start = [], day, None
-        for u in chain + self.cost_extras(chain):
+        extras = self.cost_extras(chain)
+        out, start = [], None
+        # the axe upgrades come before the Hardwood days, the rest on the day itself
+        t = max(self.today, min(chop) - sum(u.days for u in extras)) if extras and chop else day
+        for i, u in enumerate(extras + chain):
+            if i == len(extras):
+                t = max(t, day)
             if u.done:
                 state, when = "done", None
             elif u.key in self.have:
@@ -419,12 +529,12 @@ class Router:
         have = self.farm.when.mine_lowest
         return have + self.s.floors_per_day * sum(1 for d, w in self.busy.items() if w[0] == "mine" and d < day)
 
-    def mining_days(self, floor: int, by: int) -> list[int] | None:
-        """New mining days needed (before `by`) to have reached `floor`; [] if already there."""
+    def mining_days(self, floor: int, by: int, extra: int = 0) -> list[int] | None:
+        """New mining days needed (before `by`) to have reached `floor`, plus `extra` days of gathering."""
         have = self.floor_by(by)
-        if floor <= have:
+        n = extra + (math.ceil((floor - have) / self.s.floors_per_day) if floor > have else 0)
+        if not n:
             return []
-        n = math.ceil((floor - have) / self.s.floors_per_day)
         # the latest free days before it: cash is easier then
         days = self.free_days(max(self.today, self.year_start + MINES_OPEN), by - 1)[-n:]
         return days if len(days) == n else None
@@ -478,7 +588,11 @@ class Router:
         if self.done(oid):
             out.status, out.finish = "done", self.today
             return out
+        self.misses, self.info = [], []
         reqs, paid, notes = self.requirements(oid)
+        out.info = self.info
+        out.misses += self.misses
+        out.problems += [f"{w}: {y}" for w, y in self.misses]
         out.problems += notes
         out.notes = list(notes)
         reqs.sort(key=lambda r: (r.latest or 0) - r.lead)
@@ -513,6 +627,17 @@ class Router:
                     self.commit(step, r)
                     out.problems = [p for p in out.problems if not p.startswith(r.label)]
                     out.misses = [m for m in out.misses if m[0] != r.label]
+        pendant = next((st for st, _ in placed if st.label == "the Mermaid's Pendant"), None)
+        if oid == "marriage" and pendant and self.wedding:
+            d = pendant.ready + romance.WEDDING_DELAY
+            while d in self.festivals:
+                d += 1
+            if d <= out.deadline:
+                placed.append((Step(f"the wedding with {self.wedding}", d, d, how="three days after the proposal"),
+                               Req("wedding", d, d, [], 0)))
+            else:
+                out.misses.append((f"the wedding with {self.wedding}", f"three days after, on {self.farm.label(d)}"))
+                out.problems.append(f"the wedding: {self.farm.label(d)}")
         out.steps = [s for s, _ in sorted(placed, key=lambda p: p[0].day)]
         out.finish = max((s.ready for s in out.steps), default=None)
         if out.problems:
@@ -544,8 +669,10 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
                 continue
             new = [n for n in st.needs if n["state"] == "new"]
             first = _thing(new[0]["label"]) if new else st.label
+            hard = any(m.endswith(" Hardwood") for n in new for m in n["materials"])
             for d in st.chop_days:
-                add(d, "chop", "Chop Wood all day", f"Wood for {first}, for {st.label}", o.label)
+                why = f"for {first}" if _bare(first) == _bare(st.label) else f"for {first}, for {st.label}"
+                add(d, "chop", "Chop Hardwood (Secret Woods) and Wood" if hard else "Chop Wood all day", why, o.label)
             for d in st.mine_days:
                 add(d, "mine", "Go down the Mines", f"deeper floors for {st.label}", o.label)
             for n in new:
@@ -561,6 +688,13 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
                 add(st.act, "fish", st.how[0].upper() + st.how[1:] if st.how else "Fish", f"for {st.label}", o.label)
             elif st.how and not new and not st.gold:
                 add(st.ready, "get", f"Get {st.label.split(' (')[0]}: {st.how}", f"for {st.label}", o.label)
+    for o in outcomes:  # courting: every day until the proposal
+        if o.id == "marriage" and o.status != "done":
+            who = next((st.label.removeprefix("10 hearts with ") for st in o.steps
+                        if st.label.startswith("10 hearts with ")), None)
+            if who:
+                add(today, "people", f"Talk to {who}; a gift on two days each week",
+                    "friendship toward the Bouquet and the Mermaid's Pendant", o.label)
     if saving:
         n, st, o = saving
         out.append({"n": today, "day": farm.label(today), "kind": "save",
@@ -569,6 +703,11 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
                     "why": f"you have {farm.save.money:,}g; it's for {st.label}", "goal": o.label, "gold": n["gold"]})
     out.sort(key=lambda a: (a["n"], a["kind"] != "save"))
     return out
+
+
+def _bare(label: str) -> str:
+    """'the Stable' and 'a Stable' alike."""
+    return re.sub(r"^(a|an|the) ", "", label.lower())
 
 
 def _thing(label: str) -> str:
@@ -659,7 +798,8 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
                                    "act": label(st.act), "n": st.day,
                                    "shared": CATALOG.get(st.shared, (st.shared,))[0] if st.shared else ""}
                                   for st in o.steps],
-                        "misses": [{"what": w, "why": y} for w, y in o.misses], "notes": o.notes}
+                        "misses": [{"what": w, "why": y} for w, y in o.misses], "notes": o.notes,
+                        "info": o.info}
                        for o in outcomes],
         "weeks": [label(r.year_start + 1 + 7 * w) for w in range(WEEKS)],
         "today": label(r.today),

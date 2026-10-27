@@ -12439,6 +12439,101 @@
    ],
    "status": "verified",
    "tests": []
+  },
+  {
+   "id": "romance.heart-points",
+   "area": "NPCs & schedules & gifts",
+   "summary": "Friendship: 250 points a heart; talking gives 20 once a day; a loved gift 80, liked 45, neutral 20 (x1.1/1.25/1.5 for silver/gold/iridium), times 8 on the birthday; two gifts a week, a birthday gift not counted.",
+   "checked_against": [
+    "StardewValley.NPC.receiveGift",
+    "StardewValley.NPC.tryToReceiveActiveObject"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": [
+    "StardewValley.NPC.grantConversationFriendship"
+   ]
+  },
+  {
+   "id": "romance.heart-caps",
+   "area": "NPCs & schedules & gifts",
+   "summary": "Anyone dateable stops at 8 hearts + 249 points (2,249) until given a Bouquet; dating, at 10 hearts + 249 (2,749).",
+   "checked_against": [
+    "StardewValley.Farmer.changeFriendship",
+    "StardewValley.Utility.GetMaximumHeartsForCharacter"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "romance.bouquet-shop",
+   "area": "NPCs & schedules & gifts",
+   "summary": "Pierre sells the Bouquet once you have 8 hearts with any dateable villager (Data/Shops SeedShop, PLAYER_HEARTS Current AnyDateable 8); price -1 means twice the object price, 200g.",
+   "checked_against": [],
+   "data": [
+    "Data/Shops"
+   ],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "romance.mariner",
+   "area": "NPCs & schedules & gifts",
+   "summary": "The Old Mariner appears at the far end of the beach on rainy or stormy days before 7 PM, and sells the Mermaid's Pendant to an unmarried farmer with 10 hearts with someone dateable, once the house has its first upgrade.",
+   "checked_against": [
+    "StardewValley.Locations.Beach.checkAction",
+    "StardewValley.Locations.Beach.resetLocalState"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "romance.wedding-delay",
+   "area": "NPCs & schedules & gifts",
+   "summary": "The wedding is three days after the proposal, pushed past days a wedding can't happen (festivals).",
+   "checked_against": [
+    "StardewValley.NPC.engagementResponse"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "weather.rain-chance",
+   "area": "Calendar & events & access",
+   "summary": "Rain or storm: 18.3% a day in spring and fall; summer 12% + 0.3% x day of month (not the 1st); winter has snow, not rain (Data/LocationContexts Default; GameStateQuery SYNCED_SUMMER_RAIN_RANDOM).",
+   "checked_against": [
+    "StardewValley.GameStateQuery.SYNCED_SUMMER_RAIN_RANDOM"
+   ],
+   "data": [
+    "Data/LocationContexts"
+   ],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "house.upgrade-costs",
+   "area": "Economy & shops & selling",
+   "summary": "House upgrades from Robin: first 10,000g + 450 Wood, second 65,000g + 100 Hardwood, third 100,000g; three days each.",
+   "checked_against": [
+    "StardewValley.GameLocation.houseUpgradeAccept"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "craft.refined-quartz",
+   "area": "Crafting",
+   "summary": "The Furnace turns 1 Quartz into Refined Quartz in 90 minutes, using 1 Coal (Data/Machines (BC)13).",
+   "checked_against": [],
+   "data": [
+    "Data/Machines"
+   ],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

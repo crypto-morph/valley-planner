@@ -81,6 +81,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `cal.bookseller-days` | The bookseller visits on two days a season: candidate days Spring 11,12,21,22,25 / Summer 9,12,18,25,27 / Fall 4,7,8,9,12,19,22,25 / Winter 5,11,12,19,22,24; one is picked with Next(count) from a generator seeded (year×11, game id, season index), the other is half the list further on (wrapping). | `StardewValley.Utility.getDaysOfBooksellerThisSeason` | verified |
 | `cal.green-rain-day` | Green rain falls on one summer day every year, picked from 5, 6, 7, 14, 15, 16, 18, 23 with a generator seeded (year×777, game id); the weather data puts GreenRain first (IS_GREEN_RAIN_DAY). | `StardewValley.Utility.isGreenRainDay/2`<br>`Data/LocationContexts Default.WeatherConditions GreenRain` | verified |
 | `fest.grange-score` | Lewis scores the Fair's grange display as 14, plus per item quality + 1 (iridium +5) and a point for each sale-price mark it reaches (20, 90, 200; 300 below gold; 400 at normal quality; the item's real sale price), plus 5 per different kind up to 30 (vegetables, fruit, animal goods, gems and minerals, fish, forage/flowers/syrups, cooking, artisan goods), plus 9 - 2 per empty slot (nine slots). 90+ wins 1,000 star tokens, 75+ 500, 60+ 250, else 50; Lewis's shorts on display skip judging for 750. Any small object can go on it, one per slot. | `StardewValley.Event.judgeGrange`<br>`StardewValley.Event.interpretGrangeResults`<br>`StardewValley.Utility.highlightSmallObjects` | verified |
+| `weather.rain-chance` | Rain or storm: 18.3% a day in spring and fall; summer 12% + 0.3% x day of month (not the 1st); winter has snow, not rain (Data/LocationContexts Default; GameStateQuery SYNCED_SUMMER_RAIN_RANDOM). | `StardewValley.GameStateQuery.SYNCED_SUMMER_RAIN_RANDOM`<br>`Data/LocationContexts` | verified |
 
 ## NPCs & schedules & gifts
 
@@ -170,6 +171,11 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `bday.summer` | Jas 4, Gus 8, Maru 10, Alex 13, Sam 17, Demetrius 19, Dwarf 22, Willy 24, Leo 26. | `Data/Characters (BirthSeason, BirthDay, CanBeRomanced, Home, UnlockConditions, CanSocialize)` | verified |
 | `bday.fall` | Penny 2, Elliott 5, Jodi 11, Abigail 13, Sandy 15, Marnie 18, Robin 21, George 24. | `Data/Characters (BirthSeason, BirthDay, CanBeRomanced, Home, UnlockConditions, CanSocialize)` | verified |
 | `bday.winter` | Krobus 1, Linus 3, Caroline 7, Sebastian 10, Harvey 14, Wizard 17, Evelyn 20, Leah 23, Clint 26. | `Data/Characters (BirthSeason, BirthDay, CanBeRomanced, Home, UnlockConditions, CanSocialize)` | verified |
+| `romance.heart-points` | Friendship: 250 points a heart; talking gives 20 once a day; a loved gift 80, liked 45, neutral 20 (x1.1/1.25/1.5 for silver/gold/iridium), times 8 on the birthday; two gifts a week, a birthday gift not counted. | `StardewValley.NPC.receiveGift`<br>`StardewValley.NPC.tryToReceiveActiveObject` | verified |
+| `romance.heart-caps` | Anyone dateable stops at 8 hearts + 249 points (2,249) until given a Bouquet; dating, at 10 hearts + 249 (2,749). | `StardewValley.Farmer.changeFriendship`<br>`StardewValley.Utility.GetMaximumHeartsForCharacter` | verified |
+| `romance.bouquet-shop` | Pierre sells the Bouquet once you have 8 hearts with any dateable villager (Data/Shops SeedShop, PLAYER_HEARTS Current AnyDateable 8); price -1 means twice the object price, 200g. | `Data/Shops` | verified |
+| `romance.mariner` | The Old Mariner appears at the far end of the beach on rainy or stormy days before 7 PM, and sells the Mermaid's Pendant to an unmarried farmer with 10 hearts with someone dateable, once the house has its first upgrade. | `StardewValley.Locations.Beach.checkAction`<br>`StardewValley.Locations.Beach.resetLocalState` | verified |
+| `romance.wedding-delay` | The wedding is three days after the proposal, pushed past days a wedding can't happen (festivals). | `StardewValley.NPC.engagementResponse` | verified |
 
 ## Community Center & bundles & route
 
@@ -628,6 +634,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `shop.keeper-at-counter` | Most shops need their keeper in place: Pierre on tile (4,17); Gus anywhere in x 9-18, y 17-18 of the Saloon; Robin within 3 tiles of (8,19); Marnie on (11-13,14) unless the Animal Catalogue has been read; Willy at y <= 5 in the Fish Shop; any villager at the clinic desk (x 4-7, y 15); Clint anywhere in the Blacksmith; Sandy anywhere in the Oasis. Marlon's shop and JojaMart need no one. Where keepers stand comes from their schedules. | `StardewValley.GameLocation.HandleBuyAction`<br>`StardewValley.GameLocation.saloon`<br>`StardewValley.GameLocation.carpenters`<br>`StardewValley.GameLocation.animalShop`<br>`StardewValley.GameLocation.blacksmith`<br>`StardewValley.Utility.TryOpenShopMenu/2`<br>`Data/Shops Owners`<br>`Maps/SeedShop, Saloon, ScienceHouse, AnimalShop, Blacksmith, FishShop, Hospital shop tile actions` | verified |
 | `shop.recipe-entries` | A shop entry with IsRecipe sells the recipe for the item, not the item: the Saloon's (O)228 at 300g is the Maki Roll recipe. The Saloon's only cooked dish for sale is DISH_OF_THE_DAY, the save's dishOfTheDay (chosen when the day starts), sold at its standard sale price (price x 2) with the stack as the stock. | `StardewValley.Internal.ItemQueryResolver.DefaultResolvers.DISH_OF_THE_DAY`<br>`StardewValley.Internal.ShopBuilder.GetShopStock`<br>`Data/Shops Saloon` | verified |
 | `shop.clint-ore-year1` | In Year 1 Clint sells Copper Ore 75g, Iron Ore 150g, Coal 150g and Gold Ore 400g; from Year 2, 150 / 250 / 250 / 750g. A bar is 5 ore and 1 coal in a Furnace, so in Year 1 a Gold Bar can be bought for about 2,150g. | `Data/Shops Blacksmith (conditions !YEAR 2 / YEAR 2)`<br>`Data/Machines (BC)13` | verified |
+| `house.upgrade-costs` | House upgrades from Robin: first 10,000g + 450 Wood, second 65,000g + 100 Hardwood, third 100,000g; three days each. | `StardewValley.GameLocation.houseUpgradeAccept` | verified |
 
 ## Fishing
 
@@ -1004,3 +1011,4 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | Rule | What the game does | Checked against | Status |
 |---|---|---|---|
 | `craft.seed-maker-recipe` | The Seed Maker recipe is learned at Farming 9 and takes 25 Wood, 10 Coal and 1 Gold Bar. | `Data/CraftingRecipes Seed Maker` | verified |
+| `craft.refined-quartz` | The Furnace turns 1 Quartz into Refined Quartz in 90 minutes, using 1 Coal (Data/Machines (BC)13). | `Data/Machines` | verified |

@@ -107,8 +107,9 @@ const STATUS_TEXT = { have: "Set aside", ok: "On track", maybe: "Probably", luck
 const SETTING_LABELS = {
   tiles: "Tiles you farm", wood_per_day: "Wood from a chopping day", floors_per_day: "Mines floors a day",
   hardwood_per_day: "Hardwood from a stump day", fish_gold: "Gold from a fishing day", mine_gold: "Gold from a mining day",
-  float: "Cash kept back from seeds",
+  float: "Cash kept back from seeds", quartz_per_day: "Quartz from a mining day", gift_points: "Friendship from each gift",
 };
+const FIRST_GOALS = { greenhouse: "target", seed_maker: "target", kitchen: "nice", cc: "nice" };  // the rest start off
 const TIERS = { target: "Target", nice: "Nice to have", off: "Off" };
 let routeState = null;
 let routeTimer;
@@ -119,9 +120,9 @@ function loadRouteState(catalog) {
   const ids = catalog.objectives.map((o) => o.id);
   const goals = (saved && saved.goals ? saved.goals.filter((g) => ids.includes(g.id)) : []);
   ids.filter((id) => !goals.some((g) => g.id === id)).forEach((id) =>
-    goals.push({ id, tier: ["greenhouse", "seed_maker"].includes(id) ? "target" : "nice" }));
+    goals.push({ id, tier: FIRST_GOALS[id] || "off" }));
   return { goals, cave: (saved && saved.cave) || "best", start: (saved && saved.start) || "save", settings: { ...catalog.settings, ...((saved && saved.settings) || {}) },
-           labels: Object.fromEntries(catalog.objectives.map((o) => [o.id, o.label])) };
+           labels: Object.fromEntries(catalog.objectives.map((o) => [o.id, o.label])), spouses: catalog.spouses || [] };
 }
 function saveRouteState() {
   try { localStorage.setItem("route", JSON.stringify({ goals: routeState.goals, cave: routeState.cave, start: routeState.start, settings: routeState.settings })); } catch { /* fine */ }
@@ -157,8 +158,10 @@ function drawGoals() {
 function drawSettings() {
   $("#route-settings").innerHTML = Object.entries(SETTING_LABELS).map(([k, label]) =>
     `<label for="rs-${k}">${esc(label)}</label><input id="rs-${k}" type="number" min="0" step="1" data-k="${k}" value="${routeState.settings[k]}">`
-  ).join("");
-  document.querySelectorAll("#route-settings input").forEach((inp) => inp.addEventListener("input", () => {
+  ).join("") + `<label for="rs-spouse">Who to marry</label><select id="rs-spouse"><option value="">Whoever you're closest to</option>` +
+    routeState.spouses.map((p) => `<option value="${esc(p.name)}" ${routeState.settings.spouse === p.name ? "selected" : ""}>${esc(p.name)}${p.hearts ? ` (${p.hearts}♥)` : ""}</option>`).join("") + "</select>";
+  $("#rs-spouse").onchange = () => { routeState.settings.spouse = $("#rs-spouse").value; changed(); };
+  document.querySelectorAll("#route-settings input[type=number]").forEach((inp) => inp.addEventListener("input", () => {
     routeState.settings[inp.dataset.k] = Math.max(0, parseInt(inp.value || "0", 10));
     changed(600);
   }));
@@ -214,6 +217,9 @@ async function planRoute() {
     `<div><b>${esc(STATUS[o.status] || o.status)}</b>${o.finish ? ` · done by ${esc(o.finish)}` : ""} · deadline ${esc(o.deadline)}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div>` +
     routeTree(o) + "</div>"
   ).join("") : '<p class="sub">Pick at least one goal.</p>';
+  $("#route-cave").disabled = !!v.cave_chosen;
+  if (v.cave_chosen) $("#route-cave").value = v.cave; else $("#route-cave").value = routeState.cave;
+  $("#route-cave").title = v.cave_chosen ? "Your save has already chosen; it can't be changed" : "";
   drawMatrix(v);
   drawCash(v);
 }
@@ -228,7 +234,8 @@ function routeTree(o) {
       return `<li class="shared"><span>${esc(st.what)}</span><span class="when">in hand ${esc(st.ready)} · planned under ${esc(st.shared)}</span></li>`;
     }
     const kids = [];
-    if (st.chop_days) kids.push(leaf("chop", `Chop Wood: ${st.chop_days} day${st.chop_days === 1 ? "" : "s"}`, st.chop));
+    const hard = st.needs.some((n) => n.materials.some((m) => m.endsWith(" Hardwood")));
+    if (st.chop_days) kids.push(leaf("chop", `${hard ? "Chop Wood and Hardwood (Secret Woods stumps)" : "Chop Wood"}: ${st.chop_days} day${st.chop_days === 1 ? "" : "s"}`, st.chop));
     if (st.mine_days) kids.push(leaf("mine", `Go down the Mines: ${st.mine_days} day${st.mine_days === 1 ? "" : "s"}`, st.mine));
     for (const n of st.needs) {
       if (n.state === "done") kids.push(leaf("done", `${esc(cap(n.label))} <span class="sub">(you have it)</span>`, ""));
@@ -243,7 +250,8 @@ function routeTree(o) {
       `<span class="when">in hand ${esc(st.ready)}</span></summary><ul>${kids.join("")}</ul></details></li>`;
   };
   const misses = (o.misses || []).map((m) => `<li class="node miss"><span>✗ ${esc(m.what)}</span><span class="why">${esc(m.why)}</span></li>`);
-  const notes = (o.notes || []).map((p) => `<li class="node miss"><span>✗ ${esc(p)}</span></li>`);
+  const notes = (o.notes || []).map((p) => `<li class="node miss"><span>✗ ${esc(p)}</span></li>`)
+    .concat((o.info || []).map((p) => `<li class="info"><span class="sub">${esc(p)}</span></li>`));
   const rows = o.steps.map(item).concat(misses, notes);
   return rows.length ? `<ul class="route-tree">${rows.join("")}</ul>` : "";
 }
