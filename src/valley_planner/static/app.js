@@ -82,7 +82,7 @@ function errandCard(name, c) {
 }
 
 async function showErrand(name) {
-  const c = await get(`/api/errand/${name}`);
+  const c = await busy("Looking through your chests…", () => get(`/api/errand/${name}`));
   $("#ask-results").innerHTML = "";
   $("#ask-card-body").innerHTML = errandCard(name, c);
   $("#ask-card").hidden = false;
@@ -157,7 +157,7 @@ function drawSettings() {
 function changed(wait = 150) {
   saveRouteState();
   clearTimeout(routeTimer);
-  routeTimer = setTimeout(planRoute, wait);
+  routeTimer = setTimeout(() => busy("Planning the rest of the year…", planRoute), wait);
 }
 
 
@@ -280,7 +280,7 @@ function drawNeeds(v) {
     if (way) picks[item] = way; else delete picks[item];
     routeState.settings.picks = picks;
     saveRouteState();
-    views.plan();
+    busy("Re-planning with your choice…", views.plan);
   };
   document.querySelectorAll("#needs-choices [data-pick]").forEach((b) => b.addEventListener("click", () => replan(b.dataset.item, b.dataset.pick)));
   document.querySelectorAll("#needs-choices [data-unpick]").forEach((b) => b.addEventListener("click", () => replan(b.dataset.unpick, "")));
@@ -577,6 +577,22 @@ async function searchCart() {
     : `<p class="sub">Not at the cart in the next two years.</p>`;
 }
 
+// "Loading…" over the page while a view waits for the server; shown only if it takes a moment, so quick
+// loads don't flicker. Calls can nest: it stays up until the last one is done.
+let busyCount = 0, busyTimer;
+async function busy(text, work) {
+  busyCount++;
+  if (busyCount === 1) busyTimer = setTimeout(() => { $("#loading-text").textContent = text; $("#loading").hidden = false; }, 150);
+  else $("#loading-text").textContent = text;
+  try {
+    return await work();
+  } finally {
+    if (--busyCount === 0) { clearTimeout(busyTimer); $("#loading").hidden = true; }
+  }
+}
+const LOADING = { morning: "Reading your save…", route: "Planning the rest of the year…", plan: "Adding up what your goals take…",
+                  todo: "Reading your save…", sell: "Pricing what you hold…" };
+
 async function show(name) {
   if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
   closeAsk();  // a tab button puts the search away, so the page you chose is what you see
@@ -584,7 +600,7 @@ async function show(name) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   document.querySelectorAll(".view").forEach((s) => (s.hidden = s.id !== `view-${name}`));
   try {
-    await views[name]();
+    await busy(LOADING[name] || "Loading…", views[name]);
   } catch (e) {
     $(`#view-${name}`).insertAdjacentHTML("afterbegin", `<p class="parch panel">Couldn't load this: ${esc(e.message)}</p>`);
   }
