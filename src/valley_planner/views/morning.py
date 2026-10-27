@@ -75,10 +75,18 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
             today.append({"kind": e.kind, "title": e.label, "text": farm.place(e.detail) if e.detail else ""})
     if s.dish_of_the_day:
         qid, n = s.dish_of_the_day
+        saloon = next((x for x in farm.hours_today() if x["id"] == "Saloon"), {})
         today.append({"kind": "dish", "title": f"The Saloon's dish of the day: {farm.name(qid)}",
-                      "text": f"{n} this morning"})
-    for x in [x for x in farm.hours_today() if x["closed"] and "desert" not in x["closed"].lower()][:3]:
-        today.append({"kind": "closed", "title": f"{x['shop']} is shut today", "text": x["closed"]})
+                      "text": f"{n} this morning" + (f", but the Saloon is out of reach ({saloon['closed']})"
+                                                    if saloon.get("closed") else "")})
+    shut = [x for x in farm.hours_today() if x["closed"] and "desert" not in x["closed"].lower()]
+    by_why: dict[str, list[str]] = {}
+    for x in shut:  # one line per reason: a festival shuts a whole map's shops at once
+        by_why.setdefault(x["closed"], []).append(x["shop"])
+    for why, names in by_why.items():
+        verb = "is" if len(names) == 1 else "are"
+        title = f"{', '.join(names)} {verb} out of reach today" if ":" in why else f"{names[0]} is shut today"
+        today.append({"kind": "closed", "title": title, "text": why})
 
     mine = crops.mine(farm)
     rain_now = s.weather in ("rain", "storm", "green rain")
@@ -116,14 +124,17 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         if last is not None and last - w.days_played <= SOON:
             do.append({"kind": "cc", "title": f"{slot['name']} for the {slot['bundle']} bundle",
                        "text": f"{b['label']}: last safe day {b['last_start']}"})
+    fest = farm.hours.festivals.get((w.season, w.day))
+    town_shut = bool(fest and fest[2] == "Town" and fest[1] >= 1900)  # the evening festival keeps you out of town
+    later = f" (not until {_time(fest[1])}: {fest[0]})" if town_shut else ""
     turn_in = sum(len(r["items"]) for r in errands.community_center(farm)["rooms"])
     if turn_in:
         do.append({"kind": "errand", "errand": "cc", "title": f"Take {turn_in} things to the Community Center",
-                   "text": "you hold them for open bundles"})
+                   "text": "you hold them for open bundles" + later})
     museum = len(errands.gunther(farm)["take"])
     if museum:
         do.append({"kind": "errand", "errand": "gunther", "title": f"Donate {museum} new finds to Gunther",
-                   "text": "the museum doesn't have them yet"})
+                   "text": "the museum doesn't have them yet" + later})
     geodes = errands.clint(farm)["geodes"]
     if geodes:
         n = sum(g["held"] for g in geodes)
@@ -198,7 +209,8 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
                 break
         else:
             name = hours.get(shop, {}).get("shop", shop)
-            blocks.append({"start": None, "end": None, "title": text, "lines": [f"{name} isn't open in time today"],
+            why = hours.get(shop, {}).get("closed") or f"{name} isn't open in time today"
+            blocks.append({"start": None, "end": None, "title": text, "lines": [f"not today: {why}"],
                            "urgency": "now", "shop": shop})
     if fest:
         blocks.append({"start": fest.start, "end": fest.end, "title": fest.label,
@@ -212,7 +224,7 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
                                                            if save else "")]
         blocks.append({"start": _clock(t), "end": _clock(spare_end), "title": "The route" if busy else "Spare",
                        "lines": lines, "urgency": "soon" if busy else "spare"})
-    if dish and (hours.get("Saloon") or {}).get("spans"):
+    if dish and _minutes(((hours.get("Saloon") or {}).get("spans") or [[0, 0]])[-1][1]) > _minutes(EVENING):
         blocks.append({"start": EVENING, "end": EVENING + 100, "title": "The Saloon",
                        "lines": [f"{farm.name(dish[0])}, today's dish ({dish[1]} this morning)"], "urgency": "plenty"})
     shops = [{"id": x["id"], "name": x["shop"], "spans": x["spans"], "label": ", ".join(x["open"])}

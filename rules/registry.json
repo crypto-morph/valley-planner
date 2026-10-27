@@ -12639,7 +12639,7 @@
   {
    "id": "tree.fruit",
    "area": "Crops & fertilizer",
-   "summary": "Each night a fruit tree takes its growth rate (1) off daysUntilMature unless growth is blocked (an object other than an artifact spot, a non-grass terrain feature, a crop, or a building/floor/furniture on any of the 8 surrounding tiles); its stage follows. The same night, if grown (stage 4), in season (Data/FruitTrees Seasons; the greenhouse and island ignore seasons) and holding fewer than 3, it adds one fruit. fruitsOnTree in the save counts what's on it.",
+   "summary": "Each night a fruit tree takes its growth rate (1) off daysUntilMature unless growth is blocked (an object other than an artifact spot, a non-grass terrain feature, a crop, or a building/floor/furniture on any of the 8 surrounding tiles); its stage follows. The same night, if grown (stage 4), in season (Data/FruitTrees Seasons; the greenhouse and island ignore seasons) and holding fewer than 3, it adds one fruit. What's on it is saved as one <fruit> item each (the fruit list); fruitsOnTree is an obsolete field.",
    "checked_against": [
     "StardewValley.TerrainFeatures.FruitTree.dayUpdate",
     "StardewValley.TerrainFeatures.FruitTree.TryAddFruit",
@@ -12674,6 +12674,19 @@
    ],
    "data": [
     "Data/Quests"
+   ],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "festival.map-closed",
+   "area": "Calendar & events & access",
+   "summary": "On a festival day, warping into the festival's map (Data/Festivals/<day> conditions: map/start end) before its start time is refused (from the clinic you're sent to the bus stop instead), so an evening festival such as Spirit's Eve (Town, 10 PM) keeps every shop whose door is on that map out of reach all day.",
+   "checked_against": [
+    "StardewValley.Game1.warpFarmer"
+   ],
+   "data": [
+    "Data/Festivals"
    ],
    "status": "verified",
    "refs": []

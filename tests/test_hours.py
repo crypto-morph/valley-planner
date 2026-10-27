@@ -60,7 +60,8 @@ def test_pierre_wednesdays_and_festivals():
     assert h.day(SHOP["SeedShop"], When("spring", 3, 1, 3, events_seen={"191393"})).open == [(900, 1700)]
     assert h.day(SHOP["SeedShop"], When("spring", 3, 1, 3), town_key=True).open == [(830, 1700)]
     assert "Egg Festival" in h.day(SHOP["SeedShop"], When("spring", 13, 1, 13)).closed_why
-    assert h.day(SHOP["SeedShop"], When("spring", 28, 1, 28)).open  # an evening festival doesn't shut shops
+    late = h.day(SHOP["SeedShop"], When("spring", 28, 1, 28))  # an evening festival keeps you out of its map
+    assert not late.open and "no way into Pelican Town until 10:00 PM" in late.closed_why
 
 
 def test_willy_letter_and_away_days():

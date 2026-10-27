@@ -5,7 +5,10 @@ There is no opening-hours table in the game. In our words:
   action with an opening and closing time (GameLocation.lockedDoorWarp): you
   can go in from the opening time until just before the closing time. On a
   daytime festival (one starting before 7 PM) every door in the valley stays
-  shut. Pierre's door is locked on Wednesdays until the Community Center is
+  shut. On an evening festival the festival's own map can't be entered at all
+  until it starts (Game1.warpFarmer: Spirit's Eve keeps you out of Pelican
+  Town until 10 PM), so every shop whose door is there is out of reach.
+  Pierre's door is locked on Wednesdays until the Community Center is
   restored. Willy opens at 8 AM once he's sent his "new hours" letter. The
   town key opens valley doors at any hour. In Year 1, green rain leaves the
   doors in town and on the mountain unlocked all day.
@@ -27,11 +30,12 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 from .conditions import When, check, location_accessible
-from .schedules import DaySchedule, Schedules, Situation, Stop
+from .schedules import DaySchedule, Schedules, Situation, Stop, time_label
 
 DAY_START, DAY_END = 600, 2600
 DAYTIME_FESTIVAL_BEFORE = 1900
 DOOR_MAPS = ("Town", "Mountain", "Forest", "Beach", "Desert")
+FESTIVAL_MAPS = {"Town": "Pelican Town", "Beach": "the beach", "Forest": "Cindersap Forest", "Mountain": "the mountain"}
 OUTSIDE_VALLEY = {"SandyHouse"}  # the desert is its own place: valley festivals don't shut it
 GREEN_RAIN_SHUT_MAPS = {"Beach", "Forest"}  # their doors keep their hours in green rain
 WILLY_HOURS_MAIL = "willyHours"
@@ -119,12 +123,14 @@ class Hours:
         return out
 
     @cached_property
-    def festivals(self) -> dict[tuple[str, int], tuple[str, int]]:
+    def festivals(self) -> dict[tuple[str, int], tuple[str, int, str]]:
+        """(season, day) -> (name, start time, the map it's held on)."""
         out = {}
         for key, name in self.data.asset("Data/Festivals/FestivalDates").items():
             season = next(s for s in ("spring", "summer", "fall", "winter") if key.startswith(s))
-            hours = (self.data.asset(f"Data/Festivals/{key}").get("conditions") or "").partition("/")[2].split()
-            out[(season, int(key[len(season):]))] = (self.data.text(name), int(hours[0]) if hours else 900)
+            where, _, hours = (self.data.asset(f"Data/Festivals/{key}").get("conditions") or "").partition("/")
+            hours = hours.split()
+            out[(season, int(key[len(season):]))] = (self.data.text(name), int(hours[0]) if hours else 900, where)
         return out
 
     def _windows(self, shop: Shop, npc: str, day: DaySchedule, when: When) -> list[tuple[int, int]]:
@@ -157,6 +163,9 @@ class Hours:
         in_valley = shop.location not in OUTSIDE_VALLEY
         if fest and fest[1] < DAYTIME_FESTIVAL_BEFORE and in_valley:
             out.closed_why = f"{fest[0]}: shops are shut"
+            return out
+        if fest and door and door.map == fest[2]:  # the evening festival's map is shut until it starts
+            out.closed_why = f"{fest[0]}: no way into {FESTIVAL_MAPS.get(fest[2], fest[2])} until {time_label(fest[1])}"
             return out
         if shop.location == "JojaMart" and not location_accessible("JojaMart", when):
             out.closed_why = "JojaMart has closed for good"
