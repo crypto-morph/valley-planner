@@ -124,3 +124,19 @@ def test_special_orders_on_the_morning():
     farm.save.special_orders[0]["objectives"][0]["current"] = 1
     (o,) = morning.special_orders(farm)
     assert not o["hunt"] and o["deliver"].startswith("the Wizard's tower")
+
+
+def test_quest_log():
+    """Quests from the log, worded from the game's data: who, what, and whether you hold a delivery's item."""
+    from valley_planner.app import Planner
+    from valley_planner.views import quests
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    farm.save.quests = [{"id": "106", "type": "ItemDeliveryQuest", "title": "Cow's Delight", "completed": False,
+                         "daily": False, "days_left": 0, "target": "Marnie", "item_id": "300", "count": 1,
+                         "reward": 500}]
+    (q,) = quests.view(farm)["quests"]
+    assert q["who"] == "Marnie" and "amaranth" in q["objective"].lower() and q["item"] == "Amaranth"
+    assert bool(q["deliver_to"]) == (q["have"] >= 1)

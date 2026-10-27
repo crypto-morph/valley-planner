@@ -376,6 +376,17 @@ function drawTree(v) {
 
 function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
+// The quest log, the special orders taken, and what's on Lewis's board
+function drawQuests(q) {
+  const left = (n) => n == null ? "" : n <= 0 ? "last day" : `${n} day${n === 1 ? "" : "s"} left`;
+  const rows = q.quests.map((x) => li(`<b>${esc(x.title)}</b>${x.who ? ` · ${esc(x.who)}` : ""}<br><span class="sub">${esc(x.objective)}${x.hint ? ` (${esc(x.hint)})` : ""}</span>`,
+    [x.deliver_to ? `<b class="ok">you have it${x.where.length ? `: ${esc(x.where.join(", "))}` : ""}</b>` : x.item && x.have === 0 && x.kind === "deliver" ? "you don't have it yet" : "",
+     left(x.days_left), x.reward ? `${x.reward.toLocaleString()}g` : ""].filter(Boolean).join(" · ")))
+    .concat(q.orders.map((o) => li(`<b>${esc(o.name)}</b> · special order for ${esc(o.who)}<br><span class="sub">${esc(o.text)}</span>`, "")));
+  $("#m-quests").innerHTML = (rows.length ? list(rows) : '<p class="sub">No quests in your log.</p>') +
+    (q.board.length ? `<p class="sub">On Lewis's board this week: ${esc(q.board.map((b) => `${b.name} (${b.who}, ${b.reward.toLocaleString()}g)`).join("; "))}</p>` : "");
+}
+
 // The day from 6 AM to 2 AM: the suggested order, then each shop's hours, on one time axis
 function drawDay(d) {
   const m = (t) => Math.floor(t / 100) * 60 + t % 100, a = m(d.from), z = m(d.to);
@@ -457,6 +468,7 @@ const views = {
     const notes = v.today.filter((x) => x.kind !== "dish" || !v.day.blocks.some((b) => b.title === "The Saloon"))
       .concat(v.do.filter((x) => !shown.has(x.title) && !shown.has(`Pick: ${x.title}`)));
     $("#m-first").innerHTML = notes.length ? list(notes.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing else today.</p>';
+    drawQuests(v.quests);
     const byDate = [];
     v.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
     $("#m-week").innerHTML = list(byDate.map((d) => li(`<b>${esc(d.date)}</b>`, d.items.map((e) => `<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`).join(" · "))));

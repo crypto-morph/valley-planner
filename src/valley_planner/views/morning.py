@@ -109,9 +109,13 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         left = 28 - (w.days_played - 1) % 28
         do.append({"kind": "crops", "title": f"{mine['dies']} crops won't ripen before {w.season.title()} ends",
                    "text": f"{left} day{'s' if left != 1 else ''} left: don't spend more on them"})
-    for name, left in getattr(s, "building_days", {}).items():
+    jobs = dict(getattr(s, "building_days", {}))
+    if getattr(s, "house_upgrade_days", 0):
+        jobs["house upgrade"] = s.house_upgrade_days
+    for name, left in jobs.items():
         do.append({"kind": "building", "title": f"Robin is still building your {name}",
-                   "text": "ready tomorrow" if left == 1 else f"ready in {left} days: nothing can move in until then"})
+                   "text": ("ready tomorrow" if left == 1 else f"ready in {left} days")
+                   + ": she can't take another job until then"})
     for t in crops.fruit_trees(farm):
         if t["first_n"] and 0 < t["first_n"] - w.days_played <= SOON and not t["on_tree"]:
             do.append({"kind": "tree", "title": f"Your {t['fruit']} tree: {t['text']}", "text": t["where"]})
@@ -156,11 +160,19 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
     todays = [a for a in agenda or [] if a["n"] == w.days_played]
     todays += [{"kind": "deliver", "text": o["deliver"], "shop": "", "n": w.days_played}
                for o in orders if o["deliver"]]
+    from . import quests as quest_view  # quests reads this module's helpers
+    log = quest_view.view(farm)
+    todays += [{"kind": "deliver", "text": f"{q['deliver_to']}: bring {q['who']} the {q['item']} ({q['title']})",
+                "shop": "", "n": w.days_played} for q in log["quests"] if q["deliver_to"]]
+    for q in log["quests"]:
+        if q["days_left"] is not None and q["days_left"] <= 1 and not q["deliver_to"]:
+            when = "last day" if q["days_left"] <= 0 else "ends tomorrow"
+            do.append({"kind": "quest", "title": f"{q['title']}: {when}", "text": q["objective"]})
     todays += [{"kind": "mine", "text": "the Mines: hunt the prismatic slime on slime floors (1–29, 41–79)",
                 "shop": "", "n": w.days_played} for o in orders if o["hunt"]]
     events = farm.calendar.day(w, today_days_played=w.days_played)
     return {"date": farm.label(w.days_played), "weekday": WEEKDAYS[(w.days_played - 1) % 7],
-            "day": _schedule(farm, do, todays, events), "route": todays,
+            "day": _schedule(farm, do, todays, events), "route": todays, "quests": log,
             "weather": s.weather, "tomorrow": s.weather_tomorrow, "weather_words": weather,
             "money": s.money, "luck": s.daily_luck, "mood": mood, "mood_means": means,
             "today": today, "do": do, "first": today + do, "week": week,
@@ -251,7 +263,8 @@ PRISMATIC_ORDER = "Wizard2"  # its slimes only turn prismatic while this order i
 PRISMATIC_BASE, PRISMATIC_FLOOR = 0.012, 0.01  # MineShaft.populateLevel: per slime, + luck / 10, at least 1%
 HOMES = {"Wizard": "the Wizard's tower", "Lewis": "Mayor Lewis's house", "Robin": "Robin's", "Pierre": "Pierre's",
          "Clint": "Clint's", "Willy": "Willy's shop", "Demetrius": "Robin's", "Gus": "the Saloon",
-         "Caroline": "Pierre's", "Emily": "the Saloon", "Evelyn": "1 River Road", "Gunther": "the museum"}
+         "Caroline": "Pierre's", "Emily": "the Saloon", "Evelyn": "1 River Road", "Gunther": "the museum",
+         "Marnie": "Marnie's Ranch", "Pam": "the trailer", "Harvey": "the clinic", "Linus": "Linus's tent"}
 
 
 def special_orders(farm: Farm) -> list[dict]:

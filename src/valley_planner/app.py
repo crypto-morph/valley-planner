@@ -130,6 +130,11 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def morning_view() -> dict:
         return morning.view(p().farm())
 
+    @app.get("/api/quests")
+    def quests_view() -> dict:
+        from .views import quests
+        return quests.view(p().farm())
+
     @app.post("/api/morning")
     def morning_with_route(ask: RouteAsk) -> dict:
         """The morning, with the route's steps for today (the Route tab's goals) slotted into the day."""
