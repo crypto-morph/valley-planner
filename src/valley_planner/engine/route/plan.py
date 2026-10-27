@@ -125,6 +125,8 @@ class Router:
         self.wood_left = farm.held().get(f"(O){WOOD}", 0)  # Wood in hand, used before any chopping
         self.fish_days: dict[str, int] = {}
         self.wedding: str | None = None  # who the route marries, once the Pendant is placed
+        self.misses: list[tuple[str, str]] = []  # the objective being placed: what can't be, and why
+        self.info: list[str] = []
         self.planner = Planner(farm, self.end)
         save = farm.save
         if self.cave is None or save.cave_choice:  # a choice already made in the save wins
