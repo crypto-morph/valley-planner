@@ -63,6 +63,7 @@ CATALOG = {  # id -> (label, default deadline as days played in Year 1)
     "sprinklers": ("Quality Sprinklers for the field", 112),
     "house_2": ("The second house upgrade", 112),
     "marriage": ("Marriage", 112),
+    "qi": ("Mr. Qi's notes (the Club Card)", 112),
     "deluxe_barn": ("A Deluxe Barn", 112),
     "deluxe_coop": ("A Deluxe Coop", 112),
     "silo": ("A Silo", 112),
@@ -89,6 +90,13 @@ UNLOCK_GOALS = {  # objectives that are one unlock: (its key, what the route cal
 }
 MACHINE_GOALS = {"jars": ("15", "Preserves Jars"), "kegs": ("12", "Kegs")}  # objective -> (big craftable, plural)
 QUARTZ, REFINED_QUARTZ, SPRINKLER = "80", "338", "621"
+QI_STEPS = (  # mail flag set when done, the item, how many, where it goes
+    ("TH_Tunnel", "787", 1, "the safe in the tunnel left of the bus stop"),
+    ("TH_Railroad", "394", 1, "the box on the train platform"),
+    ("TH_MayorFridge", "284", 10, "Mayor Lewis's fridge"),
+    ("TH_SandDragon", "768", 1, "the sand dragon's skull in the Desert"),
+)
+QI_DONE = "TH_LumberPile"  # the Club Card, from the lumber pile beside your house
 CLAY, OAK_RESIN, TAPPER = "330", "725", "105"
 SPRINKLER_TILES = 8  # a Quality Sprinkler waters the eight tiles around it
 SKULL_KEY_FLOOR = 120  # the Mines' last floor: its chest holds the Skull Key
@@ -249,6 +257,8 @@ class Router:
         cc = bool(s.areas_complete) and all(s.areas_complete)
         if oid == "marriage":
             return any(f.status in ("Married", "Engaged") for f in s.friends.values())
+        if oid == "qi":
+            return QI_DONE in s.mail
         if oid == "mines_bottom" and "HasSkullKey" in s.mail:
             return True
         if oid == "skull_cavern":  # Skull Cavern floors are kept as 120 + the floor
@@ -371,6 +381,8 @@ class Router:
             return [Req(f"{n} Quality Sprinklers", self.today, self.end, recipe + [craft], 0)], 0, []
         if oid == "marriage":
             return self.courtship()
+        if oid == "qi":
+            return self.qi()
         return [], 0, [f"unknown objective {oid}"]
 
     def crafted(self, bc: str, n: int, plural: str) -> list[Unlock]:
@@ -454,6 +466,42 @@ class Router:
                              ", ".join(f"{n:,} {self.farm.name(f'(O){m}')}" for m, n in left.items()))
         for s in skills:
             self.info.append(f"{s}: assumed reached in time")
+
+    def qi(self) -> tuple[list[Req], int, list[str]]:
+        """Mr. Qi's notes, each step after the last (GameLocation.performAction, ManorHouse): what each still
+        needs, got the cheapest way; the Desert step also needs the bus. The last note sends you to the lumber
+        pile by your house, which holds the Club Card."""
+        mail, reqs, notes = self.farm.save.mail, [], []
+        step = next((i for i, (flag, *_rest) in enumerate(QI_STEPS) if flag not in mail), len(QI_STEPS))
+        if step == 0:
+            notes.append("it starts with a Battery Pack in the safe in the tunnel left of the bus stop")
+        for flag, oid, count, where in QI_STEPS[step:]:
+            qid, name = f"(O){oid}", self.farm.name(f"(O){oid}")
+            have = self.held.get(qid, 0) >= count
+            ways = [] if have else [self.planner.way(src, qid) for src in self.planner.sources.of(qid)]
+            slot = Slot("Mr. Qi", "", qid, name, count, 0, have, ways)
+            plural = name if count == 1 or name.endswith("s") else f"{name}s"
+            label = f"{f'{count} {plural}' if count > 1 else name} (Mr. Qi: {where})"
+            if have:
+                self.info.append(f"You have {count if count > 1 else 'the'} {name} for {where}")
+                req = Req(label, self.today, self.end, [], 0, "forage", season=f"take it to {where}")
+            else:
+                req = self.slot_req(slot)
+                if req is None:
+                    continue
+                if req.latest == 0:  # nothing the route can plan: say what stands in the way
+                    why = sorted({b for w in ways for b in w.blocked})
+                    luck = [f"{w.source.label} ({w.odds:.0%} by the year's end)" for w in ways if w.odds]
+                    self.misses.append((label, "; ".join(why) + (f"; or by luck: {', '.join(luck)}" if luck else "")
+                                        or "no way to get it this year"))
+                    continue
+                req = Req(label, req.earliest, req.latest, req.chain, req.lead, req.activity, req.luck, req.season)
+            if flag == "TH_SandDragon":  # in the Desert: the bus first
+                desert = self.planner.unlocks.chain("place:Desert")
+                req = Req(req.label, req.earliest, req.latest, desert + req.chain, req.lead, req.activity, req.luck,
+                          req.season)
+            reqs.append(req)
+        return reqs, 0, notes
 
     def _later(self, day: int | None) -> str:
         return f"not this year: about {self.farm.label(day)}" if day else "not within two years at this pace"

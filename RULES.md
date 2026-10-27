@@ -1002,6 +1002,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | Rule | What the game does | Checked against | Status |
 |---|---|---|---|
 | `quest.help-wanted-pool` | Help Wanted item requests pick from: gems/minerals/fishing finds (68 66 78 80 86 152 167 153 420), more gems past mine floor 40 (62 70 72 84 422) and 80 (64 60 82) or once the bottom is reached, desert finds with ccVault (88 90 164 165), bars with the Furnace recipe (334 335 336 338) and Refined Quartz with the Quartz Globe, the season's forage and fish, the season's crops possible now (only the early ones in the first week; some Year 2+ or with the Vault; none in winter), and known dishes whose ingredients all come from that pool. Egg and Milk categories become a plain Egg or Milk. | `StardewValley.Utility.getRandomItemFromSeason/2`<br>`StardewValley.Utility.possibleCropsAtThisTime`<br>`StardewValley.Quests.ItemDeliveryQuest.loadQuestInfo` | verified |
+| `qi.notes` | Mr. Qi's notes, in order, each needing the one before (mail flags): a Battery Pack in the tunnel safe left of the bus stop (TH_Tunnel), a Rainbow Shell in the train platform box (TH_Railroad), 10 Beets held when opening Mayor Lewis's fridge (TH_MayorFridge), a Solar Essence held at the sand dragon's skull in the Desert (TH_SandDragon), then the lumber pile by the farmhouse gives the Club Card (TH_LumberPile). | `StardewValley.GameLocation.performAction`<br>`StardewValley.Locations.ManorHouse.performAction`<br>`Data/Quests` | verified |
 
 ## Items & sources
 

@@ -246,3 +246,25 @@ def test_building_under_way_waits_for_robin():
     farm.save.building_days["Coop"] = 2
     u = Unlocks(farm).get("building:Coop")
     assert not u.done and u.days == 2 and u.gold == 0 and not u.materials
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_qi_notes():
+    """Mr. Qi's chain on a fresh farm starts at the tunnel safe; steps already done (mail flags) are skipped; the
+    Desert step needs the bus."""
+    from valley_planner.engine.route.plan import QI_STEPS, Router
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    r = Router(farm, cave="bats")
+    reqs, _, notes = r.requirements("qi")
+    assert notes and "tunnel" in notes[0]
+    farm.save.mail |= {"TH_Tunnel", "TH_Railroad"}
+    r = Router(farm, cave="bats")
+    reqs, _, _ = r.requirements("qi")
+    labels = [q.label for q in reqs] + [m[0] for m in r.misses]
+    assert not any("tunnel" in x or "train" in x for x in labels) and any("fridge" in x for x in labels)
+    desert = next(q for q in reqs if "sand dragon" in q.label) if any("sand dragon" in q.label for q in reqs) else None
+    assert desert is None or any(u.key == "place:Desert" for u in desert.chain)
+    assert len(QI_STEPS) == 4

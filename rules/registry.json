@@ -12663,6 +12663,20 @@
    "data": [],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "qi.notes",
+   "area": "Quests & requests",
+   "summary": "Mr. Qi's notes, in order, each needing the one before (mail flags): a Battery Pack in the tunnel safe left of the bus stop (TH_Tunnel), a Rainbow Shell in the train platform box (TH_Railroad), 10 Beets held when opening Mayor Lewis's fridge (TH_MayorFridge), a Solar Essence held at the sand dragon's skull in the Desert (TH_SandDragon), then the lumber pile by the farmhouse gives the Club Card (TH_LumberPile).",
+   "checked_against": [
+    "StardewValley.GameLocation.performAction",
+    "StardewValley.Locations.ManorHouse.performAction"
+   ],
+   "data": [
+    "Data/Quests"
+   ],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

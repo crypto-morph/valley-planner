@@ -143,6 +143,7 @@
  "StardewValley.Locations.IslandLocation.SeedsIgnoreSeasonsHere": "58c426c5d7d2747b0565e42fc3f84530b1fd46e216dff370f911b6c0ee39df62",
  "StardewValley.Locations.LibraryMuseum.IsItemSuitableForDonation": "56c774be61bf5d194a91abeb270dcfcaeba79f385094da27c1c39cca180fa36d",
  "StardewValley.Locations.LibraryMuseum.getRewardsForPlayer": "bdd8205ca9ca72516048aa59eca9f6052c2fbcd645d194b1f954ab3456623e27",
+ "StardewValley.Locations.ManorHouse.performAction": "d2e0d1c7a3f3cc238061a57506dc25fbd2bdb1a4cec5b6f86c1bba5401aea60e",
  "StardewValley.Locations.MineShaft.addLevelChests": "17bdda83382cbd53c7b2b3c14b527887ab163f94f8b3bfd42f93f1d45dec1a4f",
  "StardewValley.Locations.MineShaft.checkForBuriedItem": "a27aa1b6e9392c934751b4268b90c9c132af610f13cb9add9ead0b3fda4ab500",
  "StardewValley.Locations.MineShaft.checkStoneForItems": "4cbba9b76325cc93957573e248b96d0f3e60a612c19e3e566a0f08e621d4ec22",

@@ -164,7 +164,11 @@ class Planner:
             first = first or p + grow
             last = p
         if first is None and not held_seed and not seed_days and not blocked:
-            blocked = [*blocked, f"{f.name('(O)' + seed)} (no shop sells them before then)"]
+            shut = [(s.label, why[0]) for s in self.sources.index.get(seed, []) if s.kind == "shop"
+                    for ok, why in [self.sources.open_now(s, f.when)] if not ok and why]
+            seeds = f.name("(O)" + seed)
+            blocked = [*blocked, f"{seeds}: only {shut[0][0]} sells them, which needs {shut[0][1]}" if shut
+                       else f"{seeds} (no shop sells them before then)"]
         return Way(src, first, last, blocked)
 
     def _tree(self, src: Source, item: str, blocked: list[str]) -> Way:
