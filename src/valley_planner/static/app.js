@@ -214,7 +214,7 @@ function drawNeeds(v) {
   $("#needs-head").textContent = `Everything your goals need from ${v.today.replace(/, Year \d+/, "")} to ${v.end.replace(/, Year \d+/, "")}, added up. ` +
     "Open any line to see what it is for. Where an item can be got more than one way, the ways are joined by OR, and the one the route plans is ticked.";
   const res = v.resources.filter((x) => x.total > 0);
-  const gold = res.find((x) => x.id === "gold"), bars = res.filter((x) => BARS.includes(x.id));
+  const gold = res.find((x) => x.id === "gold"), bars = res.filter((x) => x.group ? x.group === "bars" : BARS.includes(x.id));
   const rest = res.filter((x) => x !== gold && !bars.includes(x));
 
   // The tiles: gold first and wide, then each material, the bars together, then the days
@@ -241,7 +241,7 @@ function drawNeeds(v) {
   $("#needs-tiles").innerHTML = tiles;
 
   // Where it goes: a collapsible row per goal, its items under it
-  const where = (x) => x.breakdown.map((b, i) => `<details class="ngoal"${i ? "" : " open"}><summary><span class="ng-row"><span>${esc(b.label)}</span>` +
+  const where = (x) => x.breakdown.map((b, i) => `<details class="ngoal"${i ? "" : " open"}><summary><span class="ng-row"><span>${esc(b.label)}${also(b.also)}</span>` +
     `<span>${amt(b.amount, x.unit)}</span></span>${bar(b.amount, x.total)}</summary><ul class="nitems">` + b.items.map((it) =>
       `<li><span>${esc(it.label)}${it.how ? `: ${esc(it.how)}` : ""}${also(it.also)}${it.this_year === false ? ' <span class="later">not this year</span>' : ""}</span><span>${amt(it.amount, x.unit)}</span></li>`
     ).join("") + "</ul></details>").join("");
@@ -257,10 +257,11 @@ function drawNeeds(v) {
   const card = (o, i) => {
     if (o.more) return `<button type="button" class="ncard more" aria-expanded="false" data-label="${esc(o.label)}" data-more="${esc(o.detail)}">${esc(o.label)}</button>`;
     let tag = o.tag || TAG[o.state] || "";
-    if (o.state === "planned" && !tag.startsWith("✓")) tag = "✓ " + tag;
+    const planned = o.planned ?? o.state === "planned";
+    if (planned && !tag.startsWith("✓")) tag = "✓ " + tag;
     if (o.state === "no" && !tag.startsWith("✕")) tag = "✕ " + tag;
-    const cls = o.state === "planned" && o.odds != null ? "planned c-luck" : o.state;  // planned but on luck: amber, still ticked
-    const line = [o.detail, o.gold ? amt(o.gold, "g") : "", o.when].filter(Boolean).map(esc).join(" · ");
+    const cls = planned ? (o.state === "luck" || o.odds != null ? "planned c-luck" : "planned") : o.state;  // planned on luck: amber, ticked
+    const line = [o.detail, o.gold ? amt(o.gold, "g") : "", o.when].filter(Boolean).map(esc).join(" · ") + also(o.also);
     return `<div class="ncard c-${cls}${i ? "" : " first"}">${tag ? `<b class="c-tag">${esc(tag)}</b>` : ""}<b class="c-ttl">${esc(o.label)}</b>${line ? `<span>${line}</span>` : ""}</div>`;
   };
   $("#needs-choices-box").hidden = !v.choices.length;
