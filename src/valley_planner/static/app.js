@@ -544,9 +544,9 @@ const views = {
     const v = await get("/api/cook");
     const g = (n) => n == null ? "?" : `${n.toLocaleString()}g`;
     const sign = (n) => n == null ? "can't tell" : `${n > 0 ? "+" : ""}${n.toLocaleString()}g`;
-    const ings = (r) => r.ingredients.map((i) => `${i.need > 1 ? `${i.need} ` : ""}${esc(i.name)}${i.have ? "" : i.buy != null ? ` <span class="sub">(buy ${i.buy}g)</span>` : ' <span class="sub">(none held)</span>'}`).join(", ");
+    const ings = (r) => r.ingredients.map((i) => `${i.need > 1 ? `${i.need} ` : ""}${esc(i.name)}${i.have ? (i.use ? ` <span class="sub">(worth ${i.each}g as ${esc(i.use)})</span>` : "") : i.buy != null ? ` <span class="sub">(buy ${i.buy}g)</span>` : ' <span class="sub">(none held)</span>'}`).join(", ");
     $("#cook-head").textContent = (v.kitchen ? "" : v.kitchen_days ? `Your kitchen is ready in ${v.kitchen_days} days. ` : "You need the kitchen (the first house upgrade) to cook. ") +
-      "A dish sells for the same at the shipping bin or Pierre's. Cooking uses your backpack and fridge, so move ingredients out of chests first." +
+      "A dish sells for the same at the shipping bin or Pierre's. Each ingredient is valued at its best other use: sold as it is, or made into something by a machine you own (jar, keg, smoker, mayonnaise machine...) if that's worth more. Machines take time and you have only so many, so a machine's value is the best case. Cooking uses your backpack and fridge, so move ingredients out of chests first." +
       (v.total ? ` Cooking the ones that gain makes about ${v.total.toLocaleString()}g more than selling their ingredients.` : "") +
       (v.losers ? ` ${v.losers} of your recipes sell for less than their ingredients: cook those for a bundle, a quest, a gift or the energy, not for gold.` : "");
     const head = "<tr><th>Dish</th><th>Ingredients</th><th>Sells</th><th>Cheapest ingredients worth</th><th>Gain: first to last</th><th>You can make</th></tr>";

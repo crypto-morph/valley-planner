@@ -2,8 +2,10 @@
 
 From the game's data at runtime: Data/CookingRecipes ("ingredients/unused/output/how it's learned/name": an
 ingredient is an item id and count, or a negative category such as -5 any egg, -6 any milk, -4 any fish), the
-dish's sale price (shipping bin or Pierre, the same price), and today's shop prices. Cooking takes any quality, so
-each dish is costed with the cheapest units you hold, at what they'd sell for instead (what cooking gives up):
+dish's sale price (shipping bin or Pierre, the same price), and today's shop prices. An ingredient is worth its
+best other use: sold as it is, or through a machine you own (a keg, a jar, the smoker...) if that pays more, less
+what the machine burns; machines take time and you have only so many, so that's the best case. Cooking takes any
+quality, so each dish is costed with the cheapest units you hold, at that value (what cooking gives up):
 the first dish uses the cheapest, the last the dearest, so a recipe can pay for a few and then stop. An
 ingredient you don't hold is costed at the cheapest shop price today, or marked as not for sale. Cooking takes
 ingredients from your backpack and fridge, so items in chests have to be moved first.
@@ -12,6 +14,7 @@ ingredients from your backpack and fridge, so items in chests have to be moved f
 from __future__ import annotations
 
 from ..engine.unlocks import Unlocks
+from ..facts.machines import Input
 from ..facts.sell import item_sell_price, sell_price
 from .farm import REGULAR_SEED_SHOPS, Farm
 
@@ -39,13 +42,38 @@ def view(farm: Farm) -> dict:
             if oid not in buy or o.price < buy[oid][0]:
                 buy[oid] = (o.price, o.shop)
 
-    # every unit you hold, at what it would sell for (its own quality): cooking takes any quality, so you'd use
-    # the cheapest first
+    # the best other use of an ingredient: sold as it is, or through a machine you own (a keg, a jar, the smoker,
+    # the dehydrator...), whichever is worth more per item, less anything the machine burns
+    from .sell import SEED_MAKER, _machine_id, _machine_name, _value
+    owned = [m for m in (_machine_id(farm, n) for n in s.machines) if m != SEED_MAKER]
+    best_cache: dict[tuple[str, int], tuple[int, str]] = {}
+
+    def best_use(oid: str, quality: int, raw: int) -> tuple[int, str]:
+        key = (oid, quality)
+        if key not in best_cache:
+            best = (raw, "")
+            for mid in owned:
+                out = farm.machines.output(mid, Input(f"(O){oid}", 10, quality), farm.when,
+                                           professions=set(s.professions))
+                if not out or not out.item or out.uses > 10:
+                    continue
+                o = objects.get(out.item.removeprefix("(O)")) or {}
+                prod = sell_price(out.price, out.quality, farm.farmer, out.item, out.name, o.get("Category"),
+                                  o.get("Type") or "", profit_margin=s.profit_margin, preserve=out.preserve)
+                per = int((prod * out.stack[0] - sum(k * _value(farm, a) for a, k in out.also)) / out.uses)
+                if per > best[0]:
+                    best = (per, f"{out.name} ({_machine_name(farm, mid)})")
+            best_cache[key] = best
+        return best_cache[key]
+
+    # every unit you hold, at its best other use (its own quality): cooking takes any quality, so the cheapest
+    # go first
     units: dict[str, list[tuple[int, str]]] = {}
     for it in s.items:
         if it.qualified_id.startswith("(O)") and not it.preserve:
             o = objects.get(it.id) or {}
-            v = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin, data_price=int(o.get("Price") or 0))
+            raw = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin, data_price=int(o.get("Price") or 0))
+            v = best_use(it.id, it.quality, raw)[0]
             units.setdefault(it.id, []).extend([(v, it.id)] * min(it.stack, 999))
 
     def stock(iid: str) -> list[tuple[int, str]]:  # (value, item id), cheapest first
@@ -82,7 +110,8 @@ def view(farm: Farm) -> dict:
                 sure = False
             can = min(can, len(have_units) // need)
             stocks.append((need, have_units, price))
-            ingredients.append({"name": label, "need": need, "have": len(have_units),
+            use = best_use(have_units[0][1], 0, value(have_units[0][1]))[1] if have_units else ""
+            ingredients.append({"name": label, "need": need, "have": len(have_units), "use": use,
                                 "each": have_units[0][0] if have_units else price, "buy": price})
         can = can if can < 10 ** 6 else 0
         # dish by dish, each using the cheapest units left: the first is the best deal, the last the worst
@@ -95,7 +124,7 @@ def view(farm: Farm) -> dict:
                     cost_k += sum(v for v, _ in take) + (need - len(take)) * (price or 0)
                 gains.append(each * made - cost_k)
         cost = each * made - gains[0] if gains else None
-        by_quality = _by_quality(farm, objects, parts, buy, each * made, set(units))
+        by_quality = _by_quality(farm, objects, parts, buy, each * made, set(units), best_use)
         learn = unlocks.get(f"recipe:{name}")
         profit = gains[0] if gains else None
         wanted = [f"the {bundles[f'(O){dish}']} bundle"] if f"(O){dish}" in bundles else []
@@ -120,7 +149,7 @@ def view(farm: Farm) -> dict:
 
 
 def _by_quality(farm: Farm, objects: dict, parts: list[str], buy: dict, sells: int,
-                held: set[str]) -> dict[int, int | None]:
+                held: set[str], best_use) -> dict[int, int | None]:
     """The dish's gain if its ingredients are all of one quality (what each would sell for instead). An 'any of'
     ingredient takes the cheapest item of its kind; flour, sugar, oil and the like have no quality, and one you'd
     have to buy is costed at its shop price."""
@@ -142,8 +171,9 @@ def _by_quality(farm: Farm, objects: dict, parts: list[str], buy: dict, sells: i
                                                                 o.get("Name") or "", o.get("Category"),
                                                                 profit_margin=farm.save.profit_margin)
             else:
-                unit = sell_price(int(o.get("Price") or 0), q, farm.farmer, f"(O){iid}", o.get("Name") or "",
-                                  o.get("Category"), profit_margin=farm.save.profit_margin)
+                unit = best_use(iid, q, sell_price(int(o.get("Price") or 0), q, farm.farmer, f"(O){iid}",
+                                                   o.get("Name") or "", o.get("Category"),
+                                                   profit_margin=farm.save.profit_margin))[0]
             cost += unit * need
         out[q] = None if cost is None else sells - cost
     return out
