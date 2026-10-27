@@ -540,6 +540,24 @@ const views = {
     $("#mine-trees").innerHTML = m.trees.length ? list(m.trees.map((t) => li(`<b>${esc(t.fruit)}</b> · ${esc(t.where)}`, esc(t.text.replace(/, Year \d+/g, (y) => y))))) : '<p class="sub">No fruit trees planted.</p>';
   },
 
+  async cook() {
+    const v = await get("/api/cook");
+    const g = (n) => n == null ? "?" : `${n.toLocaleString()}g`;
+    const sign = (n) => n == null ? "can't tell" : `${n > 0 ? "+" : ""}${n.toLocaleString()}g`;
+    const ings = (r) => r.ingredients.map((i) => `${i.need > 1 ? `${i.need} ` : ""}${esc(i.name)}${i.have ? "" : i.buy != null ? ` <span class="sub">(buy ${i.buy}g)</span>` : ' <span class="sub">(none held)</span>'}`).join(", ");
+    $("#cook-head").textContent = (v.kitchen ? "" : v.kitchen_days ? `Your kitchen is ready in ${v.kitchen_days} days. ` : "You need the kitchen (the first house upgrade) to cook. ") +
+      "A dish sells for the same at the shipping bin or Pierre's. Cooking uses your backpack and fridge, so move ingredients out of chests first." +
+      (v.total ? ` Cooking the ones that gain makes about ${v.total.toLocaleString()}g more than selling their ingredients.` : "") +
+      (v.losers ? ` ${v.losers} of your recipes sell for less than their ingredients: cook those for a bundle, a quest, a gift or the energy, not for gold.` : "");
+    const head = "<tr><th>Dish</th><th>Ingredients</th><th>Sells</th><th>Ingredients worth</th><th>Gain each</th><th>You can make</th></tr>";
+    const row = (r, extra) => `<tr><td><b>${esc(r.name)}</b>${r.wanted.length ? `<br><span class="also">for ${esc(r.wanted.join(", "))}</span>` : ""}</td><td>${ings(r)}</td>` +
+      `<td>${g(r.sells)}</td><td>${g(r.cost)}</td><td class="${(r.profit || 0) > 0 ? "ok" : "bad"}">${sign(r.profit)}</td><td>${extra(r)}</td></tr>`;
+    $("#cook-now").innerHTML = v.now.length ? head + v.now.map((r) => row(r, (x) => `${x.can}`)).join("") : '<tr><td class="sub">Nothing you can cook now beats selling its ingredients.</td></tr>';
+    $("#cook-known").innerHTML = head + v.known.map((r) => row(r, (x) => x.can ? `${x.can}` : "")).join("");
+    $("#cook-learn").innerHTML = "<tr><th>Dish</th><th>Gain each</th><th>How to learn it</th></tr>" + v.learn.map((r) =>
+      `<tr><td><b>${esc(r.name)}</b></td><td class="ok">${sign(r.profit)}</td><td>${esc(r.learn)}</td></tr>`).join("");
+  },
+
   async sell() {
     const f = sellFilters();
     const v = await get("/api/sell?" + new URLSearchParams(Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x ? "true" : "false"]))));
@@ -603,7 +621,7 @@ async function busy(text, work) {
   }
 }
 const LOADING = { morning: "Reading your save…", route: "Planning the rest of the year…", plan: "Adding up what your goals take…",
-                  todo: "Reading your save…", sell: "Pricing what you hold…" };
+                  todo: "Reading your save…", sell: "Pricing what you hold…", cook: "Pricing your recipes…" };
 
 async function show(name) {
   if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);

@@ -130,6 +130,11 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def morning_view() -> dict:
         return morning.view(p().farm())
 
+    @app.get("/api/cook")
+    def cook_view() -> dict:
+        from .views import cook
+        return cook.view(p().farm())
+
     @app.get("/api/quests")
     def quests_view() -> dict:
         from .views import quests

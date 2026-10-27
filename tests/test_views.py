@@ -149,3 +149,21 @@ def test_page_files_are_revalidated():
     from valley_planner.app import create_app
     client = TestClient(create_app())
     assert client.get("/static/app.js").headers.get("cache-control") == "no-cache"
+
+
+def test_cook_report():
+    """Each recipe's dish against its ingredients; what you can make is limited by the scarcest ingredient."""
+    from valley_planner.app import Planner
+    from valley_planner.views import cook
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    v = cook.view(farm)
+    rows = v["now"] + v["known"]
+    assert rows and all(r["known"] for r in rows)
+    for r in rows:
+        if r["profit"] is not None:
+            assert r["profit"] == r["sells"] - r["cost"]
+        assert r["can"] <= min(i["have"] // i["need"] for i in r["ingredients"])
+    assert v["total"] >= 0
