@@ -223,4 +223,13 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return ask.villager(p().farm(), name)
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+    @app.middleware("http")
+    async def always_fresh(request, call_next):
+        """The page and its files are checked with the server on every load (a quick 'not changed' when they
+        haven't), so an update shows at once instead of a browser's cached copy."""
+        response = await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
     return app

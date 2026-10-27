@@ -140,3 +140,12 @@ def test_quest_log():
     (q,) = quests.view(farm)["quests"]
     assert q["who"] == "Marnie" and "amaranth" in q["objective"].lower() and q["item"] == "Amaranth"
     assert bool(q["deliver_to"]) == (q["have"] >= 1)
+
+
+def test_page_files_are_revalidated():
+    """The page and its scripts carry no-cache, so an update shows without a forced reload."""
+    from fastapi.testclient import TestClient
+
+    from valley_planner.app import create_app
+    client = TestClient(create_app())
+    assert client.get("/static/app.js").headers.get("cache-control") == "no-cache"
