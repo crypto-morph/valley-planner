@@ -12549,6 +12549,92 @@
    "refs": [
     "StardewValley.Objects.Chest"
    ]
+  },
+  {
+   "id": "route.goal-buildings",
+   "area": "Community Center & bundles & route",
+   "summary": "A Deluxe Barn is built as an upgrade of the Big Barn, itself an upgrade of the Barn (Barn 6,000g, Big Barn 12,000g, Deluxe Barn 25,000g, plus Wood and Stone); the Deluxe Coop likewise from the Big Coop and the Coop. The Silo has no prerequisite: 100g, 100 Stone, 10 Clay, 5 Copper Bars, 2 days. A building counts as had if it, or a building upgraded from it, is on the farm.",
+   "checked_against": [],
+   "data": [
+    "Data/Buildings Barn, Big Barn, Deluxe Barn, Coop, Big Coop, Deluxe Coop, Silo (BuildCost, BuildMaterials, BuildDays, BuildingToUpgrade)"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "route.tool-upgrades-from-save",
+   "area": "Community Center & bundles & route",
+   "summary": "Clint upgrades a tool one level at a time: each level needs the previous level's tool in your inventory (ConventionalUpgradeFrom), and costs 2,000 / 5,000 / 10,000 / 25,000g with 5 Copper / Iron / Gold / Iridium Bars for levels 1-4, the same for the Axe, Pickaxe, Hoe and Watering Can. He takes the tool for two days and holds only one at a time, so you're without it meanwhile. The route starts each tool's chain from the save's own level for that tool.",
+   "checked_against": [
+    "StardewValley.Internal.ShopBuilder.GetToolUpgradeConventionalPrice",
+    "StardewValley.Internal.ShopBuilder.GetToolUpgradeData",
+    "StardewValley.Tool.actionWhenPurchased"
+   ],
+   "data": [
+    "Data/Tools SteelAxe, SteelPickaxe, SteelWateringCan, CopperPickaxe, CopperWateringCan (UpgradeLevel, ConventionalUpgradeFrom)"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "route.skull-key",
+   "area": "Community Center & bundles & route",
+   "summary": "The chest on Mines floor 120 holds the Skull Key while the host doesn't have it; having it is the host's mail flag HasSkullKey. The Skull Cavern door opens with the key (or during the Desert Festival). Skull Cavern floors are saved in deepestMineLevel as 120 + the floor, so a value above 120 means you've been in.",
+   "checked_against": [
+    "StardewValley.Locations.MineShaft.addLevelChests",
+    "StardewValley.Locations.MineShaft.resetLocalState",
+    "StardewValley.GameLocation.performAction"
+   ],
+   "data": [],
+   "status": "verified"
+  },
+  {
+   "id": "route.bus-ticket",
+   "area": "Community Center & bundles & route",
+   "summary": "Once the bus runs (the Vault, see route.vault-is-bus), each ride to the Desert costs a 500g ticket (BusStop.TicketPrice); the route plans one ride. The Skull Cavern goal pays the Vault itself unless another goal already planned it, and then shares it.",
+   "checked_against": [
+    "StardewValley.Locations.BusStop.answerDialogue"
+   ],
+   "data": [],
+   "status": "verified"
+  },
+  {
+   "id": "route.cellar",
+   "area": "Community Center & bundles & route",
+   "summary": "The third house upgrade (the cellar) needs the second first and costs 100,000g with no materials; Robin takes three days.",
+   "checked_against": [
+    "StardewValley.GameLocation.houseUpgradeAccept"
+   ],
+   "data": [],
+   "status": "verified"
+  },
+  {
+   "id": "route.kegs-jars",
+   "area": "Community Center & bundles & route",
+   "summary": "Preserves Jar: 50 Wood, 40 Stone, 8 Coal, learned at Farming 4. Keg: 30 Wood, 1 Copper Bar, 1 Iron Bar, 1 Oak Resin, learned at Farming 8. Oak Resin comes from a Tapper (40 Wood, 2 Copper Bars, Foraging 4) on a grown, unstumped oak: placing it starts the clock and it gives one Oak Resin every 7 days, through winter. Kegs and Jars are counted in chests and inventory as (BC)12 / (BC)15, plus the ones placed. How many Tappers to craft is a planning choice; the Foraging level isn't modelled and is said to be assumed.",
+   "checked_against": [
+    "StardewValley.Object.placementAction",
+    "StardewValley.TerrainFeatures.Tree.UpdateTapperProduct",
+    "StardewValley.TerrainFeatures.Tree.TryGetTapperOutput"
+   ],
+   "data": [
+    "Data/CraftingRecipes Keg, Preserves Jar, Tapper",
+    "Data/WildTrees 1 TapItems (O)725 DaysUntilReady 7, MinStack 1",
+    "Data/BigCraftables 12, 15, 105"
+   ],
+   "status": "verified"
+  },
+  {
+   "id": "route.clay",
+   "area": "Community Center & bundles & route",
+   "summary": "Clay comes from hoeing: each newly hoed outdoor tile has the location's ChanceForClay (3% by default, no location overrides it); hoeing the Mines' dirt gives an item 15% of the time, most often Clay. The route plans Clay as days hoeing in the Mines at a tunable rate (a planning choice), using Clay in hand first.",
+   "checked_against": [
+    "StardewValley.GameLocation.checkForBuriedItem",
+    "StardewValley.Locations.MineShaft.checkForBuriedItem",
+    "StardewValley.Tools.Hoe.DoFunction"
+   ],
+   "data": [
+    "Data/Locations ChanceForClay"
+   ],
+   "status": "planning choice"
   }
  ]
 }

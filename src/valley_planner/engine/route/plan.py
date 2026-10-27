@@ -5,8 +5,9 @@ as early as the cash, the days and its rules allow without moving anything above
 (the greenhouse, the Seed Maker) feeds into the economy for everything below.
 
 Planning choices, marked so they can be tuned: Wood comes from chopping days (`WOOD_PER_DAY`), bars,
-ore and coal are bought from Clint at Year-1 prices, any other material costs a gathering day, and a
-random-only slot isn't counted as achievable.
+ore and coal are bought from Clint at Year-1 prices, Quartz and Clay cost days in the Mines, Oak Resin waits
+on Tappers on oaks, anything else (Stone, Fiber) is named as not counted, and a random-only slot isn't
+counted as achievable. Skills other than Farming are assumed reached, and said so.
 """
 
 from __future__ import annotations
@@ -36,6 +37,10 @@ class Settings:
     quartz_per_day: int = 6  # Quartz found in a day in the Mines (for Refined Quartz)
     gift_points: int = 80  # friendship from each gift to your sweetheart (loved 80, liked 45)
     spouse: str = ""  # who to marry; empty: whoever you're closest to
+    jars: int = 10  # Preserves Jars to have
+    kegs: int = 10  # Kegs to have
+    tappers: int = 5  # Tappers put on oaks for the Kegs' Oak Resin
+    clay_per_day: int = 10  # Clay from a day hoeing the Mines' dirt (about one tile in seven gives some)
 
 
 WOOD_PER_DAY = Settings.wood_per_day
@@ -57,9 +62,37 @@ CATALOG = {  # id -> (label, default deadline as days played in Year 1)
     "sprinklers": ("Quality Sprinklers for the field", 112),
     "house_2": ("The second house upgrade", 112),
     "marriage": ("Marriage", 112),
+    "deluxe_barn": ("A Deluxe Barn", 112),
+    "deluxe_coop": ("A Deluxe Coop", 112),
+    "silo": ("A Silo", 112),
+    "axe_steel": ("A Steel Axe (the Secret Woods)", 112),
+    "pickaxe_steel": ("A Steel Pickaxe", 112),
+    "can_steel": ("A Steel Watering Can", 112),
+    "mines_bottom": ("The bottom of the Mines (Skull Key)", 112),
+    "skull_cavern": ("The Skull Cavern", 112),
+    "jars": ("Preserves Jars", 112),
+    "kegs": ("Kegs", 112),
+    "house_3": ("The cellar (third house upgrade)", 112),
 }
+UNLOCK_GOALS = {  # objectives that are one unlock: (its key, what the route calls it)
+    "stable": ("building:Stable", "the Stable"),
+    "house_2": ("house:2", "the second house upgrade"),
+    "house_3": ("house:3", "the third house upgrade (the cellar)"),
+    "deluxe_barn": ("building:Deluxe Barn", "a Deluxe Barn"),
+    "deluxe_coop": ("building:Deluxe Coop", "a Deluxe Coop"),
+    "silo": ("building:Silo", "a Silo"),
+    "axe_steel": ("tool:Axe@2", "a Steel Axe"),
+    "pickaxe_steel": ("tool:Pickaxe@2", "a Steel Pickaxe"),
+    "can_steel": ("tool:WateringCan@2", "a Steel Watering Can"),
+    "mines_bottom": ("floor:120", "Mines floor 120 (the Skull Key)"),
+}
+MACHINE_GOALS = {"jars": ("15", "Preserves Jars"), "kegs": ("12", "Kegs")}  # objective -> (big craftable, plural)
 QUARTZ, REFINED_QUARTZ, SPRINKLER = "80", "338", "621"
+CLAY, OAK_RESIN, TAPPER = "330", "725", "105"
 SPRINKLER_TILES = 8  # a Quality Sprinkler waters the eight tiles around it
+SKULL_KEY_FLOOR = 120  # the Mines' last floor: its chest holds the Skull Key
+BUS_TICKET = 500  # BusStop.TicketPrice
+VAULT_STEP = "the Vault"  # the requirement the Vault's gold is shared under
 
 
 @dataclass
@@ -122,7 +155,8 @@ class Router:
         self.floor = 0  # deepest Mines floor the route has planned for
         self.vault_day: int | None = None
         self.got: dict[str, tuple[Step, str]] = {}  # requirement -> its step, and the objective that planned it
-        self.wood_left = farm.held().get(f"(O){WOOD}", 0)  # Wood in hand, used before any chopping
+        self.held = farm.held()
+        self.wood_left = self.held.get(f"(O){WOOD}", 0)  # Wood in hand, used before any chopping
         self.fish_days: dict[str, int] = {}
         self.wedding: str | None = None  # who the route marries, once the Pendant is placed
         self.misses: list[tuple[str, str]] = []  # the objective being placed: what can't be, and why
@@ -210,10 +244,22 @@ class Router:
         cc = bool(s.areas_complete) and all(s.areas_complete)
         if oid == "marriage":
             return any(f.status in ("Married", "Engaged") for f in s.friends.values())
+        if oid == "mines_bottom" and "HasSkullKey" in s.mail:
+            return True
+        if oid == "skull_cavern":  # Skull Cavern floors are kept as 120 + the floor
+            return getattr(s, "deepest_mine_level", 0) > SKULL_KEY_FLOOR
+        if oid in UNLOCK_GOALS:
+            return self.planner.unlocks.get(UNLOCK_GOALS[oid][0]).done
+        if oid in MACHINE_GOALS:
+            return self.machines(MACHINE_GOALS[oid][0]) >= getattr(self.s, oid)
         return {"greenhouse": "ccPantry" in s.mail, "seed_maker": bool(s.machines.get("Seed Maker")),
-                "kitchen": s.house_upgrade >= 1, "cc": cc, "stable": bool(s.buildings.get("Stable")),
-                "house_2": s.house_upgrade >= 2,
-                "sprinklers": self.farm.held().get(f"(O){SPRINKLER}", 0) >= self.sprinklers()}.get(oid, False)
+                "kitchen": s.house_upgrade >= 1, "cc": cc,
+                "sprinklers": self.held.get(f"(O){SPRINKLER}", 0) >= self.sprinklers()}.get(oid, False)
+
+    def machines(self, bc: str) -> int:
+        """How many of a machine you have: in hand or in chests, and placed."""
+        name = (self.farm.data.asset("Data/BigCraftables").get(bc) or {}).get("Name", bc)
+        return self.held.get(f"(BC){bc}", 0) + self.farm.save.machines.get(name, 0)
 
     def sprinklers(self) -> int:
         return math.ceil(self.s.tiles / SPRINKLER_TILES)
@@ -286,6 +332,8 @@ class Router:
             return self.bundle_reqs({"Pantry"}), 0, []
         if oid == "cc":
             vault = sum(b.gold or 0 for b in self.farm.bundles.in_area(VAULT) if not b.done)
+            if vault and self.vault_day is not None:  # another goal already pays it
+                return self.bundle_reqs() + [Req(VAULT_STEP, self.vault_day, self.end, [], 0)], 0, []
             return self.bundle_reqs(), vault, []
         if oid == "kitchen":
             u = self.planner.unlocks.get("kitchen")
@@ -294,12 +342,18 @@ class Router:
             u = self.planner.unlocks.get("machine:(BC)25")
             u.how = "Farming level 9"
             return [Req("a Seed Maker", self.today, self.end, [u], 0)], 0, []
-        if oid == "stable":
-            u = self.planner.unlocks.chain("building:Stable")
-            return [Req("the Stable", self.today, self.end, u, sum(x.days for x in u))], 0, []
-        if oid == "house_2":
-            u = self.planner.unlocks.chain("house:2")
-            return [Req("the second house upgrade", self.today, self.end, u, sum(x.days for x in u))], 0, []
+        if oid in UNLOCK_GOALS:
+            key, label = UNLOCK_GOALS[oid]
+            u = self.planner.unlocks.chain(key)
+            if key.startswith("tool:"):
+                self.info.append("Clint takes one tool at a time, for two days, and you're without it meanwhile")
+                if "WateringCan" in key:
+                    self.info.append("Leave the can with Clint on a rainy day, or once sprinklers do the watering")
+            return [Req(label, self.today, self.end, u, sum(x.days for x in u))], 0, []
+        if oid in MACHINE_GOALS:
+            return self.machine_reqs(oid)
+        if oid == "skull_cavern":
+            return self.skull_cavern()
         if oid == "sprinklers":
             n = self.sprinklers() - self.farm.held().get(f"(O){SPRINKLER}", 0)
             recipe = self.planner.unlocks.chain("recipe:Quality Sprinkler")
@@ -312,6 +366,88 @@ class Router:
         if oid == "marriage":
             return self.courtship()
         return [], 0, [f"unknown objective {oid}"]
+
+    def crafted(self, bc: str, n: int, plural: str) -> list[Unlock]:
+        """The recipe (if it isn't known) and crafting n of a machine."""
+        m = self.planner.unlocks.get(f"machine:(BC){bc}")
+        recipe = [u for k in m.after for u in self.planner.unlocks.chain(k)]
+        return recipe + [Unlock(f"craft:{bc}", f"craft {n} {plural}", 0, [(x, k * n) for x, k in m.materials],
+                                after=[u.key for u in recipe])]
+
+    def tap_days(self, item: str) -> int | None:
+        """Days a Tapper takes to give `item` on the wild tree that gives it (Data/WildTrees)."""
+        for t in self.farm.data.asset("Data/WildTrees").values():
+            for tap in t.get("TapItems") or []:
+                if (tap.get("ItemId") or "").removeprefix("(O)") == item and not tap.get("Condition"):
+                    return int(tap.get("DaysUntilReady") or 0)
+        return None
+
+    def machine_reqs(self, oid: str) -> tuple[list[Req], int, list[str]]:
+        """Craft the machines still missing; Kegs need an Oak Resin each, from Tappers on oak trees first."""
+        bc, plural = MACHINE_GOALS[oid]
+        n = getattr(self.s, oid) - self.machines(bc)
+        reqs, chain = [], []
+        if oid == "kegs":
+            resin = max(0, n - self.held.get(f"(O){OAK_RESIN}", 0))
+            days = self.tap_days(OAK_RESIN)
+            if resin and days:
+                taps = max(1, min(self.s.tappers, resin))
+                have = self.held.get(f"(BC){TAPPER}", 0)
+                chain = self.crafted(TAPPER, taps - have, "Tappers") if taps > have else []
+                rounds = math.ceil(resin / taps)
+                chain.append(Unlock("tap:oak", f"tap {taps} oak trees for {resin} Oak Resin", 0, [], days * rounds,
+                                    [u.key for u in chain[-1:]],
+                                    how=f"a Tapper on a grown oak gives one Oak Resin every {days} days"))
+                reqs.append(Req(f"{resin} Oak Resin", self.today, self.end, list(chain), sum(u.days for u in chain)))
+                self.info.append(f"{resin} Oak Resin from {taps} Tappers takes {rounds * days} days "
+                                 f"({rounds} round{'s' if rounds > 1 else ''}); more Tappers (a setting) shorten it")
+                placed = self.farm.save.machines.get("Tapper", 0)
+                if placed:
+                    self.info.append(f"Your {placed} placed Tapper{'s' if placed > 1 else ''} aren't counted: one "
+                                     f"moved onto an oak saves crafting one")
+        chain += self.crafted(bc, n, plural)
+        if any(m == "382" for u in chain for m, _ in u.materials):
+            self.info.append("Coal is priced at Clint's; mining it or a Charcoal Kiln saves gold but costs days")
+        reqs.append(Req(f"{n} {plural}", self.today, self.end, chain, sum(u.days for u in chain)))
+        return reqs, 0, []
+
+    def skull_cavern(self) -> tuple[list[Req], int, list[str]]:
+        """The Skull Key from the Mines' floor 120, then the bus to the Desert, which needs the Vault."""
+        u = self.planner.unlocks
+        chain = u.chain(f"floor:{SKULL_KEY_FLOOR}") + u.chain("place:Desert") + \
+            [Unlock("bus_ticket", "buy a bus ticket to the Desert", BUS_TICKET)]
+        paid = 0
+        if not u.get("place:Desert").done:
+            if self.vault_day is None:
+                paid = sum(b.gold or 0 for b in self.farm.bundles.in_area(VAULT) if not b.done)
+                self.info.append(f"The bus to the Desert only runs once the Community Center's Vault is done: "
+                                 f"{paid:,}g in its bundles, planned here (the Community Center goal shares it). "
+                                 f"You can pay it once you can read the Junimos' notes")
+            else:
+                self.info.append("The bus comes with the Vault, already planned for another goal")
+        return [Req("the Skull Cavern", self.today, self.end, chain, sum(x.days for x in chain))], paid, []
+
+    def explain(self, reqs: list[Req]) -> None:
+        """Say what the plan doesn't price: materials gathered as you go, and skills other than Farming."""
+        seen, left, skills = set(), {}, []
+        known = {WOOD, HARDWOOD, REFINED_QUARTZ, CLAY, *BOUGHT}
+        for r in reqs:
+            keys = {u.key for u in r.chain}
+            for u in r.chain:
+                if u.done or u.key in seen or u.key in self.have:
+                    continue
+                seen.add(u.key)
+                for m, n in u.materials:
+                    if m not in known and not (m == OAK_RESIN and "tap:oak" in keys):
+                        left[m] = left.get(m, 0) + n
+                m = SKILL_RE.match(u.how or "")
+                if m and m.group(1).lower() != "farming":
+                    skills.append(f"{u.label} needs {u.how}")
+        if left:
+            self.info.append("Not counted, gathered as you go: " +
+                             ", ".join(f"{n:,} {self.farm.name(f'(O){m}')}" for m, n in left.items()))
+        for s in skills:
+            self.info.append(f"{s}: assumed reached in time")
 
     def _later(self, day: int | None) -> str:
         return f"not this year: about {self.farm.label(day)}" if day else "not within two years at this pace"
@@ -400,8 +536,11 @@ class Router:
                 elif mat == REFINED_QUARTZ:  # a Quartz and a Coal through the Furnace: Quartz from the Mines
                     gold += BOUGHT["382"] * n
                     gates.append(f"Mine {math.ceil(n / self.s.quartz_per_day)}")
-                elif mat != STONE:
-                    wood += 0  # other materials: a gathering day each, below
+                elif mat == CLAY:  # hoed up, best in the Mines' dirt; Clay in hand first
+                    left = max(0, n - self.held.get(f"(O){CLAY}", 0))
+                    if left:
+                        gates.append(f"Mine {math.ceil(left / max(1, self.s.clay_per_day))}")
+                # Oak Resin: the tapping step before it; anything else: Router.explain says it isn't counted
             m = SKILL_RE.match(u.how or "")
             if m:
                 gates.append(f"{m.group(1)} {m.group(2)}")
@@ -428,6 +567,10 @@ class Router:
         floor_need = max((int(g.split()[1]) for g in gates if g.startswith("Floor")), default=0)
         extra_mine = sum(int(g.split()[1]) for g in gates if g.startswith("Mine "))
         axe_days = sum(u.days for u in self.cost_extras(req.chain))
+        # unlocks an earlier step already plans: wait for them, and don't count their days again
+        planned = [u for u in req.chain if not u.done and u.key in self.have]
+        after = max((self.have[u.key] for u in planned), default=0)
+        lead = req.lead - sum(u.days for u in planned)
         for g in gates:
             skill, level = g.split()
             if skill == "Day":
@@ -438,13 +581,9 @@ class Router:
             if skill.lower() != "farming":
                 continue  # other skills: assumed reached (not modelled yet)
             day = res.level_day(int(level))
-            if day is None or day > latest_ready - req.lead:
+            if day is None or day > latest_ready - lead:
                 return None, f"{req.label}: Farming {level} isn't reached in time with {self.sim.tiles} tiles"
             start = max(start, day)
-        # unlocks an earlier step already plans: wait for them, and don't count their days again
-        planned = [u for u in req.chain if not u.done and u.key in self.have]
-        after = max((self.have[u.key] for u in planned), default=0)
-        lead = req.lead - sum(u.days for u in planned)
         first = max(self.today, req.earliest - lead, start if start != req.earliest else 1)
         if latest_ready - lead < self.today:
             return None, f"{req.label}: too late, the last day to start was {self.farm.label(latest_ready - lead)}"
@@ -563,7 +702,9 @@ class Router:
             return
         self.spends.append((day, gold))
         self.vault_day = day
-        placed.append((Step(f"pay the Vault ({gold:,}g)", day, day, gold), Req("vault", day, day, [], 0)))
+        step = Step(f"pay the Vault ({gold:,}g)", day, day, gold)
+        self.got.setdefault(VAULT_STEP, (step, self.current))
+        placed.append((step, Req("vault", day, day, [], 0)))
 
     def commit(self, step: Step, req: Req) -> None:
         wood = sum(n for u in req.chain if u.key not in self.have and not u.done for m, n in u.materials if m == WOOD)
@@ -599,6 +740,7 @@ class Router:
             return out
         self.misses, self.info = [], []
         reqs, paid, notes = self.requirements(oid)
+        self.explain(reqs)
         out.info = self.info
         out.misses += self.misses
         out.problems += [f"{w}: {y}" for w, y in self.misses]
@@ -810,6 +952,8 @@ def _verb(n: dict) -> str:
         return "RECIPE"
     if key.startswith("craft:"):
         return "CRAFT"
+    if key.startswith("tap:"):
+        return "TAP"
     return "BUY" if n["gold"] or n["label"].startswith("buy") else "GET"
 
 

@@ -111,6 +111,8 @@ const SETTING_LABELS = {
   tiles: "Tiles you farm", wood_per_day: "Wood from a chopping day", floors_per_day: "Mines floors a day",
   hardwood_per_day: "Hardwood from a stump day", fish_gold: "Gold from a fishing day", mine_gold: "Gold from a mining day",
   float: "Cash kept back from seeds", quartz_per_day: "Quartz from a mining day", gift_points: "Friendship from each gift",
+  jars: "Preserves Jars to have", kegs: "Kegs to have", tappers: "Tappers on oaks (for Kegs)",
+  clay_per_day: "Clay from a day digging in the Mines",
 };
 const FIRST_GOALS = { greenhouse: "target", seed_maker: "target", kitchen: "nice", cc: "nice" };  // the rest start off
 const TIERS = { target: "Target", nice: "Nice to have", off: "Off" };
