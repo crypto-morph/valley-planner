@@ -220,3 +220,15 @@ def test_new_goals_done_from_save():
     r = Router(farm)
     assert r.machines("12") == 10 and r.done("kegs") and not r.done("jars")
     assert r.done("mines_bottom") and not r.done("skull_cavern") and r.done("deluxe_coop") and not r.done("silo")
+
+
+def test_fruit_tree_schedule():
+    """A tree grown overnight fruits that same night in season; out of season it waits for its season."""
+    from valley_planner.facts.trees import schedule
+    fall25 = 2 * 28 + 25
+    apple = schedule(fall25, 1, ["fall"])
+    assert apple["grown"] == apple["first"] == fall25 + 1 and apple["fruit_by"] == 3
+    pom = schedule(fall25, 15, ["fall"])  # grown in winter: first fruit next Fall 1
+    assert pom["grown"] == fall25 + 15 and pom["first"] == 112 + 2 * 28 + 1
+    assert schedule(fall25, 0, ["fall"], on_tree=2)["first"] == fall25
+    assert schedule(fall25, 3, ["spring"], indoor=True)["first"] == fall25 + 3

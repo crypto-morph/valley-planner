@@ -510,6 +510,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `crop.gold-needs-basic-fert` | Fertilizer is not required for gold: with none, P(gold) = 0.02*Farming + 0.01 (e.g. 11% at Farming 5). Basic Fertilizer adds 0.2*(Farming+2)/12 to it, and must be on the tile before the crop sprouts. | `StardewValley.Crop.harvest`<br>`StardewValley.TerrainFeatures.HoeDirt.CheckApplyFertilizerRules` | to fix |
 | `quest.prep-covered` | Planner bookkeeping (how many to keep for a request), not a game rule. |  | unverifiable |
 | `hw.pool-crops` | Item-delivery Help Wanted quests pick a crop 15% of the time (not in Winter) from possibleCropsAtThisTime. The planner's sets match the full lists, but during days 1-7 the game uses a smaller first-week list: Spring 24, 192 (+250 Y2+, +248 with Vault); Summer 264, 262, 260 (+266 Y2+); Fall 272, 278 (+284 with Vault). From day 8 the full lists apply (Fall's 274 only from Y2, 282 with Vault). 'Y2' means year > 1. | `StardewValley.Quests.ItemDeliveryQuest.loadQuestInfo`<br>`StardewValley.Utility.possibleCropsAtThisTime` | to fix |
+| `tree.fruit` | Each night a fruit tree takes its growth rate (1) off daysUntilMature unless growth is blocked (an object other than an artifact spot, a non-grass terrain feature, a crop, or a building/floor/furniture on any of the 8 surrounding tiles); its stage follows. The same night, if grown (stage 4), in season (Data/FruitTrees Seasons; the greenhouse and island ignore seasons) and holding fewer than 3, it adds one fruit. fruitsOnTree in the save counts what's on it. | `StardewValley.TerrainFeatures.FruitTree.dayUpdate`<br>`StardewValley.TerrainFeatures.FruitTree.TryAddFruit`<br>`StardewValley.TerrainFeatures.FruitTree.IsGrowthBlocked`<br>`StardewValley.TerrainFeatures.FruitTree.IsInSeasonHere`<br>`Data/FruitTrees` | verified |
 
 ## Economy & shops & selling
 
@@ -857,6 +858,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `hw.pool-season-winter` | Winter list matches exactly. | `StardewValley.Utility.getRandomItemFromSeason` | verified |
 | `window.salmonberry` | Spring 15-18. | `StardewValley.TerrainFeatures.Bush.dayUpdate`<br>`StardewValley.TerrainFeatures.Bush.inBloom`<br>`StardewValley.TerrainFeatures.Bush.shake` | verified |
 | `window.blackberry` | Fall 8-11. | `StardewValley.TerrainFeatures.Bush.dayUpdate`<br>`StardewValley.TerrainFeatures.Bush.inBloom`<br>`StardewValley.TerrainFeatures.Bush.shake` | verified |
+| `cave.unpredictable` | The fruit bats' nightly fruit comes from Game1.random, which each new day is seeded from the game id, days played and the steps you took that day, then used by every location's day update before the cave's. So the cave can't be forecast from a save: only its odds. | `StardewValley.Locations.FarmCave.DayUpdate`<br>`StardewValley.Game1._newDayAfterFade` | verified |
 
 ## Save file
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ..facts import trees
 from ..facts.conditions import SEASONS, location_accessible
 from ..facts.crops import AGRICULTURIST, SPEED_GRO, speed_boost
 from ..facts.sell import sell_price
@@ -137,6 +138,35 @@ def _season_day(season: str, day: int) -> tuple[str, int]:
     return SEASONS[i % 4], day
 
 
+def fruit_trees(farm: Farm) -> list[dict]:
+    """Each fruit tree: when it's grown, when its first fruit comes, and what's on it now."""
+    today, out = farm.when.days_played, []
+    for t in farm.save.fruit_trees:
+        if t.get("stump"):
+            continue
+        fruit = (t.get("fruit") or ["fruit"])[0]
+        indoor = t["location"] == "Greenhouse" or t["location"].startswith("Island")
+        when = trees.schedule(today, t["days_left"], t.get("seasons") or [], t.get("on_tree", 0), indoor)
+        first, on = when["first"], t.get("on_tree", 0)
+        if on:
+            text = f"{on} {fruit}{'s' if on > 1 else ''} on it now"
+        elif first is None:
+            text = "no fruit within two years"
+        else:
+            day = "tomorrow" if first == today + 1 else farm.label(first)
+            grown = "tomorrow" if when["grown"] == today + 1 else farm.label(when["grown"])
+            if t["days_left"] and first == when["grown"]:
+                text = f"grown {grown}, with its first {fruit} on it"
+            else:
+                text = (f"grown {grown}; " if t["days_left"] else "") + f"first {fruit} {day}"
+            text += (
+                f", {when['fruit_by']} by the season's end" if when["fruit_by"] and when["fruit_by"] > 1 else "")
+        out.append({"fruit": fruit, "fruit_id": (t.get("fruit_ids") or [""])[0], "where": farm.place(t["location"]),
+                    "days_left": t["days_left"], "on_tree": on, "first": farm.label(first) if first else "",
+                    "first_n": first, "text": text})
+    return out
+
+
 def mine(farm: Farm) -> dict:
     s, w = farm.save, farm.when
     nxt = SEASONS[(SEASONS.index(w.season) + 1) % 4]
@@ -180,7 +210,8 @@ def mine(farm: Farm) -> dict:
     rows = [{**g, "fertilizer": sorted(g["fertilizer"])} for g in groups.values()]
     order = {"ready": 0, "dies": 1, "growing": 2, "dead": 3}
     rows.sort(key=lambda r: (order[r["status"]], r["in_days"], r["crop"]))
-    return {"total": sum(r["count"] for r in rows), "ready": sum(r["count"] for r in rows if r["status"] == "ready"),
+    return {"trees": fruit_trees(farm), "total": sum(r["count"] for r in rows),
+            "ready": sum(r["count"] for r in rows if r["status"] == "ready"),
             "thirsty": sum(r["thirsty"] for r in rows),
             "dies": sum(r["count"] for r in rows if r["status"] == "dies"),
             "dead": sum(r["count"] for r in rows if r["status"] == "dead"),

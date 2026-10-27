@@ -498,6 +498,7 @@ def read_save(path: Path, data=None) -> Save:
                             "fruit_ids": fruit_ids,
                             "fruit": [objects.get(f, {}).get("Name", f) for f in fruit_ids],
                             "days_left": max(0, _int(el, "daysUntilMature")),
+                            "on_tree": _int(el, "fruitsOnTree"), "stump": _bool(el, "stump"),
                             "seasons": [s.lower() for s in tree.get("Seasons") or []]})
 
     house_upgrade = _int(player, "houseUpgradeLevel")

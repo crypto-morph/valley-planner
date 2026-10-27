@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from ..facts import trees
 from ..facts.access import place_open
 from ..facts.bundles import JOJA, VAULT
 from ..facts.conditions import When, check
@@ -170,8 +171,10 @@ class Planner:
         """Fruit only from a tree you already have: a sapling planted now takes 28 days, then waits for its season."""
         oid = item.removeprefix("(O)")
         for t in self.farm.save.fruit_trees:
-            if oid in t.get("fruit_ids", []):
-                ready = self.today + max(0, t.get("days_left", 0))
+            if oid in t.get("fruit_ids", []) and not t.get("stump"):
+                when = trees.schedule(self.today, t.get("days_left", 0), t.get("seasons") or [], t.get("on_tree", 0),
+                                      t.get("location") == "Greenhouse")
+                ready = when["first"] if when["first"] is not None else self.deadline + 1
                 days = [d for d in range(ready, self.deadline + 1) if src.in_season(_season_of(d))]
                 if days:
                     return Way(src, days[0], days[-1], blocked)

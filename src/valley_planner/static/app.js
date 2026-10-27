@@ -64,6 +64,11 @@ function errandCard(name, c) {
     return head + (c.rooms.length ? c.rooms.map((r) => `<h3>${esc(r.room)}</h3>` + list(r.items.map((x) => li(`${x.count} ${esc(x.name)}${x.quality ? ` (${esc(x.quality)})` : ""}`, `${esc(x.bundle)}${x.open ? "" : " · room not open yet"}${inPlaces(x.where)}`)))).join("") : "<p>Nothing you hold fills an open slot right now.</p>") +
       (c.vault.length ? "<h3>Vault</h3>" + list(c.vault.map((v) => li(esc(v.bundle), v.gold <= c.money ? "<b>you can pay this now</b>" : `${(v.gold - c.money).toLocaleString()}g to go`))) : "");
   }
+  if (name === "trees") {
+    return head + (c.trees.length ? list(c.trees.map((t) => li(`<b>${esc(t.fruit)}</b> · ${esc(t.where)}`, esc(t.text)))) : "<p>No fruit trees planted.</p>") +
+      (c.cave.length ? `<h3>The farm cave: ${esc(c.cave_kind)}</h3><p class="sub">Each night is down to chance, so these are the odds of at least one, not a forecast.</p>` +
+        list(c.cave.map((x) => li(esc(x.name), `${Math.round(x.chance * 100)}% a night`))) : "");
+  }
   if (name === "grange") {
     return head + `<p><b>${c.score} points: ${esc(c.place)} place</b> (${c.tokens.toLocaleString()} star tokens)` +
       (c.short ? ` · ${c.short} short of first: swap in higher-quality or pricier items, or more kinds` : "") + "</p>" +
@@ -520,6 +525,7 @@ const views = {
       `<tr><td>${esc(r.crop)}</td><td>${esc(r.location)}</td><td class="status-${esc(r.status)}">${esc(r.status === "growing" || r.status === "dies" ? `ripens ${r.ripens}` : r.status)}${r.status === "dies" ? " (dies first)" : ""}</td>` +
       `<td>${r.count}</td><td>${r.thirsty || ""}</td></tr>`
     ).join("");
+    $("#mine-trees").innerHTML = m.trees.length ? list(m.trees.map((t) => li(`<b>${esc(t.fruit)}</b> · ${esc(t.where)}`, esc(t.text.replace(/, Year \d+/g, (y) => y))))) : '<p class="sub">No fruit trees planted.</p>';
   },
 
   async sell() {

@@ -177,4 +177,19 @@ def seasonal(farm: Farm) -> list[dict]:
     return out
 
 
-ERRANDS = {"gunther": gunther, "clint": clint, "cc": community_center, "birthdays": birthdays, "grange": grange}
+def trees(farm: Farm) -> dict:
+    """Your fruit trees and when each fruits next, and the farm cave's odds if it's fruit bats."""
+    from ..facts.cave import BAT_FRUIT, BATS, MUSHROOM, MUSHROOMS, nightly
+    from .crops import fruit_trees
+    choice = {1: BATS, 2: MUSHROOMS}.get(farm.save.cave_choice)
+    cave = []
+    if choice:
+        for oid in (BAT_FRUIT if choice == BATS else MUSHROOM):
+            cave.append({"name": farm.name(f"(O){oid}"), "chance": round(nightly(choice, f"(O){oid}"), 3)})
+        cave.sort(key=lambda c: -c["chance"])
+    return {"title": "Fruit trees", "trees": fruit_trees(farm),
+            "cave": cave, "cave_kind": {BATS: "fruit bats", MUSHROOMS: "mushroom boxes"}.get(choice, "")}
+
+
+ERRANDS = {"trees": trees, "gunther": gunther, "clint": clint, "cc": community_center, "birthdays": birthdays,
+           "grange": grange}

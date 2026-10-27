@@ -261,6 +261,8 @@
  "StardewValley.TerrainFeatures.FruitTree.DaysUntilMatureToGrowthStage": "af05b3e150ba4c065076d312e5969f4eddfac8a0d8947aaeb022c0b66121a0c7",
  "StardewValley.TerrainFeatures.FruitTree.GetQuality": "c976729888c4f604b533f103472adb51ac67376d3ad3afc672edabc5781aeeb7",
  "StardewValley.TerrainFeatures.FruitTree.IsGrowthBlocked": "acfda16f5f08ab1844f0e066267719b1498387ccf29a439f07db0ae9b79dcdfa",
+ "StardewValley.TerrainFeatures.FruitTree.IsInSeasonHere": "7967551a95cd3dd5a06ef6914c1c136799be3127806585298ce49d5ed6bbf004",
+ "StardewValley.TerrainFeatures.FruitTree.TryAddFruit": "52fe77a4b5d78ce3ee72804928cdfdcf91b48f7aead2c357fdf088cc37b0da09",
  "StardewValley.TerrainFeatures.FruitTree.dayUpdate": "bd2d6b83cd718cae7be6f2f40e6e3fc42c394c5a1b53840ecde2dc92408ad6dc",
  "StardewValley.TerrainFeatures.Grass.TryDropItemsOnCut": "7e68a81409bb95799643954ff92ad65666d47639b09695e96b5cee4fdd4f987e",
  "StardewValley.TerrainFeatures.HoeDirt.CheckApplyFertilizerRules": "65e202aaec78f06ec383354b7e65b487bc4757eb49a8f5b610273f0f2cb016f1",

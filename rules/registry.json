@@ -12635,6 +12635,34 @@
     "Data/Locations ChanceForClay"
    ],
    "status": "planning choice"
+  },
+  {
+   "id": "tree.fruit",
+   "area": "Crops & fertilizer",
+   "summary": "Each night a fruit tree takes its growth rate (1) off daysUntilMature unless growth is blocked (an object other than an artifact spot, a non-grass terrain feature, a crop, or a building/floor/furniture on any of the 8 surrounding tiles); its stage follows. The same night, if grown (stage 4), in season (Data/FruitTrees Seasons; the greenhouse and island ignore seasons) and holding fewer than 3, it adds one fruit. fruitsOnTree in the save counts what's on it.",
+   "checked_against": [
+    "StardewValley.TerrainFeatures.FruitTree.dayUpdate",
+    "StardewValley.TerrainFeatures.FruitTree.TryAddFruit",
+    "StardewValley.TerrainFeatures.FruitTree.IsGrowthBlocked",
+    "StardewValley.TerrainFeatures.FruitTree.IsInSeasonHere"
+   ],
+   "data": [
+    "Data/FruitTrees"
+   ],
+   "status": "verified",
+   "refs": []
+  },
+  {
+   "id": "cave.unpredictable",
+   "area": "Farm cave & misc",
+   "summary": "The fruit bats' nightly fruit comes from Game1.random, which each new day is seeded from the game id, days played and the steps you took that day, then used by every location's day update before the cave's. So the cave can't be forecast from a save: only its odds.",
+   "checked_against": [
+    "StardewValley.Locations.FarmCave.DayUpdate",
+    "StardewValley.Game1._newDayAfterFade"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

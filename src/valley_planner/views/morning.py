@@ -101,6 +101,9 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         left = 28 - (w.days_played - 1) % 28
         do.append({"kind": "crops", "title": f"{mine['dies']} crops won't ripen before {w.season.title()} ends",
                    "text": f"{left} day{'s' if left != 1 else ''} left: don't spend more on them"})
+    for t in crops.fruit_trees(farm):
+        if t["first_n"] and 0 < t["first_n"] - w.days_played <= SOON and not t["on_tree"]:
+            do.append({"kind": "tree", "title": f"Your {t['fruit']} tree: {t['text']}", "text": t["where"]})
     plan = cc.plan(farm)
     for slot in plan["slots"]:
         b = slot["best"]
@@ -162,7 +165,9 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
     blocks: list[dict] = []
     chores = [x["title"] for x in do if x["kind"] == "crops" and not x["title"].startswith(tuple("0123456789"))]
     chores = [c for c in chores if c.startswith(("Water", "Harvest"))]
-    chores += [f"Pick: {x['title']}" for x in do if x["kind"] == "cc" and " tree" in x["text"]]  # your own trees
+    ripe = {t["fruit"] for t in crops.fruit_trees(farm) if t["on_tree"]}
+    chores += [f"Pick: {x['title']}" for x in do  # your own trees, when there's fruit on them
+               if x["kind"] == "cc" and " tree" in x["text"] and x["title"].split(" for ")[0] in ripe]
     t = _minutes(DAY_START)
     fest = next((e for e in events if e.kind == "festival" and e.start), None)
     if chores:
