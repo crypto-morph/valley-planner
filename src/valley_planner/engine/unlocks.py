@@ -44,6 +44,11 @@ class Unlock:
     done: bool = False
 
 
+def _alternates(animal: dict) -> set[str]:
+    """The animals Marnie may hand over when you buy this one (white or brown chickens and cows)."""
+    return {x for alt in animal.get("AlternatePurchaseTypes") or [] for x in alt.get("AnimalIds") or []}
+
+
 class Unlocks:
     def __init__(self, farm: Farm):
         self.farm = farm
@@ -61,11 +66,19 @@ class Unlocks:
                           int(b.get("BuildDays") or 0), [f"building:{prev}"] if prev else [],
                           done=bool(s.buildings.get(what)) or self._has_upgrade_of(what))
         if kind == "animal":
-            a = self.data.asset("Data/FarmAnimals").get(what) or {}
+            animals = self.data.asset("Data/FarmAnimals")
+            a = animals.get(what) or {}
+            how = ""
+            if int(a.get("PurchasePrice") or -1) < 0:  # Brown Chicken, Brown Cow: bought as the other colour
+                seller = next((k for k, v in animals.items() if what in _alternates(v)), None)
+                if seller:
+                    a = {**animals[seller], "DaysToMature": a.get("DaysToMature"),
+                         "DaysToProduce": a.get("DaysToProduce")}
+                    how = f"Marnie sells it as a {seller.split()[-1]}; the colour is random"
             house = a.get("RequiredBuilding") or a.get("House") or ""
-            return Unlock(key, f"buy a {what}", int(a.get("PurchasePrice") or 0) * 2, [],
+            return Unlock(key, f"buy a {what}", max(0, int(a.get("PurchasePrice") or 0)) * 2, [],
                           int(a.get("DaysToMature") or 0) + int(a.get("DaysToProduce") or 1),
-                          [f"building:{house}"] if house else [],
+                          [f"building:{house}"] if house else [], how=how,
                           done=any(x["type"] == what for x in s.animals))
         if kind == "tool":
             tool, _, level = what.partition("@")
