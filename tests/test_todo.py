@@ -45,3 +45,28 @@ def test_day_log(tmp_path):
     assert log.earlier(61) == 60 and log.earlier(60) is None
     assert data_root({"VALLEY_PLANNER_DATA": "/x"}) == Path("/x")
     assert data_root({"LOCALAPPDATA": "C:/L"}, "win32") == Path("C:/L") / "ValleyPlanner" / "days"
+
+
+def test_donated_counts_as_got():
+    """An item put straight into a bundle overnight counts: its slot filled between the two saves."""
+    from types import SimpleNamespace
+
+    from valley_planner.engine.todo import check
+    prev = SimpleNamespace(items=[], shipped={}, bundle_slots={5: [False, False]})
+    nxt = SimpleNamespace(items=[], shipped={}, bundle_data={"Boiler Room/5": "Fish/O 1 1/698 1 0 142 1 0/1"},
+                          bundle_slots={5: [True, False]})
+    task = {"check": {"type": "get", "item": "(O)698", "count": 1, "had": 0}}
+    assert check(task, prev, nxt) is True
+    other = {"check": {"type": "get", "item": "(O)142", "count": 1, "had": 0}}
+    assert check(other, prev, nxt) is False
+
+
+def test_robin_busy_and_ordered_kitchen():
+    from types import SimpleNamespace
+
+    from valley_planner.engine.todo import check
+    busy = SimpleNamespace(building_days={}, house_upgrade_days=2, buildings={})
+    assert check({"check": {"type": "build", "building": "Deluxe Coop"}}, busy, busy) == "blocked"
+    free = SimpleNamespace(building_days={}, house_upgrade_days=0, buildings={})
+    ordered = SimpleNamespace(house_upgrade=0, house_upgrade_days=3)
+    assert check({"check": {"type": "kitchen"}}, free, ordered) is True

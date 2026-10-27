@@ -492,7 +492,7 @@ const views = {
     if (y) {
       $("#todo-review-head").textContent = `${y.label}: ${y.done} of ${y.total} done`;
       $("#todo-review").innerHTML = list(y.items.map((r) => li(esc(r.title),
-        r.done === true ? "done" : r.done === false ? (r.ticked ? "you ticked it" : "not done") : (r.ticked ? "ticked" : "can't tell"))));
+        r.done === true ? "done" : r.done === "blocked" ? "couldn't: they were busy" : r.done === false ? (r.ticked ? "you ticked it" : "not done") : (r.ticked ? "ticked" : "can't tell"))));
     }
   },
 

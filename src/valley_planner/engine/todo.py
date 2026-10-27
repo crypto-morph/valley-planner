@@ -81,10 +81,23 @@ def tasks(farm: Farm) -> list[Task]:
                         "farm", {"type": "pet", "animals": {d["id"]: d["friendship"] for d in s.animals}}))
     plan = cc.plan(farm)
     unlocks = Unlocks(farm)
+    offered: set[str] = set()
     for u in plan["unlocks"]:
         mats_ok = all(held.get(f"(O){m['id']}", 0) >= m["count"] for m in u["materials"])
         ready = all(unlocks.get(a).done for a in unlocks.get(u["key"]).after)  # nothing before it is still to do
+        if u["key"].startswith(("building:", "kitchen", "house:")) and _robin_busy(s):
+            continue  # Robin takes one job at a time
+        if u["key"].startswith("tool:") and s.tool_at_clint:
+            continue  # so does Clint
+        if u["label"].startswith(("Robin finishes", "Clint finishes")):
+            continue  # nothing to do but wait
+        builder = "robin" if u["key"].startswith(("building:", "kitchen", "house:")) else \
+            "clint" if u["key"].startswith("tool:") else ""
+        if builder and builder in offered:
+            continue  # each takes one job: offer the first only
         if ready and u["gold"] <= s.money and mats_ok and not u["how"] and u["key"] != "place:Woods":
+            if builder:
+                offered.add(builder)
             out.append(Task(f"unlock:{u['key']}", u["label"][:1].upper() + u["label"][1:],
                             f"opens {', '.join(u['slots'])} for the Community Center", "cc", _unlock_check(u["key"])))
     for slot in plan["slots"]:
@@ -142,21 +155,48 @@ def check(task: dict, prev, nxt) -> bool | None:
     if t == "get":
         oid = c["item"].removeprefix("(O)")
         have = sum(it.stack for it in nxt.items if it.qualified_id == c["item"])
-        return have >= c["count"] or have > c.get("had", 0) or nxt.shipped.get(oid, 0) > (prev.shipped.get(oid, 0)
-                                                                                            if prev else 0)
+        return (have >= c["count"] or have > c.get("had", 0) or donated(prev, nxt, oid)
+                or nxt.shipped.get(oid, 0) > (prev.shipped.get(oid, 0) if prev else 0))
+    if t in ("build", "kitchen") and prev and _robin_busy(prev):
+        return "blocked"  # she was on another job that morning, so it couldn't be ordered
     if t == "build":
         return bool(nxt.buildings.get(c["building"]))
     if t == "buy":
         return any(d["type"] == c["animal"] for d in nxt.animals)
     if t == "upgrade":
-        return getattr(nxt, "axe_level", 0) >= c["level"] if c["tool"] == "Axe" else None
+        if prev and getattr(prev, "tool_at_clint", ""):
+            return "blocked"  # Clint already had a tool
+        levels = getattr(nxt, "tool_levels", {}) or {}
+        if not levels:
+            return None
+        # handed in counts: he's working on it
+        return levels.get(c["tool"], -1) >= c["level"] or getattr(nxt, "tool_at_clint", "") == c["tool"]
     if t == "flag":
         return c["flag"] in getattr(nxt, "flags", set())
-    if t == "kitchen":
-        return nxt.house_upgrade >= 1
+    if t == "kitchen":  # ordered counts: Robin's working on it
+        return nxt.house_upgrade >= 1 or getattr(nxt, "house_upgrade_days", 0) > 0
     if t == "plant":
         return sum(1 for cr in nxt.crops if cr.harvest_id == c["harvest"]) > c["had"]
     return None
+
+
+def donated(prev, nxt, oid: str) -> bool:
+    """Did this item go into a Community Center bundle overnight? A slot for it filled between the two saves."""
+    if prev is None:
+        return False
+    for key, raw in (getattr(nxt, "bundle_data", {}) or {}).items():
+        index = int(key.split("/")[1])
+        parts = raw.split("/")[2].split() if len(raw.split("/")) > 2 else []
+        before, after = prev.bundle_slots.get(index, []), nxt.bundle_slots.get(index, [])
+        for i in range(0, len(parts) - 2, 3):
+            n = i // 3
+            if parts[i] == oid and n < len(after) and after[n] and not (n < len(before) and before[n]):
+                return True
+    return False
+
+
+def _robin_busy(save) -> bool:
+    return bool(getattr(save, "building_days", {}) or getattr(save, "house_upgrade_days", 0))
 
 
 class DayLog:
@@ -213,7 +253,13 @@ def today(farm: Farm, log: DayLog) -> dict:
         for t in old.get("tasks", []):
             auto = check(t, prev, farm.save)
             ticked = old.get("ticks", {}).get(t["id"])
-            results.append({"id": t["id"], "title": t["title"], "done": auto, "ticked": ticked})
+            results.append({"id": t["id"], "title": t["title"], "done": auto, "ticked": ticked,
+                            "robin": (t.get("check") or {}).get("type") in ("build", "kitchen")})
+        if any(r["robin"] and r["done"] is True for r in results):  # one Robin job taken: the others couldn't be
+            for r in results:
+                if r["robin"] and r["done"] is False:
+                    r["done"] = "blocked"
         review = {"label": old.get("label"), "items": results,
-                  "done": sum(1 for r in results if r["done"] or r["ticked"]), "total": len(results)}
+                  "done": sum(1 for r in results if r["done"] is True or r["ticked"]),
+                  "total": sum(1 for r in results if r["done"] != "blocked")}  # what couldn't be done isn't counted
     return {"date": rec["label"], "tasks": rec["tasks"], "ticks": rec["ticks"], "yesterday": review}
