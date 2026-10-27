@@ -1,0 +1,108 @@
+{
+  "today": "Fall 20, Year 1", "end": "Winter 28, Year 1", "days_left": 37,
+  "goals": [
+    {"id": "cc", "label": "The Community Center", "tier": "target", "status": "luck"},
+    {"id": "house2", "label": "The second house upgrade", "tier": "target", "status": "ok"},
+    {"id": "greenhouse", "label": "The greenhouse", "tier": "target", "status": "ok"},
+    {"id": "kitchen", "label": "The kitchen", "tier": "nice", "status": "ok"},
+    {"id": "horse", "label": "A horse", "tier": "nice", "status": "ok"},
+    {"id": "marriage", "label": "Marriage", "tier": "nice", "status": "ok"},
+    {"id": "sprinklers", "label": "Quality Sprinklers", "tier": "nice", "status": "ok"}
+  ],
+  "resources": [
+    {"id": "gold", "label": "Gold", "unit": "g", "total": 211400, "have": 8649, "expected": 105498, "short": 97253,
+     "note": "from selling what you hold, crops, fruit and animals",
+     "extra": "Bars for the sprinklers and the Stable add about 36,500g more if you buy the ore from Clint.",
+     "days": null, "days_label": "",
+     "breakdown": [
+       {"goal": "cc", "label": "The Community Center", "amount": 94000, "items": [
+         {"label": "Truffle", "how": "Deluxe Barn, then a Pig", "amount": 41000, "also": [], "this_year": true},
+         {"label": "Rabbit's Foot", "how": "Deluxe Coop, then a Rabbit", "amount": 28000, "also": [], "this_year": false},
+         {"label": "The Vault", "how": "also brings the bus: Sandfish", "amount": 25000, "also": [], "this_year": true}]},
+       {"goal": "house2", "label": "The second house upgrade", "amount": 65000, "items": [
+         {"label": "Second house upgrade", "how": "Robin, 3 days", "amount": 65000, "also": [], "this_year": true}]},
+       {"goal": "greenhouse", "label": "The greenhouse", "amount": 27200, "items": [
+         {"label": "L. Goat Milk", "how": "Big Barn, then a Goat", "amount": 16000, "also": ["The Community Center"], "this_year": true},
+         {"label": "Duck Egg", "how": "Big Coop, then a Duck", "amount": 11200, "also": ["The Community Center"], "this_year": true}]},
+       {"goal": "kitchen", "label": "The kitchen", "amount": 10000, "items": [
+         {"label": "First house upgrade", "how": "Robin, 3 days", "amount": 10000, "also": ["The Community Center", "Marriage"], "this_year": true}]},
+       {"goal": "horse", "label": "A horse", "amount": 10000, "items": [
+         {"label": "The Stable", "how": "Robin, 3 days", "amount": 10000, "also": [], "this_year": true}]},
+       {"goal": "marriage", "label": "Marriage: Bouquet and Mermaid's Pendant", "amount": 5200, "items": [
+         {"label": "Bouquet", "how": "Pierre's", "amount": 200, "also": [], "this_year": true},
+         {"label": "Mermaid's Pendant", "how": "the Old Mariner, on a rainy day", "amount": 5000, "also": [], "this_year": true}]}
+     ]},
+    {"id": "wood", "label": "Wood", "unit": "", "total": 2650, "have": 36, "expected": null, "short": 2614,
+     "days": 27, "days_label": "chopping days at 100 a day", "note": "", "extra": "",
+     "breakdown": [
+       {"goal": "cc", "label": "The Community Center", "amount": 1050, "items": [
+         {"label": "Deluxe Barn", "how": "for the Truffle", "amount": 550, "also": [], "this_year": true},
+         {"label": "Deluxe Coop", "how": "for the Rabbit's Foot", "amount": 500, "also": [], "this_year": false}]},
+       {"goal": "greenhouse", "label": "The greenhouse", "amount": 850, "items": [
+         {"label": "Big Barn", "how": "for the Goat", "amount": 450, "also": ["The Community Center"], "this_year": true},
+         {"label": "Big Coop", "how": "for the Duck", "amount": 400, "also": ["The Community Center"], "this_year": true}]},
+       {"goal": "kitchen", "label": "The kitchen", "amount": 450, "items": [
+         {"label": "First house upgrade", "how": "", "amount": 450, "also": ["The Community Center", "Marriage"], "this_year": true}]},
+       {"goal": "marriage", "label": "Marriage", "amount": 300, "items": [
+         {"label": "The beach bridge", "how": "to reach the Old Mariner", "amount": 300, "also": [], "this_year": true}]}
+     ]},
+    {"id": "stone", "label": "Stone", "unit": "", "total": 850, "have": 0, "expected": null, "short": 850,
+     "days": null, "days_label": "", "note": "picked up while mining and clearing", "extra": "",
+     "breakdown": [
+       {"goal": "cc", "label": "The Community Center", "amount": 500, "items": [
+         {"label": "Deluxe Barn", "how": "", "amount": 300, "also": [], "this_year": true},
+         {"label": "Deluxe Coop", "how": "", "amount": 200, "also": [], "this_year": false}]},
+       {"goal": "greenhouse", "label": "The greenhouse", "amount": 350, "items": [
+         {"label": "Big Barn", "how": "", "amount": 200, "also": ["The Community Center"], "this_year": true},
+         {"label": "Big Coop", "how": "", "amount": 150, "also": ["The Community Center"], "this_year": true}]}
+     ]},
+    {"id": "hardwood", "label": "Hardwood", "unit": "", "total": 200, "have": 0, "expected": null, "short": 200,
+     "days": 17, "days_label": "days at the Secret Woods stumps", "note": "", "extra": "",
+     "breakdown": [
+       {"goal": "horse", "label": "A horse", "amount": 100, "items": [{"label": "The Stable", "how": "", "amount": 100, "also": [], "this_year": true}]},
+       {"goal": "house2", "label": "The second house upgrade", "amount": 100, "items": [{"label": "Second house upgrade", "how": "", "amount": 100, "also": [], "this_year": true}]}
+     ]},
+    {"id": "iron_bar", "label": "Iron Bar", "unit": "", "total": 15, "have": 0, "expected": null, "short": 15,
+     "days": null, "days_label": "", "note": "75 ore through a Furnace", "extra": "",
+     "breakdown": [
+       {"goal": "sprinklers", "label": "Quality Sprinklers", "amount": 10, "items": [{"label": "Quality Sprinklers", "how": "Farming 6", "amount": 10, "also": [], "this_year": true}]},
+       {"goal": "horse", "label": "A horse", "amount": 5, "items": [{"label": "The Stable", "how": "", "amount": 5, "also": [], "this_year": true}]}
+     ]},
+    {"id": "gold_bar", "label": "Gold Bar", "unit": "", "total": 10, "have": 0, "expected": null, "short": 10,
+     "days": null, "days_label": "", "note": "50 ore through a Furnace", "extra": "",
+     "breakdown": [
+       {"goal": "sprinklers", "label": "Quality Sprinklers", "amount": 10, "items": [{"label": "Quality Sprinklers", "how": "Farming 6", "amount": 10, "also": [], "this_year": true}]}
+     ]},
+    {"id": "refined_quartz", "label": "Refined Quartz", "unit": "", "total": 10, "have": 0, "expected": null, "short": 10,
+     "days": null, "days_label": "", "note": "10 Quartz and 10 Coal through a Furnace", "extra": "",
+     "breakdown": [
+       {"goal": "sprinklers", "label": "Quality Sprinklers", "amount": 10, "items": [{"label": "Quality Sprinklers", "how": "Farming 6", "amount": 10, "also": [], "this_year": true}]}
+     ]}
+  ],
+  "days": {"chop": 27, "stumps": 17, "mine": 0, "fish": 0, "left": 37},
+  "choices": [
+    {"item": "Truffle", "where": "Chef's bundle", "goal": "cc", "options": [
+      {"label": "A Pig", "detail": "Deluxe Barn, then a Pig", "gold": 41000, "state": "planned", "tag": "✓ PLANNED", "when": "digs from Winter 2", "odds": null, "more": false},
+      {"label": "Truffle Crabs", "detail": "drop it almost every kill · not on your route", "gold": null, "state": "possible", "tag": "MONSTER", "when": "", "odds": null, "more": false},
+      {"label": "Traveling Cart", "detail": "if it turns up by Winter 28", "gold": null, "state": "luck", "tag": "LUCK · 28%", "when": "", "odds": 0.28, "more": false}]},
+    {"item": "Rabbit's Foot", "where": "Enchanter's bundle", "goal": "cc", "options": [
+      {"label": "A Rabbit", "detail": "Deluxe Coop, then a Rabbit", "gold": 28000, "state": "no", "tag": "TOO LATE THIS YEAR", "when": "", "odds": null, "more": false},
+      {"label": "Jas, Desert Festival", "detail": "needs the bus (the Vault)", "gold": null, "state": "later", "tag": "YEAR 2 · SPRING 15–17", "when": "", "odds": null, "more": false},
+      {"label": "Serpents", "detail": "0.8% a kill", "gold": null, "state": "possible", "tag": "MONSTER", "when": "", "odds": null, "more": false},
+      {"label": "Traveling Cart", "detail": "by Winter 28", "gold": null, "state": "luck", "tag": "LUCK · 28%", "when": "", "odds": 0.28, "more": false}]},
+    {"item": "Pomegranate", "where": "Enchanter's bundle", "goal": "cc", "options": [
+      {"label": "Your fruit bats", "detail": "", "gold": 0, "state": "planned", "tag": "✓ PLANNED · FREE", "when": "likely by Winter 16", "odds": null, "more": false},
+      {"label": "A Pomegranate tree", "detail": "planted a season before it fruits", "gold": null, "state": "no", "tag": "NOT THIS YEAR", "when": "", "odds": null, "more": false},
+      {"label": "Traveling Cart", "detail": "by Winter 28", "gold": null, "state": "luck", "tag": "LUCK · 28%", "when": "", "odds": 0.28, "more": false}]},
+    {"item": "Fried Egg", "where": "Chef's bundle", "goal": "cc", "options": [
+      {"label": "Cook it", "detail": "in the kitchen", "gold": null, "state": "planned", "tag": "✓ PLANNED", "when": "from Winter 15", "odds": null, "more": false},
+      {"label": "Alex, Desert Festival", "detail": "needs the bus (the Vault)", "gold": null, "state": "later", "tag": "YEAR 2 · SPRING 15–17", "when": "", "odds": null, "more": false},
+      {"label": "Traveling Cart", "detail": "by Winter 28", "gold": null, "state": "luck", "tag": "LUCK · 28%", "when": "", "odds": 0.28, "more": false}]},
+    {"item": "Red Cabbage", "where": "Dye bundle", "goal": "cc", "options": [
+      {"label": "Traveling Cart", "detail": "watch the cart Fridays and Sundays", "gold": null, "state": "planned", "tag": "✓ PLANNED · LUCK 28%", "when": "", "odds": 0.28, "more": false},
+      {"label": "Grow it", "detail": "Pierre sells the seeds from Year 2", "gold": null, "state": "no", "tag": "NOT THIS YEAR", "when": "", "odds": null, "more": false}]},
+    {"item": "Crocus", "where": "Winter Foraging", "goal": "cc", "options": [
+      {"label": "Forage in Pelican Town", "detail": "", "gold": 0, "state": "planned", "tag": "✓ PLANNED · FREE", "when": "any winter day from Winter 1", "odds": null, "more": false},
+      {"label": "5 more places", "detail": "Mountains, Forest, Bus Stop, Railroad, Backwoods", "gold": null, "state": "possible", "tag": "", "when": "", "odds": null, "more": true}]}
+  ]
+}
