@@ -648,6 +648,7 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
     offer = r.cave_day() if farm.save.cave_choice else res.earned_day(EARNINGS_TRIGGER)
     return {
         "settings": settings.__dict__, "cave": cave, "cave_day": label(offer),
+        "cave_chosen": bool(farm.save.cave_choice),  # the save has already made the choice
         "objectives": [{"id": o.id, "label": o.label, "tier": o.tier, "status": o.status,
                         "deadline": label(o.deadline), "finish": label(o.finish), "problems": o.problems,
                         "gold": sum(st.gold for st in o.steps),

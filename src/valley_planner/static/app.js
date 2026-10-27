@@ -207,7 +207,8 @@ async function planRoute() {
   $("#route-cave-note").textContent = (v.cave_options
     ? `Fruit bats or mushrooms: planned both, and ${caveName[v.cave] || v.cave} achieve more (` +
       v.cave_options.map((c) => `${caveName[c.cave]}: ${c.targets_ok} target${c.targets_ok === 1 ? "" : "s"}, ${c.nice_ok} nice-to-have${c.nice_ok === 1 ? "" : "s"}, ${c.end_cash.toLocaleString()}g at the year's end`).join("; ") + ")."
-    : `Cave: ${caveName[v.cave] || v.cave}.`) + (v.cave_day ? ` Demetrius makes his offer on ${v.cave_day}.` : " Demetrius's offer doesn't come this year.");
+    : `Cave: ${caveName[v.cave] || v.cave}.`) + (v.cave_chosen ? " You've already chosen, so the plan uses it from today."
+    : v.cave_day ? ` Demetrius makes his offer on ${v.cave_day}.` : " Demetrius's offer doesn't come this year.");
   $("#route-results").innerHTML = v.objectives.length ? v.objectives.map((o) =>
     `<div class="route-result ${esc(o.status)}"><h3>${esc(o.label)} <span class="sub">· ${o.tier === "target" ? "target" : "nice to have"}</span></h3>` +
     `<div><b>${esc(STATUS[o.status] || o.status)}</b>${o.finish ? ` · done by ${esc(o.finish)}` : ""} · deadline ${esc(o.deadline)}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div>` +
