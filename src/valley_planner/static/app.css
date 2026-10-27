@@ -158,3 +158,19 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 .ncard.more { width: auto; min-height: 44px; font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
 .ncard.more:hover { border-color: var(--wood); }
 .or { padding: 0.15rem 0.6rem; border-radius: 999px; background: var(--muted); color: #fff; font-size: 0.75rem; font-weight: 800; }
+/* Plan: resource boxes you press, and where the chosen one goes */
+.ntile.pick { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ntile.pick:hover { border-color: #2E6E8E; }
+.ntile.pick[aria-pressed="true"] { background: #EAF2F5; border: 3px solid #2E6E8E; box-shadow: 0 4px 12px rgba(46, 110, 142, 0.25); }
+.ntile .n-uses { font-size: 0.8rem; font-weight: 800; color: #2E6E8E; }
+.ntile .nmeter { display: flex; }
+.needs-single { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.9rem; color: var(--muted); margin: 0.6rem 0; }
+.needs-single:empty { display: none; }
+.nwhere { margin-top: 0.6rem; padding: 1rem 1.2rem; border: 3px solid #2E6E8E; border-radius: 14px; background: var(--panel); }
+.nwhere:empty { display: none; }
+.nwhere-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1rem; }
+.nwhere-head h2 { margin: 0; font-size: 1.3rem; }
+.ngoal .ng-row { display: flex; justify-content: space-between; gap: 1rem; }
+button.ncard { font-family: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.ncard:hover { box-shadow: 0 0 0 3px #A9CBD9; }
+.linkish { font: inherit; font-size: 0.8rem; border: 0; background: none; color: #2E6E8E; text-decoration: underline; cursor: pointer; padding: 0.3rem 0; }

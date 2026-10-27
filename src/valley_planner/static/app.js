@@ -204,71 +204,81 @@ const pct = (n, of) => (of ? Math.max(n > 0 ? 1 : 0, Math.min(100, (n / of) * 10
 const also = (xs) => xs && xs.length ? ` <b class="also">· also ${esc(xs.map((x) => x.replace(/^The /, "the ")).join(" and "))}</b>` : "";
 const bar = (n, of) => `<span class="nbar" aria-hidden="true"><span style="width:${pct(n, of)}%"></span></span>`;
 
+let needsOpen = "gold";  // the resource whose breakdown is showing
+
 function drawNeeds(v) {
   const goals = v ? v.goals.filter((g) => g.tier !== "off") : [];
   if (!goals.length) {
     $("#needs-head").innerHTML = 'No goals chosen yet. Pick some on the <a href="#route" data-go="route">Route tab</a> and this adds up what they take.';
-    $("#needs-tiles").innerHTML = $("#needs-where").innerHTML = "";
+    $("#needs-tiles").innerHTML = $("#needs-where").innerHTML = $("#needs-single").innerHTML = "";
     $("#needs-choices-box").hidden = true;
     $("#needs-head a").addEventListener("click", (e) => { e.preventDefault(); show("route"); });
     return;
   }
-  $("#needs-head").textContent = `Everything your goals need from ${v.today.replace(/, Year \d+/, "")} to ${v.end.replace(/, Year \d+/, "")}, added up. ` +
-    "Open any line to see what it is for. Where an item can be got more than one way, the ways are joined by OR, and the one the route plans is ticked.";
+  $("#needs-head").textContent = `Everything your goals need from ${v.today.replace(/, Year \d+/, "")} to ${v.end.replace(/, Year \d+/, "")}, added up. Pick a box to see what it goes to.`;
   const res = v.resources.filter((x) => x.total > 0);
-  const gold = res.find((x) => x.id === "gold"), bars = res.filter((x) => x.group ? x.group === "bars" : BARS.includes(x.id));
-  const rest = res.filter((x) => x !== gold && !bars.includes(x));
+  const uses = (x) => x.breakdown.reduce((n, b) => n + b.items.length, 0);
+  const multi = res.filter((x) => x.id === "gold" || uses(x) > 1), single = res.filter((x) => !multi.includes(x));
+  if (!multi.some((x) => x.id === needsOpen)) needsOpen = multi.length ? multi[0].id : "";
 
-  // The tiles: gold first and wide, then each material, the bars together, then the days
-  const tile = (label, big, line, cls = "") => `<div class="ntile${cls}"><div class="n-lab">${esc(label)}</div><div class="n-big">${big}</div>${line ? `<div class="n-line">${line}</div>` : ""}</div>`;
-  let tiles = "";
-  if (gold) {
-    const g = gold, end = v.end.replace(/, Year \d+/, "");
-    tiles += `<div class="ntile wide"><div class="n-lab">Gold</div><div class="n-big">${amt(g.total, "g")}</div>` +
-      `<div class="nmeter" role="img" aria-label="${esc(`${num(g.have)}g in hand, about ${about(g.expected || 0)}g more expected, ${num(g.short)}g short`)}">` +
-      `<span class="m-have" style="width:${pct(g.have, g.total)}%"></span><span class="m-exp" style="width:${pct(g.expected || 0, g.total)}%"></span></div>` +
-      `<div class="n-line"><b class="ok">${amt(g.have, "g")}</b> in hand` +
-      (g.expected ? ` · <b class="exp">about ${about(g.expected)}g</b> more by ${esc(end)}${g.note ? ` ${esc(g.note)}` : ""}` : "") +
-      (g.short > 0 ? ` · <b class="bad">about ${about(g.short)}g short</b>` : ' · <b class="ok">covered</b>') + "</div>" +
-      (g.extra ? `<div class="n-line small">${esc(g.extra)}</div>` : "") + "</div>";
-  }
-  tiles += rest.map((x) => tile(x.label, amt(x.total, x.unit),
-    [x.have ? `${amt(x.have, x.unit)} in hand` : "", x.days ? `about <b>${x.days} ${esc(x.days_label)}</b>` : "", esc(x.note)].filter(Boolean).join(" · "))).join("");
-  if (bars.length) tiles += tile("Bars", bars.map((x) => `${num(x.total)} ${esc(x.label.replace(/ Bar$/, ""))}`).join(" · "),
-    bars.map((x) => `${esc(x.label.replace(/ Bar$/, ""))}: ${esc(x.note)}`).join(", "), " wide mid");
-  const d = v.days, spent = d.chop + d.stumps + d.mine + d.fish;
-  if (spent) tiles += tile("Days", `${spent}`, [["chopping", d.chop], ["stumps", d.stumps], ["mining", d.mine], ["fishing", d.fish]]
-    .filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(" · ") + ` · of ${d.left} days left` +
-    (spent > d.left ? ` <b class="bad">· ${spent - d.left} more than there are</b>` : ""));
-  $("#needs-tiles").innerHTML = tiles;
+  // A box per resource that goes to more than one thing; pressing it shows where it goes
+  const end = v.end.replace(/, Year \d+/, "");
+  const line = (x) => x.id === "gold"
+    ? `<span class="nmeter" aria-hidden="true"><span class="m-have" style="width:${pct(x.have, x.total)}%"></span><span class="m-exp" style="width:${pct(x.expected || 0, x.total)}%"></span></span>` +
+      `<span class="n-line"><b class="ok">${amt(x.have, "g")}</b> in hand${x.expected ? ` · <b class="exp">~${about(x.expected)}g</b> to come by ${esc(end)}` : ""}` +
+      (x.short > 0 ? ` · <b class="bad">~${about(x.short)}g short</b>` : ' · <b class="ok">covered</b>') + "</span>"
+    : `<span class="n-line">${[x.have ? `${amt(x.have, x.unit)} in hand` : "", x.days ? `~${x.days} ${esc(x.days_label)}` : "", x.short > 0 && x.have ? `${amt(x.short, x.unit)} short` : ""].filter(Boolean).join(" · ")}</span>`;
+  const goalsOf = (x) => x.breakdown.length;
+  $("#needs-tiles").innerHTML = multi.map((x) => `<button type="button" class="ntile pick${x.id === "gold" ? " wide" : ""}" data-res="${esc(x.id)}" aria-pressed="${x.id === needsOpen}">` +
+    `<span class="n-lab">${esc(x.label)}</span><span class="n-big">${amt(x.total, x.unit)}</span>${line(x)}` +
+    `<span class="n-uses">${uses(x)} things · ${goalsOf(x)} goal${goalsOf(x) === 1 ? "" : "s"}</span></button>`).join("") +
+    (() => {
+      const d = v.days, spent = d.chop + d.stumps + d.mine + d.fish;
+      return spent ? `<div class="ntile"><span class="n-lab">Days</span><span class="n-big">${spent}</span><span class="n-line">` +
+        [["chopping", d.chop], ["stumps", d.stumps], ["mining", d.mine], ["fishing", d.fish]].filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(" · ") +
+        ` · of ${d.left} left${spent > d.left ? ` <b class="bad">· ${spent - d.left} too many</b>` : ""}</span></div>` : "";
+    })();
+  $("#needs-single").innerHTML = single.length ? "<b>Only one use:</b> " + single.map((x) => {
+    const it = x.breakdown[0].items[0];
+    return `<span>${amt(x.total, x.unit)} ${esc(x.label)} · ${esc(it.label)}${x.have ? ` <span class="sub">(${amt(x.have, x.unit)} in hand)</span>` : ""}</span>`;
+  }).join("") : "";
+  document.querySelectorAll("#needs-tiles .pick").forEach((b) => b.addEventListener("click", () => { needsOpen = b.dataset.res; drawNeeds(v); }));
 
-  // Where it goes: a collapsible row per goal, its items under it
-  const where = (x) => x.breakdown.map((b, i) => `<details class="ngoal"${i ? "" : " open"}><summary><span class="ng-row"><span>${esc(b.label)}${also(b.also)}</span>` +
-    `<span>${amt(b.amount, x.unit)}</span></span>${bar(b.amount, x.total)}</summary><ul class="nitems">` + b.items.map((it) =>
-      `<li><span>${esc(it.label)}${it.how ? `: ${esc(it.how)}` : ""}${also(it.also)}${it.this_year === false ? ' <span class="later">not this year</span>' : ""}</span><span>${amt(it.amount, x.unit)}</span></li>`
-    ).join("") + "</ul></details>").join("");
-  const wood = rest.find((x) => x.id === "wood"), others = [...rest.filter((x) => x !== wood), ...bars];
-  const compact = others.map((x) => `<li><span><b>${esc(x.label)} ${amt(x.total, x.unit)}</b> · ` +
-    esc(x.breakdown.flatMap((b) => b.items.map((it) => `${it.label.replace(/^The /, "the ")} ${num(it.amount)}`)).join(", ")) + "</span></li>").join("");
-  $("#needs-where").innerHTML = (gold ? `<section class="parch panel"><h2 class="sign">Where the gold goes</h2>${where(gold)}</section>` : "") +
-    (wood || others.length ? '<section class="parch panel">' + (wood ? `<h2 class="sign">Where the ${esc(wood.label)} goes</h2>${where(wood)}` : "") +
-      (others.length ? `<h3>${esc(others.map((x) => x.label).join(", ").replace(/, ([^,]*)$/, " and $1"))}</h3><ul class="list ncompact">${compact}</ul>` : "") + "</section>" : "");
+  // Where the chosen one goes: by goal, then by item
+  const x = res.find((r) => r.id === needsOpen);
+  $("#needs-where").innerHTML = x ? `<div class="nwhere-head"><h2>${esc(x.label)}: ${amt(x.total, x.unit)}</h2>` +
+    `<span class="sub">${esc([x.days ? `about ${x.days} ${x.days_label}` : "", x.note, x.extra].filter(Boolean).join(" · "))}</span></div>` +
+    x.breakdown.map((b) => `<div class="ngoal"><div class="ng-row"><b>${esc(b.label)}${also(b.also)}</b><b>${amt(b.amount, x.unit)}</b></div>${bar(b.amount, x.total)}` +
+      `<ul class="nitems">` + b.items.map((it) => `<li><span>${esc(it.label)}${it.how ? `: ${esc(it.how)}` : ""}${also(it.also)}${it.this_year === false ? ' <span class="later">not this year</span>' : ""}</span><span>${amt(it.amount, x.unit)}</span></li>`).join("") +
+      "</ul></div>").join("") : "";
 
-  // Choose how: each way as a card, joined by OR
+  // Choose how: each way a card, joined by OR; press one to plan with it
   const TAG = { planned: "✓ PLANNED", luck: "LUCK", no: "✕ NOT THIS YEAR", later: "LATER", possible: "" };
-  const card = (o, i) => {
+  const card = (c, o, i) => {
     if (o.more) return `<button type="button" class="ncard more" aria-expanded="false" data-label="${esc(o.label)}" data-more="${esc(o.detail)}">${esc(o.label)}</button>`;
     let tag = o.tag || TAG[o.state] || "";
     const planned = o.planned ?? o.state === "planned";
     if (planned && !tag.startsWith("✓")) tag = "✓ " + tag;
     if (o.state === "no" && !tag.startsWith("✕")) tag = "✕ " + tag;
     const cls = planned ? (o.state === "luck" || o.odds != null ? "planned c-luck" : "planned") : o.state;  // planned on luck: amber, ticked
-    const line = [o.detail, o.gold ? amt(o.gold, "g") : "", o.when].filter(Boolean).map(esc).join(" · ") + also(o.also);
-    return `<div class="ncard c-${cls}${i ? "" : " first"}">${tag ? `<b class="c-tag">${esc(tag)}</b>` : ""}<b class="c-ttl">${esc(o.label)}</b>${line ? `<span>${line}</span>` : ""}</div>`;
+    const text = [o.detail, o.gold ? amt(o.gold, "g") : "", o.when].filter(Boolean).map(esc).join(" · ") + also(o.also);
+    const inner = `${tag ? `<b class="c-tag">${esc(tag)}</b>` : ""}<b class="c-ttl">${esc(o.label)}</b>${text ? `<span>${text}</span>` : ""}`;
+    return planned || !o.pick ? `<div class="ncard c-${cls}${i ? "" : " first"}">${inner}</div>`
+      : `<button type="button" class="ncard c-${cls}${i ? "" : " first"}" data-item="${esc(c.item)}" data-pick="${esc(o.pick)}" title="Plan with this way">${inner}</button>`;
   };
   $("#needs-choices-box").hidden = !v.choices.length;
-  $("#needs-choices").innerHTML = v.choices.map((c) => `<div class="nchoice"><div class="nc-item"><b>${esc(c.item)}</b><br><span class="sub">${esc(c.where)}</span></div>` +
-    `<div class="nc-ways">${c.options.map((o, i) => i ? `<span class="way"><span class="or">OR</span>${card(o, i)}</span>` : card(o, i)).join("")}</div></div>`).join("");
+  $("#needs-choices").innerHTML = v.choices.map((c) => `<div class="nchoice"><div class="nc-item"><b>${esc(c.item)}</b><br><span class="sub">${esc(c.where)}</span>` +
+    (c.picked ? `<br><button type="button" class="linkish" data-unpick="${esc(c.item)}">your choice · undo</button>` : "") + "</div>" +
+    `<div class="nc-ways">${c.options.map((o, i) => i ? `<span class="way"><span class="or">OR</span>${card(c, o, i)}</span>` : card(c, o, i)).join("")}</div></div>`).join("");
+  const replan = (item, way) => {
+    const picks = { ...(routeState.settings.picks || {}) };
+    if (way) picks[item] = way; else delete picks[item];
+    routeState.settings.picks = picks;
+    saveRouteState();
+    views.plan();
+  };
+  document.querySelectorAll("#needs-choices [data-pick]").forEach((b) => b.addEventListener("click", () => replan(b.dataset.item, b.dataset.pick)));
+  document.querySelectorAll("#needs-choices [data-unpick]").forEach((b) => b.addEventListener("click", () => replan(b.dataset.unpick, "")));
   document.querySelectorAll("#needs-choices .more").forEach((b) => b.addEventListener("click", () => {
     const open = b.getAttribute("aria-expanded") !== "true";
     b.setAttribute("aria-expanded", open);
@@ -402,10 +412,8 @@ function drawCash(v) {
 
 const views = {
   async route() {
-    if (!routeState) {
-      routeState = loadRouteState(await get("/api/route/objectives"));
-      drawSettings();
-    }
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    if (!$("#route-settings").childElementCount) drawSettings();
     await planRoute();
   },
 
@@ -443,8 +451,8 @@ const views = {
   },
 
   async plan() {
-    const rs = routeState || loadRouteState(await get("/api/route/objectives"));
-    const body = routeBody(rs, rs.start);
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    const rs = routeState, body = routeBody(rs, rs.start);
     if (!body.targets.length && !body.nice.length) { drawNeeds(null); return; }
     $("#needs-head").textContent = "Adding it up…";
     const r = await fetch("/api/needs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

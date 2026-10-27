@@ -37,6 +37,7 @@ class Settings:
     quartz_per_day: int = 6  # Quartz found in a day in the Mines (for Refined Quartz)
     gift_points: int = 80  # friendship from each gift to your sweetheart (loved 80, liked 45)
     spouse: str = ""  # who to marry; empty: whoever you're closest to
+    picks: dict = field(default_factory=dict)  # item name -> the way you chose (a source label, or "cave")
     jars: int = 10  # Preserves Jars to have
     kegs: int = 10  # Kegs to have
     tappers: int = 5  # Tappers put on oaks for the Kegs' Oak Resin
@@ -233,7 +234,11 @@ class Router:
         return self.cost(self.chain(w))[0]
 
     def pick(self, s: Slot) -> Way | None:
-        """The cheapest viable way (then the soonest); the planner's own pick if none is viable."""
+        """The way you picked; else the cheapest viable way (then the soonest); the planner's own pick if none is
+        viable."""
+        chosen = next((w for w in s.ways if w.source.label == self.s.picks.get(s.name)), None)
+        if chosen:
+            return chosen
         ok = [w for w in s.ways if self.viable(w)]
         if ok:
             return min(ok, key=lambda w: (self.way_gold(w), len(w.unlocks), w.earliest))
@@ -295,7 +300,7 @@ class Router:
     def slot_req(self, s: Slot) -> Req | None:
         if s.have:
             return None
-        cave = self.cave_req(s)
+        cave = self.cave_req(s) if self.s.picks.get(s.name, "cave") == "cave" else None  # unless you picked another
         if cave:
             return cave
         w = self.pick(s)
@@ -322,7 +327,8 @@ class Router:
                 continue
             reqs = [r for s in slots if (r := self.slot_req(s))]
             have = sum(1 for s in slots if s.have)
-            reqs.sort(key=lambda r: (r.luck is not None, r.latest == 0, self.cost(r.chain)[0], r.earliest))
+            reqs.sort(key=lambda r: (r.label.split(" (")[0] not in self.s.picks,  # a way you picked stays in
+                                     r.luck is not None, r.latest == 0, self.cost(r.chain)[0], r.earliest))
             out += reqs[:max(0, need - have)]
         return out
 

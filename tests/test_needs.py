@@ -93,3 +93,21 @@ def test_needs_endpoint(fresh):
     assert [r["id"] for r in v["resources"][:4]] == ["gold", "wood", "stone", "hardwood"]
     _check(v)
     assert any(o["planned"] for c in v["choices"] for o in c["options"])
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_a_picked_way_is_planned():
+    """Picking another way for an item plans with it: the choice shows it ticked, and its chain's gold goes."""
+    from valley_planner.engine.route.needs import needs
+    from valley_planner.engine.route.plan import Settings
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    base = needs(farm, ["greenhouse"], [], settings=Settings(tiles=80), cave="bats")
+    choice = next(c for c in base["choices"] if any(o.get("pick") and not o.get("planned") for o in c["options"]))
+    other = next(o for o in choice["options"] if o.get("pick") and not o.get("planned"))
+    v = needs(farm, ["greenhouse"], [], settings=Settings(tiles=80, picks={choice["item"]: other["pick"]}), cave="bats")
+    after = next(c for c in v["choices"] if c["item"] == choice["item"])
+    assert after["picked"] == other["pick"]
+    assert next(o for o in after["options"] if o.get("pick") == other["pick"])["planned"]

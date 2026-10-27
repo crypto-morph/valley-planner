@@ -307,7 +307,7 @@ def _choices(farm, r: Router, outs, slots: dict[str, Slot], asked: dict[str, tup
                              "state": "planned" if step else "no",
                              "tag": "✓ PLANNED · FREE" if step else "✕ NOT THIS YEAR",
                              "when": f"likely by {farm.label(q.earliest)}", "odds": None, "planned": bool(step),
-                             "also": []})
+                             "also": [], "pick": "cave"})
             same = [w for w in slot.ways if not cave and w.source.label == q.season]
             route_way = next((w for w in same if (w.earliest or 1, w.latest_start or 0) == (q.earliest, q.latest)),
                              same[0] if same else None)
@@ -316,7 +316,8 @@ def _choices(farm, r: Router, outs, slots: dict[str, Slot], asked: dict[str, tup
                 opts.append(_option(farm, r, later, slot, w, ours, step, why.get(q.label, ""), tally,
                                     mine.get(q.label), o.id))
             opts.sort(key=lambda x: _ORDER[x["state"]])
-            out.append({"item": slot.name, "where": f"{slot.bundle} bundle", "goal": o.id, "options": _fold(opts)})
+            out.append({"item": slot.name, "where": f"{slot.bundle} bundle", "goal": o.id, "options": _fold(opts),
+                        "picked": r.s.picks.get(slot.name, "")})
     return out
 
 
@@ -332,7 +333,8 @@ def _option(farm, r: Router, later: Planner, slot: Slot, w: Way, mine: bool, ste
         detail = "" if s == "any season" else s
     opt = {"label": _way_label(w), "detail": detail, "gold": gold, "state": "possible", "tag": "",
            "when": "", "odds": round(w.odds, 3) if w.odds is not None else None,
-           "planned": mine and (step is not None or w.odds is not None), "also": tally.also(chain, goal)}
+           "planned": mine and (step is not None or w.odds is not None), "also": tally.also(chain, goal),
+           "pick": w.source.label}
     if mine and step is not None:
         opt.update(state="planned", tag="✓ PLANNED · FREE" if not chain else "✓ PLANNED",
                    when=f"from {farm.label(step.act or step.ready)}")
