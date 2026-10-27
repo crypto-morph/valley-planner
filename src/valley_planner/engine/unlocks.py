@@ -6,8 +6,10 @@ From the game:
 - Animals: Marnie's price is twice the data's PurchasePrice; they need
   their building, then grow up (DaysToMature) and produce (DaysToProduce).
 - Tool upgrades (Clint): 2,000 / 5,000 / 10,000 / 25,000g and 5 copper /
-  iron / gold / iridium bars for levels 1-4, two days, one level at a time.
-- The kitchen: the first house upgrade, 10,000g and 450 Wood, three days.
+  iron / gold / iridium bars for levels 1-4, two days, one level at a time
+  (from the save's own tool levels).
+- The kitchen: the first house upgrade, 10,000g and 450 Wood, three days;
+  the second 65,000g and 100 Hardwood; the third (the cellar) 100,000g.
 - Crafted machines: their recipe's materials, once the recipe is known
   (Data/CraftingRecipes: "s <Skill> <level>" means that skill level).
 - Cooking recipes: "f <villager> <hearts>" (a letter), "s <skill> <level>",
@@ -29,6 +31,8 @@ TOOL_BARS = {1: "334", 2: "335", 3: "336", 4: "337"}
 TOOL_DAYS = 2
 KITCHEN = (10000, (("388", 450),), 3)
 HOUSE_2 = (65000, (("709", 100),), 3)  # GameLocation.houseUpgradeAccept: 65,000g and 100 Hardwood, 3 days
+HOUSE_3 = (100000, (), 3)  # the cellar: gold only
+TOOL_NAMES = {"WateringCan": "Watering Can"}
 BRIDGE_WOOD = 300
 SKILLS = ("farming", "fishing", "foraging", "mining", "combat")
 
@@ -84,7 +88,8 @@ class Unlocks:
         if kind == "tool":
             tool, _, level = what.partition("@")
             lvl, have = int(level), self._tool_level(tool)
-            return Unlock(key, f"a {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {tool} from Clint",
+            name = TOOL_NAMES.get(tool, tool)
+            return Unlock(key, f"a {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {name} from Clint",
                           TOOL_PRICES[lvl], [(TOOL_BARS[lvl], 5)], TOOL_DAYS,
                           [f"tool:{tool}@{lvl - 1}"] if lvl > 1 else [], done=have >= lvl)
         if kind == "sapling":
@@ -104,6 +109,10 @@ class Unlocks:
             gold, mats, days = HOUSE_2
             return Unlock(key, "the second house upgrade", gold, list(mats), days, ["kitchen"],
                           done=s.house_upgrade >= 2)
+        if kind == "house" and what == "3":
+            gold, mats, days = HOUSE_3
+            return Unlock(key, "the third house upgrade (the cellar)", gold, list(mats), days, ["house:2"],
+                          done=s.house_upgrade >= 3)
         if kind == "machine":
             bc = self.data.asset("Data/BigCraftables").get(what.removeprefix("(BC)")) or {}
             name = bc.get("Name") or what
@@ -166,7 +175,9 @@ class Unlocks:
         return None
 
     def _tool_level(self, tool: str) -> int:
-        return self.save.axe_level if tool == "Axe" else 0
+        """The save's level for this tool (-1: not owned); a tool at Clint's counts as the level it left at."""
+        levels = getattr(self.save, "tool_levels", None) or {}
+        return levels.get(tool, self.save.axe_level if tool == "Axe" else 0)
 
     def _has_upgrade_of(self, building: str) -> bool:
         """A Big Coop also counts as having a Coop."""

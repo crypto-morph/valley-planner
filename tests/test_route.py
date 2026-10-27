@@ -110,3 +110,113 @@ def test_tech_tree():
             assert all(c["urgency"] in ("plenty", "soon", "now", "daily", "shared") for c in row)
     both = [x for x in t["synergy"] if {g["goal"] for g in x["goals"]} >= {"The greenhouse", "The Community Center"}]
     assert both
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_new_goals_fresh():
+    """Each new goal plans on a fresh farm, or says clearly why it can't."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    for g in ("deluxe_barn", "deluxe_coop", "silo", "axe_steel", "pickaxe_steel", "can_steel", "mines_bottom",
+              "skull_cavern", "jars", "kegs", "house_3"):
+        o = route(farm, [g], [], tiles=80, cave="bats")["objectives"][0]
+        assert o["status"] == "ok" or (o["problems"] and all(": " in p for p in o["problems"])), (g, o)
+        if o["status"] == "ok":
+            assert o["steps"] and o["finish"], g
+    house = route(farm, ["house_3"], [], tiles=80, cave="bats")["objectives"][0]
+    assert house["status"] == "impossible" and "short" in house["problems"][0]  # 175,000g of upgrades in Year 1
+    barn = route(farm, ["deluxe_barn"], [], tiles=80, cave="bats")["objectives"][0]
+    assert [n["label"] for n in barn["steps"][0]["needs"]] == ["build a Barn", "build a Big Barn",
+                                                                "build a Deluxe Barn"]
+    assert any("Stone" in i for i in barn["info"])  # what isn't priced is said, not dropped
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_tool_level_from_save():
+    """Tool chains start from the save's own levels: a Copper Pickaxe needs only the Steel step."""
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.engine.unlocks import Unlocks
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    farm.save.tool_levels = {**farm.save.tool_levels, "Pickaxe": 1, "WateringCan": 2}
+    u = Unlocks(farm)
+    assert [x.label for x in u.chain("tool:Pickaxe@2")] == ["a Steel Pickaxe from Clint"]
+    assert u.get("tool:WateringCan@2").done and not u.get("tool:Axe@1").done
+    steel = u.get("tool:Pickaxe@2")
+    assert steel.gold == 5000 and steel.materials == [("335", 5)] and steel.days == 2
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_cellar_after_second_upgrade():
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.engine.unlocks import Unlocks
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    assert [x.key for x in Unlocks(farm).chain("house:3")] == ["kitchen", "house:2", "house:3"]
+    farm.save.house_upgrade = 2
+    cellar = Unlocks(farm).chain("house:3")
+    assert [x.key for x in cellar] == ["house:3"] and cellar[0].gold == 100000 and not cellar[0].materials
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_kegs_wait_for_oak_resin():
+    """Kegs need an Oak Resin each: Tappers on oaks first, a week a round, and the Kegs wait for it."""
+    from valley_planner.engine.route.plan import Settings, route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    v = route(farm, ["kegs"], [], settings=Settings(kegs=10, tappers=5), tiles=80, cave="bats")
+    o = v["objectives"][0]
+    assert o["status"] == "ok"
+    resin, kegs = o["steps"]
+    assert resin["what"] == "10 Oak Resin" and kegs["what"] == "10 Kegs"
+    tap = next(n for n in resin["needs"] if n["key"] == "tap:oak")
+    assert "5 oak trees" in tap["label"] and tap["state"] == "new"
+    assert resin["n"] + 14 <= next(c["day"] for c in v["cash"] if farm.label(c["day"]) == resin["ready"])
+    assert any(n["key"] == "tap:oak" and n["state"] == "earlier" for n in kegs["needs"])
+    assert kegs["n"] >= next(c["day"] for c in v["cash"] if farm.label(c["day"]) == resin["ready"])
+    assert any("Foraging level 4" in i for i in o["info"])  # the Tapper recipe's skill isn't modelled: said so
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_skull_cavern_needs_the_vault():
+    """The bus to the Desert needs the Vault: without its gold by the deadline the Skull Cavern can't be planned;
+    with the Community Center planned first, the Vault is shared, not paid twice."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    o = route(farm, ["skull_cavern"], [], deadlines={"skull_cavern": 40}, tiles=80, cave="bats")["objectives"][0]
+    assert o["status"] == "impossible" and any("Vault" in p for p in o["problems"])
+    assert any("Vault" in i for i in o["info"])
+    alone = route(farm, ["skull_cavern"], [], tiles=80, cave="bats")["objectives"][0]
+    assert alone["status"] == "ok" and alone["steps"][0]["what"].startswith("pay the Vault")
+    v = route(farm, ["skull_cavern"], ["cc"], tiles=80, cave="bats")
+    sc, cc = v["objectives"]
+    assert [st for st in cc["steps"] if st["what"].startswith("pay the Vault") and st["shared"] == "The Skull Cavern"]
+    assert not [st for st in cc["steps"] if st["what"].startswith("pay the Vault") and not st["shared"]]
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_new_goals_done_from_save():
+    """Placed machines and ones in chests both count; the Skull Key's mail or floor 120 is the Mines' bottom."""
+    from valley_planner.engine.route.plan import Router
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    from valley_planner.save import Item
+    farm = new_farm(GameData(GAME))
+    farm.save.machines["Keg"] = 6
+    farm.save.items.append(Item(id="12", name="Keg", stack=4, quality=0, where="Farm chest", big=True))
+    farm.save.mail.add("HasSkullKey")
+    farm.save.buildings["Deluxe Coop"] = 1
+    r = Router(farm)
+    assert r.machines("12") == 10 and r.done("kegs") and not r.done("jars")
+    assert r.done("mines_bottom") and not r.done("skull_cavern") and r.done("deluxe_coop") and not r.done("silo")
