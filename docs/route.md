@@ -30,6 +30,26 @@ Some objectives come before individual bundle slots because they make everything
   bought for about 2,000g rather than mined. With it, seeds stop costing money and planting can grow.
 - **Then the rest of the Community Center**, fitted around those.
 
+## Objectives in priority order
+
+The player picks objectives and drags them into priority order; the route is optimised for that order
+and shows what can and can't still be achieved.
+
+- **Objectives**, each with a default deadline you can change, broken into requirements with lead times,
+  gold, materials and activity days: the greenhouse (by Fall 28), the Seed Maker, the Community Center
+  (by room), marriage to a chosen villager (8 hearts, the Bouquet, 10 hearts; the Mermaid's Pendant from
+  the Old Mariner on a rainy beach day, which needs the first house upgrade; gifts, birthdays and talking
+  from the game's friendship rules), and later the kitchen and house upgrades, museum targets, Skull
+  Cavern, sprinklers, more animals.
+- **Lexicographic scheduling**: the top objective is placed as early as it safely can, reserving its
+  activity days, gold, materials and tiles; each next one fits into what's left without delaying any
+  above it. Anything that misses its deadline says why: gold not there in time, its days clash with a
+  higher objective, or a fixed window has passed (a season, a festival, a Year-1-only item).
+- **The page**: the draggable list beside a matrix — one row per objective, one column per week, each
+  cell what that week is spent on and what gold and materials fall due — with each row's status ("on track
+  for Fall 12", "at risk: 4,000g needed by Summer 20", "can't this year: the Big Coop can't be ready for
+  the Duck Egg"), and the gold and Wood forecast for the year under it.
+
 ## Stages
 
 1. **Requirements** (`engine/route/needs.py`): every bundle slot, its best route and its lead time from
