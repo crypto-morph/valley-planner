@@ -112,6 +112,9 @@ class Planner:
             elif kind == "building" and not f.save.buildings.get(what) and not self.unlocks.get(need).done:
                 blocked.append(f"a {what}")
                 keys.append(need)
+            elif kind == "floor" and w.mine_lowest < int(what):
+                blocked.append(f"reaching Mines floor {what}")
+                keys.append(need)
             elif kind == "kitchen" and f.save.house_upgrade < 1:
                 blocked.append("a kitchen (the first house upgrade)")
                 keys.append("kitchen")
@@ -195,6 +198,26 @@ class Planner:
     def _bc_display(self, mid: str) -> str:
         b = self.farm.data.asset("Data/BigCraftables").get(mid.removeprefix("(BC)")) or {}
         return self.farm.data.text(b.get("DisplayName")) or b.get("Name") or mid
+
+    def bundle_slots(self) -> list[tuple[str, int, list[Slot]]]:
+        """(bundle key, how many still needed, every open ingredient as a Slot) for each open bundle."""
+        f = self.farm
+        plan = f.bundles.plan(f.save.items)
+        out = []
+        for b in f.bundles.all:
+            if b.done or b.area in (VAULT, JOJA):
+                continue
+            cands = []
+            for ing in b.open_ingredients:
+                have = (b.key, ing.index) in plan.reserved
+                item = ing.item or f"category {ing.category}"
+                name = f.name(ing.item) if ing.item else f"any {item}"
+                ways = [] if have or not ing.item else [self.way(s, ing.item) for s in self.sources.of(ing.item)]
+                slot = Slot(b.display, b.room, item, name, ing.stack, ing.quality, have, ways)
+                slot.best = _best(ways)
+                cands.append(slot)
+            out.append((b.key, b.still_needed, cands))
+        return out
 
     def slots(self) -> list[Slot]:
         f = self.farm

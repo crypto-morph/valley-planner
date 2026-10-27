@@ -119,6 +119,7 @@ class Sources:
                 desert = sid in ("Sandy", "DesertTrade", "Casino") or sid.startswith("DesertFestival")
                 needs = ("place:Desert",) if desert else ()
                 needs += ("place:Island",) if sid.startswith("Island") or sid == "VolcanoShop" else ()
+                needs += ("place:Sewer",) if sid == "ShadowShop" else ()
                 fest = next((v for k, v in FESTIVAL_DAYS.items() if k in sid), None)
                 if fest:
                     seasons, days = frozenset({fest[0]}), (fest[1], fest[2])
@@ -136,6 +137,10 @@ class Sources:
                                 notes=tuple(f"seeds: {s}" for s in seed_shops[:4])))
 
         fish = self.data.asset("Data/Fish")
+        for fid, raw in fish.items():  # crab-pot catches aren't in any fishing spot: any crab pot, any season
+            f = raw.split("/")
+            if len(f) > 4 and f[1] == "trap":
+                add(fid, Source("crabpot", f"a crab pot ({f[4]} water)", needs=("recipe:Crab Pot",), lead=1))
         for loc, ldata in self.data.asset("Data/Locations").items():
             if loc in ("Default", "fishingGame", "Temp") or (loc.startswith("Farm_") and not self._farm_here(loc)):
                 continue
@@ -217,9 +222,15 @@ class Sources:
                     continue
                 if chance > 0:
                     add(drops[i], Source("monster", f"a {name}", chance=chance))
+        from .mines import FLOORS
+        for oid, (first, _last, how) in FLOORS.items():  # by floor: see facts/mines.py
+            add(oid, Source("mine", f"the Mines, floor {first}+ ({how})",
+                            needs=("place:UndergroundMine", f"floor:{first}")))
         for oid, o in self.data.asset("Data/Objects").items():
+            if oid in FLOORS:
+                continue
             if o.get("Type") == "Minerals" or int(o.get("Category") or 0) in (-2, -12):
-                add(oid, Source("mine", "the Mines (rocks, nodes and geodes)", needs=("place:UndergroundMine",)))
+                add(oid, Source("mine", "geodes from the Mines", needs=("place:UndergroundMine",)))
             elif o.get("Type") == "Arch":
                 add(oid, Source("dig", "artifact spots, digging and fishing chests"))
         # Spawned by the game's code rather than its data

@@ -86,6 +86,9 @@ class Unlocks:
             return Unlock(key, f"a {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {tool} from Clint",
                           TOOL_PRICES[lvl], [(TOOL_BARS[lvl], 5)], TOOL_DAYS,
                           [f"tool:{tool}@{lvl - 1}"] if lvl > 1 else [], done=have >= lvl)
+        if kind == "floor":
+            deepest = max(getattr(s, "mine_lowest", 0), getattr(s, "deepest_mine_level", 0))
+            return Unlock(key, f"reach Mines floor {what}", how="mining", done=deepest >= int(what))
         if kind == "kitchen":
             gold, mats, days = KITCHEN
             return Unlock(key, "the kitchen (house upgrade)", gold, list(mats), days, done=s.house_upgrade >= 1)

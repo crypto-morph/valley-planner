@@ -22,8 +22,12 @@ from .simulate import YEAR_DAYS, Farmsim
 
 WOOD, STONE, HARDWOOD = "388", "390", "709"
 WOOD_PER_DAY = 100  # planning choice: Wood from a day spent chopping
+FLOORS_PER_DAY = 8  # planning choice: Mines floors gained in a day spent mining
+MINES_OPEN = 5  # the landslide clears on day 5
 BOUGHT = {"334": 5 * 75 + 150, "335": 5 * 150 + 150, "336": 5 * 400 + 150, "382": 150,  # Clint, Year 1
           "378": 75, "380": 150, "384": 400}
+DATE_GATES = {"place:UndergroundMine": 5, "place:Railroad": 31}  # places that simply open on a day
+HARD = ("Island", "quest", "Rusty Key", "Willy's boat")  # gates the route can't plan in Year 1
 SKILL_RE = re.compile(r"^(Farming|Fishing|Foraging|Mining|Combat) level (\d+)", re.I)
 
 CATALOG = {  # id -> (label, default deadline as days played in Year 1)
@@ -41,6 +45,7 @@ class Step:
     ready: int  # when it's in hand
     gold: int = 0
     chop_days: list[int] = field(default_factory=list)
+    mine_days: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -64,6 +69,7 @@ class Req:
     lead: int
     activity: str | None = None  # fish / forage / mine: a day spent getting it
     luck: float | None = None
+    season: str = ""  # the way's label: fishing at one place in one season shares a day
 
 
 class Router:
@@ -76,6 +82,9 @@ class Router:
         self.seed_maker_day: int | None = None
         self.greenhouse_day: int | None = None
         self.festivals = {d for d in range(1, YEAR_DAYS + 1) if self._festival(d)}
+        self.floor = 0  # deepest Mines floor the route has planned for
+        self.vault_day: int | None = None
+        self.fish_days: dict[str, int] = {}
         self.planner = Planner(farm, YEAR_DAYS)
         self._result = None
 
@@ -94,11 +103,37 @@ class Router:
                 if d not in self.busy and d not in self.festivals]
 
     # ----- requirements -----
+    def chain(self, w: Way) -> list[Unlock]:
+        """Everything a way needs that isn't done, each once, prerequisites first."""
+        out, seen = [], set()
+        for k in w.unlocks:
+            for u in self.planner.unlocks.chain(k):
+                if u.key not in seen:
+                    seen.add(u.key)
+                    out.append(u)
+        return out
+
+    def viable(self, w: Way) -> bool:
+        """A way whose unlocks are all things the route can plan (no quests, no island)."""
+        return w.odds is None and (w.earliest is not None) and not self.cost(self.chain(w))[3]
+
+    def way_gold(self, w: Way) -> int:
+        return self.cost(self.chain(w))[0]
+
+    def pick(self, s: Slot) -> Way | None:
+        """The cheapest viable way (then the soonest); the planner's own pick if none is viable."""
+        ok = [w for w in s.ways if self.viable(w)]
+        if ok:
+            return min(ok, key=lambda w: (self.way_gold(w), len(w.unlocks), w.earliest))
+        return s.best
+
     def slot_req(self, s: Slot) -> Req | None:
-        if s.have or s.best is None:
+        if s.have:
             return None
-        w: Way = s.best
-        chain = [u for k in w.unlocks for u in self.planner.unlocks.chain(k)]
+        w = self.pick(s)
+        if w is None:
+            return Req(f"{s.name} ({s.bundle})", 1, 0, [], 0)
+        chain = self.chain(w)
         lead = sum(u.days for u in chain)
         if w.source.kind == "animal" and "(deluxe)" in w.source.label:
             kind = w.source.label.removeprefix("a ").removesuffix(" (deluxe)")
@@ -106,17 +141,30 @@ class Router:
             if extra:
                 k = self.farm.animals.kinds[kind]
                 lead += extra - (k.days_to_mature + k.days_to_produce)
-        activity = {"fish": "fish", "forage": "forage", "mine": "mine", "dig": "forage"}.get(w.source.kind)
-        return Req(f"{s.name} ({s.bundle})", w.earliest or 1, w.latest_start or 0, chain, lead, activity, w.odds)
+        activity = {"fish": "fish", "forage": "forage", "mine": "mine", "dig": "forage",
+                    "crabpot": "forage"}.get(w.source.kind)
+        return Req(f"{s.name} ({s.bundle})", w.earliest or 1, w.latest_start or 0, chain, lead, activity, w.odds,
+                   season=w.source.label)
+
+    def bundle_reqs(self, rooms: set[str] | None = None) -> list[Req]:
+        """For each open bundle, the cheapest ways to fill the slots it still needs."""
+        out = []
+        for _key, need, slots in self.planner.bundle_slots():
+            if rooms and not any(s.room in rooms for s in slots):
+                continue
+            reqs = [r for s in slots if (r := self.slot_req(s))]
+            have = sum(1 for s in slots if s.have)
+            reqs.sort(key=lambda r: (r.luck is not None, r.latest == 0, self.cost(r.chain)[0], r.earliest))
+            out += reqs[:max(0, need - have)]
+        return out
 
     def requirements(self, oid: str) -> tuple[list[Req], int, list[str]]:
         """(requirements, gold that's simply paid, notes) for an objective."""
-        slots = self.planner.slots()
         if oid == "greenhouse":
-            return [r for s in slots if s.room == "Pantry" and (r := self.slot_req(s))], 0, []
+            return self.bundle_reqs({"Pantry"}), 0, []
         if oid == "cc":
             vault = sum(b.gold or 0 for b in self.farm.bundles.in_area(VAULT) if not b.done)
-            return [r for s in slots if (r := self.slot_req(s))], vault, []
+            return self.bundle_reqs(), vault, []
         if oid == "kitchen":
             u = self.planner.unlocks.get("kitchen")
             return [Req("the kitchen", 1, YEAR_DAYS, [u], u.days)], 0, []
@@ -133,6 +181,18 @@ class Router:
         for u in chain:
             if u.key in self.have or u.done:
                 continue
+            if u.key.startswith("floor:"):
+                gates.append(f"Floor {u.key[6:]}")
+                continue
+            if u.key in DATE_GATES:
+                gates.append(f"Day {DATE_GATES[u.key]}")
+                continue
+            if u.key == "place:Desert":
+                if self.vault_day is None:
+                    problems.append("the bus to the Desert (pay the Vault first)")
+                else:
+                    gates.append(f"Day {self.vault_day + 1}")
+                continue
             gold += u.gold
             for mat, n in u.materials:
                 if mat == WOOD:
@@ -146,10 +206,12 @@ class Router:
             m = SKILL_RE.match(u.how or "")
             if m:
                 gates.append(f"{m.group(1)} {m.group(2)}")
-            elif u.how and (u.how.startswith("buy it from") or "colour is random" in u.how):
+            elif u.how and (u.how.startswith("buy it from") or "colour is random" in u.how or u.how == "mining"):
                 pass
             elif u.how and not u.gold and not u.materials:
-                problems.append(f"{u.label}: {u.how}")
+                if any(h in u.how or h in u.label for h in HARD):
+                    problems.append(f"{u.label}: {u.how}")
+                # other recipes (letters, events, Clint's Furnace): assumed to come in time
         return gold, math.ceil(wood / WOOD_PER_DAY) if wood else 0, gates, problems
 
     def place(self, req: Req, deadline: int) -> tuple[Step | None, str]:
@@ -163,8 +225,14 @@ class Router:
             return None, f"{req.label}: needs {'; '.join(problems)}"
         res = self.result()
         start = req.earliest
+        floor_need = max((int(g.split()[1]) for g in gates if g.startswith("Floor")), default=0)
         for g in gates:
             skill, level = g.split()
+            if skill == "Day":
+                start = max(start, int(level))
+                continue
+            if skill == "Floor":
+                continue
             if skill.lower() != "farming":
                 continue  # other skills: assumed reached (not modelled yet)
             day = res.level_day(int(level))
@@ -175,29 +243,62 @@ class Router:
             chop = self.free_days(1, b - 1)[-chops:] if chops else []
             if len(chop) < chops:
                 continue
+            mine = self.mining_days(floor_need, b)
+            if mine is None:
+                continue
             if gold and self.result([(b, gold)]).lowest_from(b) < 0:
                 continue
-            ready = b + req.lead
+            ready = max(b, max(mine, default=0) + 1) + req.lead
             act = None
-            if req.activity:
-                options = self.free_days(max(ready, req.earliest), latest_ready)
-                if not options:
-                    continue
-                act = options[0]
-            return Step(req.label, b, act or ready, gold, chop), ""
+            if req.activity == "fish":
+                shared = self.fish_days.get(req.season)
+                if shared and max(ready, req.earliest) <= shared <= latest_ready:
+                    act = shared
+                else:
+                    options = [d for d in self.free_days(max(ready, req.earliest), latest_ready)
+                               if _season(d) == _season(max(ready, req.earliest))]
+                    if not options:
+                        continue
+                    act = options[0]
+            elif req.activity == "forage":
+                act = max(ready, req.earliest)  # picked up on the way: no day of its own
+            return Step(req.label, b, act or ready, gold, chop, mine), ""
         short = self.result([(latest_ready - req.lead, gold)]).lowest_from(max(1, latest_ready - req.lead)) \
             if gold else 0
         if gold and short < 0:
             return None, f"{req.label}: about {-short:,}g short by {self.farm.label(latest_ready - req.lead)}"
         return None, f"{req.label}: no free days left before {self.farm.label(latest_ready)}"
 
+    def mining_days(self, floor: int, by: int) -> list[int] | None:
+        """New mining days needed (before `by`) to have reached `floor`; [] if already there."""
+        have = max(self.floor, self.farm.when.mine_lowest)
+        if floor <= have:
+            return []
+        n = math.ceil((floor - have) / FLOORS_PER_DAY)
+        days = self.free_days(MINES_OPEN, by - 1)[:n]
+        return days if len(days) == n else None
+
+    def pay_vault(self, gold: int, out: Outcome, placed: list) -> None:
+        res = self.result()
+        day = next((d.day for d in res.days if self.result([(d.day, gold)]).lowest_from(d.day) >= 0), None)
+        if day is None or day > out.deadline:
+            out.problems.append(f"the Vault's {gold:,}g isn't there by {self.farm.label(out.deadline)}")
+            return
+        self.spends.append((day, gold))
+        self.vault_day = day
+        placed.append((Step(f"pay the Vault ({gold:,}g)", day, day, gold), Req("vault", day, day, [], 0)))
+
     def commit(self, step: Step, req: Req) -> None:
         if step.gold:
             self.spends.append((step.day, step.gold))
         for d in step.chop_days:
-            self.busy[d] = "chop"
-        if req.activity and step.ready not in self.busy:
-            self.busy[step.ready] = req.activity
+            self.busy.setdefault(d, "chop")
+        for d in step.mine_days:
+            self.busy.setdefault(d, "mine")
+        self.floor += len(step.mine_days) * FLOORS_PER_DAY
+        if req.activity == "fish":
+            self.fish_days.setdefault(req.season, step.ready)
+            self.busy.setdefault(step.ready, "fish")
         for u in req.chain:
             self.have.setdefault(u.key, step.day + u.days)
 
@@ -208,22 +309,28 @@ class Router:
         out.problems += notes
         reqs.sort(key=lambda r: (r.latest or 0) - r.lead)
         placed: list[tuple[Step, Req]] = []
-        for r in reqs:
+        desert = [r for r in reqs if any(u.key == "place:Desert" for u in r.chain)]
+        reqs = [r for r in reqs if r not in desert]
+        for r in reqs + ([None] if paid else []) + desert:
+            if r is None:  # the Vault, after everything else and before the desert's items (it brings the bus)
+                self.pay_vault(paid, out, placed)
+                continue
             step, why = self.place(r, out.deadline)
             if step is None:
                 out.problems.append(why)
             else:
                 placed.append((step, r))
                 self.commit(step, r)  # provisionally, so later requirements see it
-        if paid:
-            res = self.result()
-            day = next((d.day for d in res.days if d.cash >= paid and self.result([(d.day, paid)]).lowest_from(d.day)
-                        >= 0), None)
-            if day is None or day > out.deadline:
-                out.problems.append(f"the Vault's {paid:,}g isn't there by {self.farm.label(out.deadline)}")
-            else:
-                self.spends.append((day, paid))
-                placed.append((Step(f"pay the Vault ({paid:,}g)", day, day, paid), Req("vault", day, day, [], 0)))
+        if self.vault_day is not None and oid == "cc":  # the bus is coming: slots only the desert fills
+            done = {st.label for st, _ in placed}
+            for r in self.bundle_reqs():
+                if r.label in done or not any(u.key == "place:Desert" for u in r.chain):
+                    continue
+                step, why = self.place(r, out.deadline)
+                if step:
+                    placed.append((step, r))
+                    self.commit(step, r)
+                    out.problems = [p for p in out.problems if not p.startswith(r.label)]
         out.steps = [s for s, _ in sorted(placed, key=lambda p: p[0].day)]
         out.finish = max((s.ready for s in out.steps), default=None)
         if out.problems:
@@ -233,6 +340,10 @@ class Router:
         if oid == "seed_maker" and not out.problems and out.finish:
             self.seed_maker_day = out.finish
         return out
+
+
+def _season(d: int) -> int:
+    return (d - 1) // 28
 
 
 def route(farm, targets: list[str], nice: list[str] = (), *, tiles: int = 60,
@@ -250,8 +361,10 @@ def route(farm, targets: list[str], nice: list[str] = (), *, tiles: int = 60,
         "tiles": tiles,
         "objectives": [{"id": o.id, "label": o.label, "tier": o.tier, "status": o.status,
                         "deadline": label(o.deadline), "finish": label(o.finish), "problems": o.problems,
-                        "steps": [{"what": s.label, "day": label(s.day), "ready": label(s.ready), "gold": s.gold,
-                                   "chop_days": len(s.chop_days)} for s in o.steps]} for o in outcomes],
+                        "steps": [{"what": s.label, "day": label(s.day), "ready": label(s.ready),
+                                   "gold": s.gold,
+                                   "chop_days": len(s.chop_days), "mine_days": len(s.mine_days)}
+                                  for s in o.steps]} for o in outcomes],
         "cash": [{"day": label(d.day), "cash": d.cash, "farming": d.level} for d in res.days if d.day % 7 == 1],
         "busy": {label(d): what for d, what in sorted(r.busy.items())},
     }
