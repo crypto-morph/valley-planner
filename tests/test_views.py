@@ -167,3 +167,17 @@ def test_cook_report():
             assert r["profit"] == r["sells"] - r["cost"]
         assert r["can"] <= min(i["have"] // i["need"] for i in r["ingredients"])
     assert v["total"] >= 0
+
+
+def test_cook_uses_cheapest_units_first():
+    """Dish by dish the cost can only rise: the cheapest units go first."""
+    from valley_planner.app import Planner
+    from valley_planner.views import cook
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    for r in cook.view(farm)["now"]:
+        if r["profit"] is not None and r["worst"] is not None:
+            assert r["worst"] <= r["profit"]
+            assert r["worth"] <= r["can"]

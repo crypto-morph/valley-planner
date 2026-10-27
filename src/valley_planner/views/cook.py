@@ -2,16 +2,17 @@
 
 From the game's data at runtime: Data/CookingRecipes ("ingredients/unused/output/how it's learned/name": an
 ingredient is an item id and count, or a negative category such as -5 any egg, -6 any milk, -4 any fish), the
-dish's sale price (shipping bin or Pierre, the same price), and today's shop prices. An ingredient you hold is
-costed at what you'd get for selling it instead (what cooking gives up); one you don't is costed at the cheapest
-shop price today, or marked as not for sale. Cooking takes ingredients from your backpack and fridge, so items
-in chests have to be moved first.
+dish's sale price (shipping bin or Pierre, the same price), and today's shop prices. Cooking takes any quality, so
+each dish is costed with the cheapest units you hold, at what they'd sell for instead (what cooking gives up):
+the first dish uses the cheapest, the last the dearest, so a recipe can pay for a few and then stop. An
+ingredient you don't hold is costed at the cheapest shop price today, or marked as not for sale. Cooking takes
+ingredients from your backpack and fridge, so items in chests have to be moved first.
 """
 
 from __future__ import annotations
 
 from ..engine.unlocks import Unlocks
-from ..facts.sell import sell_price
+from ..facts.sell import item_sell_price, sell_price
 from .farm import REGULAR_SEED_SHOPS, Farm
 
 CATEGORIES = {-4: "any fish", -5: "any egg", -6: "any milk", -7: "any cooking item", -75: "any vegetable",
@@ -19,7 +20,7 @@ CATEGORIES = {-4: "any fish", -5: "any egg", -6: "any milk", -7: "any cooking it
 
 
 def view(farm: Farm) -> dict:
-    s, held = farm.save, farm.held()
+    s = farm.save
     objects = farm.data.asset("Data/Objects") or {}
     unlocks = Unlocks(farm)
 
@@ -36,10 +37,22 @@ def view(farm: Farm) -> dict:
             if oid not in buy or o.price < buy[oid][0]:
                 buy[oid] = (o.price, o.shop)
 
-    def held_of(cat: int) -> list[tuple[str, int]]:  # held items of a category, cheapest first
-        items = [(q[3:], n) for q, n in held.items() if q.startswith("(O)")
-                 and (objects.get(q[3:]) or {}).get("Category") == cat]
-        return sorted(items, key=lambda x: value(x[0]))
+    # every unit you hold, at what it would sell for (its own quality): cooking takes any quality, so you'd use
+    # the cheapest first
+    units: dict[str, list[tuple[int, str]]] = {}
+    for it in s.items:
+        if it.qualified_id.startswith("(O)") and not it.preserve:
+            o = objects.get(it.id) or {}
+            v = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin, data_price=int(o.get("Price") or 0))
+            units.setdefault(it.id, []).extend([(v, it.id)] * min(it.stack, 999))
+
+    def stock(iid: str) -> list[tuple[int, str]]:  # (value, item id), cheapest first
+        if iid.lstrip("-").isdigit() and int(iid) < 0:
+            cat = int(iid)
+            out = [u for oid, us in units.items() if (objects.get(oid) or {}).get("Category") == cat for u in us]
+        else:
+            out = list(units.get(iid, []))
+        return sorted(out)
 
     kitchen = s.house_upgrade >= 1
     from ..engine import cc
@@ -52,38 +65,45 @@ def view(farm: Farm) -> dict:
         dish = out[0]
         made = int(out[1]) if len(out) > 1 else 1
         each = value(dish)
-        ingredients, cost, can, sure = [], 0, 10 ** 6, True
+        ingredients, can, sure, stocks = [], 10 ** 6, True, []
         for i in range(0, len(parts) - 1, 2):
             iid, need = parts[i], int(parts[i + 1])
-            if iid.lstrip("-").isdigit() and int(iid) < 0:
-                options = held_of(int(iid))
-                have = sum(n for _, n in options)
-                unit = value(options[0][0]) if options else None
-                label = CATEGORIES.get(int(iid), "any of a kind") + (f" ({farm.name('(O)' + options[0][0])})"
-                                                                     if options else "")
-                price = None
+            have_units = stock(iid)
+            category = iid.lstrip("-").isdigit() and int(iid) < 0
+            price = None if category else buy.get(iid, (None, ""))[0]
+            if category:
+                label = CATEGORIES.get(int(iid), "any of a kind") + (
+                    f" ({farm.name('(O)' + have_units[0][1])})" if have_units else "")
             else:
-                have = held.get(f"(O){iid}", 0)
-                price, shop = buy.get(iid, (None, ""))
-                unit = value(iid) if have else price
                 label = farm.name(f"(O){iid}")
-            if unit is None:
+            if not have_units and price is None:
                 sure = False
-            else:
-                cost += unit * need
-            can = min(can, have // need)
-            ingredients.append({"name": label, "need": need, "have": have, "each": unit,
-                                "buy": price if price is not None else None})
+            can = min(can, len(have_units) // need)
+            stocks.append((need, have_units, price))
+            ingredients.append({"name": label, "need": need, "have": len(have_units),
+                                "each": have_units[0][0] if have_units else price, "buy": price})
+        can = can if can < 10 ** 6 else 0
+        # dish by dish, each using the cheapest units left: the first is the best deal, the last the worst
+        gains = []
+        if sure:
+            for k in range(max(1, can)):
+                cost_k = 0
+                for need, have_units, price in stocks:
+                    take = have_units[k * need:(k + 1) * need]
+                    cost_k += sum(v for v, _ in take) + (need - len(take)) * (price or 0)
+                gains.append(each * made - cost_k)
+        cost = each * made - gains[0] if gains else None
         learn = unlocks.get(f"recipe:{name}")
-        profit = each * made - cost if sure else None
+        profit = gains[0] if gains else None
         wanted = [f"the {bundles[f'(O){dish}']} bundle"] if f"(O){dish}" in bundles else []
         wanted += [f"the quest {quests[f'(O){dish}']}"] if f"(O){dish}" in quests else []
         rows.append({"name": farm.name(f"(O){dish}"), "recipe": name, "known": name in s.cooking_recipes,
                      "wanted": wanted,
                      "learn": "" if name in s.cooking_recipes else (learn.how or "") + (
                          f" ({learn.gold:,}g)" if learn.gold else ""),
-                     "sells": each * made, "cost": cost if sure else None, "profit": profit,
-                     "can": can if can < 10 ** 6 else 0, "ingredients": ingredients})
+                     "sells": each * made, "cost": cost, "profit": profit,
+                     "worst": gains[can - 1] if can > 1 else profit, "worth": sum(1 for g in gains[:can] if g > 0),
+                     "gain_all": sum(g for g in gains[:can] if g > 0), "can": can, "ingredients": ingredients})
     rows.sort(key=lambda r: (not r["known"], -(r["profit"] or -10 ** 6) * max(1, r["can"]) if r["can"] else 0,
                              -(r["profit"] if r["profit"] is not None else -10 ** 6)))
     cook_now = [r for r in rows if r["known"] and r["can"] and ((r["profit"] or 0) > 0 or r["wanted"])]
@@ -91,5 +111,5 @@ def view(farm: Farm) -> dict:
             "now": cook_now, "known": [r for r in rows if r["known"] and r not in cook_now],
             "learn": sorted([r for r in rows if not r["known"] and (r["profit"] or 0) > 0],
                             key=lambda r: -(r["profit"] or 0))[:15],
-            "total": sum(r["profit"] * r["can"] for r in cook_now if (r["profit"] or 0) > 0),
+            "total": sum(r["gain_all"] for r in cook_now),
             "losers": sum(1 for r in rows if r["known"] and r["profit"] is not None and r["profit"] < 0)}

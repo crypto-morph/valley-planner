@@ -549,11 +549,12 @@ const views = {
       "A dish sells for the same at the shipping bin or Pierre's. Cooking uses your backpack and fridge, so move ingredients out of chests first." +
       (v.total ? ` Cooking the ones that gain makes about ${v.total.toLocaleString()}g more than selling their ingredients.` : "") +
       (v.losers ? ` ${v.losers} of your recipes sell for less than their ingredients: cook those for a bundle, a quest, a gift or the energy, not for gold.` : "");
-    const head = "<tr><th>Dish</th><th>Ingredients</th><th>Sells</th><th>Ingredients worth</th><th>Gain each</th><th>You can make</th></tr>";
+    const head = "<tr><th>Dish</th><th>Ingredients</th><th>Sells</th><th>Cheapest ingredients worth</th><th>Gain: first to last</th><th>You can make</th></tr>";
     const row = (r, extra) => `<tr><td><b>${esc(r.name)}</b>${r.wanted.length ? `<br><span class="also">for ${esc(r.wanted.join(", "))}</span>` : ""}</td><td>${ings(r)}</td>` +
-      `<td>${g(r.sells)}</td><td>${g(r.cost)}</td><td class="${(r.profit || 0) > 0 ? "ok" : "bad"}">${sign(r.profit)}</td><td>${extra(r)}</td></tr>`;
-    $("#cook-now").innerHTML = v.now.length ? head + v.now.map((r) => row(r, (x) => `${x.can}`)).join("") : '<tr><td class="sub">Nothing you can cook now beats selling its ingredients.</td></tr>';
-    $("#cook-known").innerHTML = head + v.known.map((r) => row(r, (x) => x.can ? `${x.can}` : "")).join("");
+      `<td>${g(r.sells)}</td><td>${g(r.cost)}</td><td class="${(r.profit || 0) > 0 ? "ok" : "bad"}">${sign(r.profit)}${r.worst != null && r.worst !== r.profit ? ` <span class="sub">to ${sign(r.worst)}</span>` : ""}</td><td>${extra(r)}</td></tr>`;
+    const makes = (x) => x.can ? `${x.can}${x.worth && x.worth < x.can ? ` <span class="sub">(${x.worth} for a gain)</span>` : ""}` : "";
+    $("#cook-now").innerHTML = v.now.length ? head + v.now.map((r) => row(r, makes)).join("") : '<tr><td class="sub">Nothing you can cook now beats selling its ingredients.</td></tr>';
+    $("#cook-known").innerHTML = head + v.known.map((r) => row(r, makes)).join("");
     $("#cook-learn").innerHTML = "<tr><th>Dish</th><th>Gain each</th><th>How to learn it</th></tr>" + v.learn.map((r) =>
       `<tr><td><b>${esc(r.name)}</b></td><td class="ok">${sign(r.profit)}</td><td>${esc(r.learn)}</td></tr>`).join("");
   },
