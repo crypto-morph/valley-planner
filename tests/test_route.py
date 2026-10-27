@@ -90,3 +90,23 @@ def test_more_goals():
     assert labels[-1].startswith("the wedding with") and "the Mermaid's Pendant" in labels
     pendant = next(st for st in m["steps"] if st["what"] == "the Mermaid's Pendant")
     assert {n["label"] for n in pendant["needs"]} >= {"the kitchen (house upgrade)", "repair the beach bridge"}
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_tech_tree():
+    """The tree: weekly columns from today, each lane's rows in week order without two cards in one week, cards
+    coloured by the days they have to spare, and a step two goals use names both."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    v = route(new_farm(GameData(GAME)), ["greenhouse"], ["cc"], tiles=80, cave="bats")
+    t = v["tree"]
+    assert t["columns"][0]["label"].startswith("Spring 1") and len(t["columns"]) == 16
+    for lane in t["lanes"]:
+        for row in lane["rows"]:
+            cols = [c["col"] for c in row]
+            assert cols == sorted(cols) and len(set(cols)) == len(cols)
+            assert all(c["urgency"] in ("plenty", "soon", "now", "daily", "shared") for c in row)
+    both = [x for x in t["synergy"] if {g["goal"] for g in x["goals"]} >= {"The greenhouse", "The Community Center"}]
+    assert both

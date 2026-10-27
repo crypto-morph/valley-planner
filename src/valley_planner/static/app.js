@@ -128,33 +128,6 @@ function saveRouteState() {
   try { localStorage.setItem("route", JSON.stringify({ goals: routeState.goals, cave: routeState.cave, start: routeState.start, settings: routeState.settings })); } catch { /* fine */ }
 }
 
-function drawGoals() {
-  const ol = $("#route-goals");
-  ol.innerHTML = routeState.goals.map((g, i) =>
-    `<li draggable="true" data-i="${i}" class="${g.tier === "off" ? "off" : ""}"><span class="grip" aria-hidden="true">⋮⋮</span>` +
-    `<span class="name">${esc(routeState.labels[g.id] || g.id)}</span>` +
-    `<select data-i="${i}" aria-label="How much it matters">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}" ${g.tier === k ? "selected" : ""}>${v}</option>`).join("")}</select></li>`
-  ).join("");
-  let from = null;
-  ol.querySelectorAll("li").forEach((li) => {
-    li.addEventListener("dragstart", () => { from = +li.dataset.i; li.classList.add("dragging"); });
-    li.addEventListener("dragend", () => li.classList.remove("dragging"));
-    li.addEventListener("dragover", (e) => e.preventDefault());
-    li.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const to = +li.dataset.i;
-      if (from === null || from === to) return;
-      const [g] = routeState.goals.splice(from, 1);
-      routeState.goals.splice(to, 0, g);
-      changed();
-    });
-  });
-  ol.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", () => {
-    routeState.goals[+sel.dataset.i].tier = sel.value;
-    changed();
-  }));
-}
-
 function drawSettings() {
   $("#route-settings").innerHTML = Object.entries(SETTING_LABELS).map(([k, label]) =>
     `<label for="rs-${k}">${esc(label)}</label><input id="rs-${k}" type="number" min="0" step="1" data-k="${k}" value="${routeState.settings[k]}">`
@@ -173,12 +146,10 @@ function drawSettings() {
 
 function changed(wait = 150) {
   saveRouteState();
-  drawGoals();
   clearTimeout(routeTimer);
   routeTimer = setTimeout(planRoute, wait);
 }
 
-const STATUS = { done: "Done", ok: "On track", luck: "Down to luck", impossible: "Can't, as things stand" };
 
 // The route's next week on the To-do: what to do each day, and which goal it's for.
 async function todoRoute() {
@@ -202,9 +173,10 @@ async function planRoute() {
   const body = { targets: goals.filter((g) => g.tier === "target").map((g) => g.id),
                  nice: goals.filter((g) => g.tier === "nice").map((g) => g.id),
                  cave: routeState.cave, start: routeState.start, settings: routeState.settings };
-  $("#route-results").innerHTML = '<p class="sub">Planning the year…</p>';
+  $("#route-tree").classList.add("busy");
   const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) { $("#route-results").innerHTML = `<p>Couldn't plan: ${esc(r.statusText)}</p>`; return; }
+  $("#route-tree").classList.remove("busy");
+  if (!r.ok) { $("#route-tree").innerHTML = `<p>Couldn't plan: ${esc(r.statusText)}</p>`; return; }
   const v = await r.json();
   const caveName = { bats: "fruit bats", mushrooms: "mushrooms" };
   $("#route-cave-note").textContent = (v.cave_options
@@ -212,73 +184,97 @@ async function planRoute() {
       v.cave_options.map((c) => `${caveName[c.cave]}: ${c.targets_ok} target${c.targets_ok === 1 ? "" : "s"}, ${c.nice_ok} nice-to-have${c.nice_ok === 1 ? "" : "s"}, ${c.end_cash.toLocaleString()}g at the year's end`).join("; ") + ")."
     : `Cave: ${caveName[v.cave] || v.cave}.`) + (v.cave_chosen ? " You've already chosen, so the plan uses it from today."
     : v.cave_day ? ` Demetrius makes his offer on ${v.cave_day}.` : " Demetrius's offer doesn't come this year.");
-  $("#route-results").innerHTML = v.objectives.length ? v.objectives.map((o) =>
-    `<div class="route-result ${esc(o.status)}"><h3>${esc(o.label)} <span class="sub">· ${o.tier === "target" ? "target" : "nice to have"}</span></h3>` +
-    `<div><b>${esc(STATUS[o.status] || o.status)}</b>${o.finish ? ` · done by ${esc(o.finish)}` : ""} · deadline ${esc(o.deadline)}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div>` +
-    routeTree(o) + "</div>"
-  ).join("") : '<p class="sub">Pick at least one goal.</p>';
+  drawTree(v);
   $("#route-cave").disabled = !!v.cave_chosen;
   if (v.cave_chosen) $("#route-cave").value = v.cave; else $("#route-cave").value = routeState.cave;
   $("#route-cave").title = v.cave_chosen ? "Your save has already chosen; it can't be changed" : "";
-  drawMatrix(v);
   drawCash(v);
 }
 
-// One goal as a tree: each thing it needs, and under it the steps to get it, in order.
-function routeTree(o) {
-  if (o.status === "done") return '<p class="sub">Already done in your save.</p>';
-  const g = (n) => `${n.toLocaleString()}g`;
-  const leaf = (cls, text, when) => `<li class="${cls}"><span>${text}</span>${when ? `<span class="when">${esc(when)}</span>` : ""}</li>`;
-  const item = (st) => {
-    if (st.shared) {
-      return `<li class="shared"><span>${esc(st.what)}</span><span class="when">in hand ${esc(st.ready)} · planned under ${esc(st.shared)}</span></li>`;
-    }
-    const kids = [];
-    const hard = st.needs.some((n) => n.materials.some((m) => m.endsWith(" Hardwood")));
-    if (st.chop_days) kids.push(leaf("chop", `${hard ? "Chop Wood and Hardwood (Secret Woods stumps)" : "Chop Wood"}: ${st.chop_days} day${st.chop_days === 1 ? "" : "s"}`, st.chop));
-    if (st.mine_days) kids.push(leaf("mine", `Go down the Mines: ${st.mine_days} day${st.mine_days === 1 ? "" : "s"}`, st.mine));
-    for (const n of st.needs) {
-      if (n.state === "done") kids.push(leaf("done", `${esc(cap(n.label))} <span class="sub">(you have it)</span>`, ""));
-      else if (n.state === "earlier") kids.push(leaf("earlier", `${esc(cap(n.label))} <span class="sub">(planned above)</span>`, n.ready ? `ready ${n.ready}` : ""));
-      else {
-        const cost = [n.gold ? g(n.gold) : "", ...n.materials].filter(Boolean).join(", ");
-        kids.push(leaf("new", `${esc(cap(n.label))}${cost ? ` <span class="cost">${esc(cost)}</span>` : ""}`, n.ready ? `ready ${n.ready}` : ""));
-      }
-    }
-    if (st.how) kids.push(leaf("get", esc(cap(st.how)), st.act || st.ready));
-    return `<li class="node"><details${kids.length > 1 ? " open" : ""}><summary><span>${esc(st.what)}</span>` +
-      `<span class="when">in hand ${esc(st.ready)}</span></summary><ul>${kids.join("")}</ul></details></li>`;
-  };
-  const misses = (o.misses || []).map((m) => `<li class="node miss"><span>✗ ${esc(m.what)}</span><span class="why">${esc(m.why)}</span></li>`);
-  const notes = (o.notes || []).map((p) => `<li class="node miss"><span>✗ ${esc(p)}</span></li>`)
-    .concat((o.info || []).map((p) => `<li class="info"><span class="sub">${esc(p)}</span></li>`));
-  const rows = o.steps.map(item).concat(misses, notes);
-  return rows.length ? `<ul class="route-tree">${rows.join("")}</ul>` : "";
-}
+// The route as a tech tree: a lane per goal, weekly columns from today, cards coloured by the days they have
+// to spare, and the goal at the end of each lane.
+const LANE_STATUS = { ok: "On track", luck: "Down to luck", impossible: "✕ Not this year", done: "Done" };
 
-// "Fall 22, Year 1" after "Fall 20, Year 1"?
-function laterThan(a, b) {
-  const n = (s) => { const m = /(\w+) (\d+), Year (\d+)/.exec(s); return m ? (+m[3] - 1) * 112 + ["Spring", "Summer", "Fall", "Winter"].indexOf(m[1]) * 28 + +m[2] : 0; };
-  return n(a) > n(b);
+function drawTree(v) {
+  const t = v.tree, n = t.columns.length;
+  const year = (/Year (\d+)/.exec(v.today) || [])[1];
+  const d = (s) => (s || "").replaceAll(`, Year ${year}`, "");
+  const objs = Object.fromEntries(v.objectives.map((o) => [o.id, o]));
+  const lanes = Object.fromEntries(t.lanes.map((l) => [l.id, l]));
+  const cols = `grid-template-columns: 212px repeat(${n}, 184px) 200px`;
+  const head = `<div class="tree-lane tree-head" style="${cols}"><div></div>` + t.columns.map((c, i) =>
+    `<div class="tcol${i === 0 ? " now" : ""}"><b>${esc(c.label)}</b><span class="${c.gold ? "due" : ""}">${i === 0 ? "This week · " : ""}${c.gold ? `${c.gold.toLocaleString()}g due` : "nothing to pay"}</span></div>`).join("") +
+    `<div class="tcol"><b>Goal</b><span>what it unlocks</span></div></div>`;
+  const tiers = (g) => `<div class="tiers" role="group" aria-label="How much ${esc(routeState.labels[g.id])} matters">` + Object.entries(TIERS).map(([k, label]) =>
+    `<button type="button" data-goal="${esc(g.id)}" data-tier="${k}" aria-pressed="${g.tier === k}">${label === "Nice to have" ? "Nice" : label}</button>`).join("") + "</div>";
+  const card = (c, row) => {
+    const helps = c.helps.length ? `<button type="button" class="helps">Helps ${c.helps.length} goals<span class="pop" role="tooltip">` +
+      c.helps.map((h) => `<b>${esc(h.goal)}</b> · ${esc(h.why)}`).join("<br>") + "</span></button>" : "";
+    const waits = c.waits.map((w) => `<div class="waits">${esc(d(w))}</div>`).join("");
+    return `<div class="tcard u-${esc(c.urgency)}${c.helps.length ? " multi" : ""}" style="grid-column: ${c.col + 2}; grid-row: ${row}">${helps}` +
+      `<div class="t-tag">${esc(c.tag)}</div><div class="t-ttl">${esc(c.title)}</div><div class="t-det">${esc(d(c.detail))}</div>${waits}</div>`;
+  };
+  const body = routeState.goals.map((g) => {
+    const name = esc(routeState.labels[g.id] || g.id);
+    const o = objs[g.id], lane = lanes[g.id];
+    const label = (status, extra = "") => `<div class="lane-head" draggable="true" data-goal="${esc(g.id)}" style="grid-row: 1 / span ${extra || 1}">` +
+      `<div class="lane-name"><span class="grip" aria-hidden="true">⋮⋮</span>${name}</div><div class="lane-status">${status}</div>${tiers(g)}</div>`;
+    if (g.tier === "off" || !o) {
+      return `<div class="tree-lane off" style="${cols}">${label('<span class="sub">Switched off</span>')}<div class="lane-note" style="grid-column: 2 / -1">Set it to Target or Nice to plan it and see what it moves.</div></div>`;
+    }
+    if (o.status === "done") {
+      return `<div class="tree-lane done" style="${cols}">${label('<b class="ok">✓ Done in your save</b>')}<div class="lane-note" style="grid-column: 2 / -1"></div></div>`;
+    }
+    const rows = lane ? lane.rows : [];
+    const misses = (o.misses || []).map((m) => `<div class="tcard u-x"><div class="t-tag">✕ ${/luck/.test(m.why) ? "LUCK" : "NOT THIS YEAR"}</div><div class="t-ttl">${esc(m.what)}</div><div class="t-det">${esc(d(m.why))}</div></div>`)
+      .concat((o.notes || []).map((p) => `<div class="tcard u-x"><div class="t-tag">✕ NOT THIS YEAR</div><div class="t-det">${esc(d(p))}</div></div>`));
+    const info = (o.info || []).map((p) => `<p class="sub">${esc(p)}</p>`).join("");
+    const span = Math.max(1, rows.length) + (misses.length || info ? 1 : 0);
+    const now = rows.some((r) => r.some((c) => c.urgency === "now"));
+    const status = o.status === "ok" ? `<b class="${now ? "bad" : "ok"}">${now ? "On track · act this week" : "On track"}</b>` : `<b class="x">${esc(LANE_STATUS[o.status] || o.status)}</b>`;
+    const tier = `<span class="sub">${g.tier === "target" ? "Target" : "Nice to have"}</span>`;
+    const rails = rows.map((r, i) => `<div class="rail" style="grid-column: ${r[0].col + 2} / ${n + 2}; grid-row: ${i + 1}"></div>`).join("");
+    const cards = rows.map((r, i) => r.map((c) => card(c, i + 1)).join("")).join("");
+    const goal = `<div class="tgoal ${o.status === "ok" ? "g-ok" : "g-x"}" style="grid-column: ${n + 2}; grid-row: 1 / span ${Math.max(1, rows.length)}">` +
+      `<div class="t-tag">${g.tier === "target" ? "GOAL · TARGET" : "GOAL"}</div><div class="t-ttl">${o.status === "ok" ? "" : "✕ "}${name}</div>` +
+      `<div class="t-det">${o.status === "ok" ? `ready ${esc(d(o.finish))}` : `not by ${esc(d(o.deadline))}`}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div></div>`;
+    const bottom = misses.length || info ? `<div class="lane-misses" style="grid-column: 2 / -1; grid-row: ${span}">${misses.join("")}${info}</div>` : "";
+    return `<div class="tree-lane" style="${cols}">${label(`${tier}<br>${status}`, span)}${rails}${cards}${goal}${bottom}</div>`;
+  }).join("");
+  $("#route-tree").innerHTML = head + body;
+  $("#route-chips").innerHTML = routeState.goals.filter((g) => g.tier !== "off" && objs[g.id]).map((g) => {
+    const o = objs[g.id];
+    const cls = o.status === "done" || o.status === "ok" ? "ok" : "x";
+    const when = o.status === "done" ? "done" : o.status === "ok" ? d(o.finish) : "not this year";
+    return `<span class="chip ${cls}">${o.status === "ok" || o.status === "done" ? "" : "✕ "}${esc(o.label)} · ${esc(when)}</span>`;
+  }).join("");
+  const syn = t.synergy || [];
+  $("#route-synergy-box").hidden = !syn.length;
+  $("#route-synergy").innerHTML = syn.map((x) => `<div class="syn"><b>${esc(cap(x.what))}</b> <span class="n">· ${x.goals.length} goals</span><br>` +
+    x.goals.map((h) => `${esc(h.goal)}: ${esc(h.why)}`).join(" · ") + "</div>").join("");
+  // tiers and priority, right on the lanes
+  document.querySelectorAll("#route-tree .tiers button").forEach((b) => b.addEventListener("click", () => {
+    const g = routeState.goals.find((x) => x.id === b.dataset.goal);
+    if (g && g.tier !== b.dataset.tier) { g.tier = b.dataset.tier; changed(); }
+  }));
+  let from = null;
+  document.querySelectorAll("#route-tree .lane-head").forEach((h) => {
+    h.addEventListener("dragstart", () => { from = h.dataset.goal; h.closest(".tree-lane").classList.add("dragging"); });
+    h.addEventListener("dragend", () => h.closest(".tree-lane").classList.remove("dragging"));
+    h.closest(".tree-lane").addEventListener("dragover", (e) => e.preventDefault());
+    h.closest(".tree-lane").addEventListener("drop", (e) => {
+      e.preventDefault();
+      const to = h.dataset.goal;
+      if (!from || from === to) return;
+      const goals = routeState.goals, i = goals.findIndex((x) => x.id === from);
+      const [moved] = goals.splice(i, 1);
+      goals.splice(goals.findIndex((x) => x.id === to), 0, moved);
+      changed();
+    });
+  });
 }
 
 function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
-
-function drawMatrix(v) {
-  const short = (w) => w.replace(", Year 1", "").replace("Spring", "Sp").replace("Summer", "Su").replace("Fall", "Fa").replace("Winter", "Wi");
-  const from = Math.max(0, v.weeks.filter((w) => !laterThan(w, v.today)).length - 1);  // from this week on
-  const head = "<tr><th class=\"row\">Goal</th>" + v.weeks.slice(from).map((w) => `<th>${esc(short(w))}</th>`).join("") + "</tr>";
-  const rows = v.matrix.map((m) => {
-    const o = v.objectives.find((x) => x.id === m.id);
-    return `<tr><th class="row">${esc(o ? o.label : m.id)}</th>` + m.cells.slice(from).map((c) => {
-      const days = Object.entries(c.days).map(([k, n]) => `${{ chop: "C", mine: "M", fish: "F" }[k] || k}${n}`).join(" ");
-      const tip = [c.buy.length ? `Buy: ${c.buy.join(", ")}` : "", c.ready.length ? `Arrives: ${c.ready.join(", ")}` : "", days ? `Days: ${days}` : ""].filter(Boolean).join("\n");
-      const cls = [(c.gold || days) ? "has" : "", c.ready.length ? "ready" : ""].filter(Boolean).join(" ");
-      return `<td class="${cls}" title="${esc(tip)}">${c.gold ? `<span class="g">${(c.gold / 1000).toFixed(c.gold < 10000 ? 1 : 0)}k</span>` : ""}${days ? esc(days) : ""}</td>`;
-    }).join("") + "</tr>";
-  }).join("");
-  $("#route-matrix").innerHTML = head + rows;
-}
 
 function drawCash(v) {
   const pts = v.cash;
@@ -324,7 +320,6 @@ const views = {
     if (!routeState) {
       routeState = loadRouteState(await get("/api/route/objectives"));
       drawSettings();
-      drawGoals();
     }
     await planRoute();
   },

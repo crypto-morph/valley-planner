@@ -140,42 +140,50 @@
     </section>
 
     <section id="view-route" class="view" hidden>
-      <div class="route-layout">
-        <section class="parch panel route-side">
-          <h2 class="sign">Your goals</h2>
-          <p class="sub">Drag to set the order. Targets must happen; nice-to-haves fit in around them.</p>
-          <ol id="route-goals" class="route-goals"></ol>
-          <h3>Start from</h3>
-          <select id="route-start">
-            <option value="save">Your save, from today</option>
-            <option value="fresh">A fresh farm, Spring 1</option>
-          </select>
-          <h3>The farm cave</h3>
-          <select id="route-cave">
-            <option value="best">Plan both, pick the better</option>
-            <option value="bats">Fruit bats</option>
-            <option value="mushrooms">Mushrooms</option>
-          </select>
-          <h3>Planning choices</h3>
-          <div id="route-settings" class="route-settings"></div>
-          <p class="sub">Prices and rules are the game's; these numbers are estimates you can change. From your save, a cave you've already chosen is kept.</p>
-        </section>
-        <div class="route-main">
-          <section class="parch panel">
-            <h2 class="sign">What you can achieve</h2>
-            <p class="sub" id="route-cave-note"></p>
-            <div id="route-results" class="route-results"></div>
-          </section>
-          <section class="parch panel">
-            <h2 class="sign">Week by week</h2>
-            <p class="sub">Gold due each week, and days spent chopping (C), mining (M) and fishing for bundles (F). Hover a cell for what's bought and what arrives.</p>
-            <div class="table-wrap"><table class="route-matrix" id="route-matrix"></table></div>
-          </section>
-          <section class="parch panel">
-            <h2 class="sign">Cash through the year</h2>
-            <div id="route-cash" class="route-cash"></div>
-          </section>
+      <section class="parch panel">
+        <h2 class="sign">Your route</h2>
+        <p class="sub">Each row is a goal. Read it left to right: do this, to unlock this, to get this. Set each goal to Target, Nice or Off, and drag a goal's name to change its priority.</p>
+        <div id="route-chips" class="route-chips"></div>
+        <div class="route-key" aria-label="How much time each step has">
+          <span class="tcard-key u-plenty">Plenty: 2+ weeks spare</span>
+          <span class="tcard-key u-soon">Soon: 1–2 weeks</span>
+          <span class="tcard-key u-now">Now: this week</span>
+          <span class="tcard-key u-x">✕ Not this year</span>
+          <span class="tcard-key u-shared">Planned in another row</span>
         </div>
+        <p class="sub" id="route-cave-note"></p>
+      </section>
+      <section class="parch panel">
+        <div class="tree-wrap"><div id="route-tree" class="tree"></div></div>
+      </section>
+      <section class="parch panel" id="route-synergy-box" hidden>
+        <h2 class="sign">Where your goals help each other</h2>
+        <p class="sub">One step, more than one goal: these move several goals forward together.</p>
+        <div id="route-synergy" class="route-synergy"></div>
+      </section>
+      <div class="two">
+        <section class="parch panel">
+          <h2 class="sign">Cash through the year</h2>
+          <div id="route-cash" class="route-cash"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">Planning choices</h2>
+          <div class="route-settings">
+            <label for="route-start">Start from</label>
+            <select id="route-start">
+              <option value="save">Your save, from today</option>
+              <option value="fresh">A fresh farm, Spring 1</option>
+            </select>
+            <label for="route-cave">The farm cave</label>
+            <select id="route-cave">
+              <option value="best">Plan both, pick the better</option>
+              <option value="bats">Fruit bats</option>
+              <option value="mushrooms">Mushrooms</option>
+            </select>
+          </div>
+          <div id="route-settings" class="route-settings"></div>
+          <p class="sub">Prices and rules are the game's; these numbers are estimates you can change.</p>
+        </section>
       </div>
     </section>
 
