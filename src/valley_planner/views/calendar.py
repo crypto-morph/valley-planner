@@ -31,6 +31,7 @@ def shop_hours(farm: Farm, ahead: int = 0) -> dict:
     for shop in SHOPS:
         d = farm.hours.day(shop, w, raining=raining, green_rain=ahead == 0 and farm.save.weather == "green rain",
                            stats=farm.save.stats)
-        rows.append({"shop": shop.name, "open": [f"{time_label(a)} – {time_label(b)}" for a, b in d.open],
+        rows.append({"id": shop.id, "shop": shop.name, "spans": [list(x) for x in d.open],
+                     "open": [f"{time_label(a)} – {time_label(b)}" for a, b in d.open],
                      "closed": d.closed_why or "", "sure": d.sure})
     return {"date": date_label(w.season, w.day, w.year), "shops": rows}

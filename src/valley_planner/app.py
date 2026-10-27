@@ -130,6 +130,15 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def morning_view() -> dict:
         return morning.view(p().farm())
 
+    @app.post("/api/morning")
+    def morning_with_route(ask: RouteAsk) -> dict:
+        """The morning, with the route's steps for today (the Route tab's goals) slotted into the day."""
+        from .engine.route.plan import route
+        farm, targets, nice, settings, cave = route_args(ask)
+        farm = p().farm()  # the morning is always the save's day
+        agenda = route(farm, targets, nice, settings=settings, cave=cave)["agenda"] if targets or nice else []
+        return morning.view(farm, agenda)
+
     @app.get("/api/plan")
     def plan_view(deadline: int | None = None) -> dict:
         return cc.plan(p().farm(), deadline)

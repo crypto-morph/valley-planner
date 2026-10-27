@@ -985,10 +985,10 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
     out: list[dict] = []
     end = today + AGENDA_DAYS
 
-    def add(d, kind, text, why, goal, gold=0):
+    def add(d, kind, text, why, goal, gold=0, shop=""):
         if today <= d < end:
             out.append({"n": d, "day": farm.label(d), "kind": kind, "text": text, "why": why, "goal": goal,
-                        "gold": gold})
+                        "gold": gold, "shop": shop})
 
     saving = None
     for o in outcomes:
@@ -1006,7 +1006,7 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
             for n in new:
                 cost = ", ".join(([f"{n['gold']:,}g"] if n["gold"] else []) + n["materials"])
                 text = n["label"][0].upper() + n["label"][1:] + (f": {cost}" if cost else "")
-                add(n["on"], "buy", text, f"for {st.label}", o.label, n["gold"])
+                add(n["on"], "buy", text, f"for {st.label}", o.label, n["gold"], _shop_for(n))
                 if n["gold"] and today <= n["on"] < today + 2 * AGENDA_DAYS and saving is None \
                         and farm.save.money < n["gold"]:
                     saving = (n, st, o)
@@ -1031,6 +1031,24 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
                     "why": f"you have {farm.save.money:,}g; it's for {st.label}", "goal": o.label, "gold": n["gold"]})
     out.sort(key=lambda a: (a["n"], a["kind"] != "save"))
     return out
+
+
+def _shop_for(n: dict) -> str:
+    """Where a step is bought or ordered: a shop id from the hours list, or "" for anywhere."""
+    key = n["key"]
+    if key.startswith(("building:", "kitchen", "house:")):
+        return "Carpenter"
+    if key.startswith("animal:"):
+        return "AnimalShop"
+    if key.startswith("tool:"):
+        return "Blacksmith"
+    if key == "bouquet" or "from Pierre" in n["label"]:
+        return "SeedShop"
+    for shop, words in (("Saloon", "the Saloon"), ("FishShop", "Willy"), ("SeedShop", "Pierre"),
+                        ("Carpenter", "Robin"), ("AnimalShop", "Marnie"), ("Blacksmith", "Clint")):
+        if words in (n.get("how") or ""):
+            return shop
+    return ""
 
 
 def _bare(label: str) -> str:

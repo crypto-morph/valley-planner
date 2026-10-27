@@ -371,6 +371,27 @@ function drawTree(v) {
 
 function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
+// The day from 6 AM to 2 AM: the suggested order, then each shop's hours, on one time axis
+function drawDay(d) {
+  const m = (t) => Math.floor(t / 100) * 60 + t % 100, a = m(d.from), z = m(d.to);
+  const x = (t) => ((m(t) - a) / (z - a) * 100).toFixed(2);
+  const w = (s, e) => ((m(e) - m(s)) / (z - a) * 100).toFixed(2);
+  const ticks = [[600, "6 AM"], [900, "9"], [1200, "noon"], [1500, "3 PM"], [1800, "6"], [2100, "9"], [2400, "midnight"], [2600, "2 AM"]];
+  const clock = (t) => { const h = Math.floor(t / 100) % 24, mm = t % 100; return `${(h + 11) % 12 + 1}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`; };
+  const timed = d.blocks.filter((b) => b.start != null), loose = d.blocks.filter((b) => b.start == null);
+  $("#m-day").innerHTML =
+    `<div class="dl-row dl-ticks"><span></span><div class="dl-track">${ticks.map(([t, l]) => `<span style="left:${x(t)}%">${l}</span>`).join("")}</div></div>` +
+    // the plan in order, each block as wide as its hours allow but never too narrow to read
+    `<div class="dl-row"><span class="dl-lab"><b>Your day</b></span><div class="dl-plan">` +
+    timed.map((b) => `<div class="dl-block u-${esc(b.urgency)}" style="flex:${m(b.end) - m(b.start)} 1 0">` +
+      `<span class="dl-when">${esc(`${clock(b.start)}–${clock(b.end)}`)}</span><b>${esc(b.title)}</b><span>${esc(b.lines.join(" · "))}</span></div>`).join("") + "</div></div>" +
+    (loose.length ? `<div class="dl-row"><span class="dl-lab"></span><div>${loose.map((b) => `<p class="bad"><b>${esc(b.title)}</b>: ${esc(b.lines.join(" · "))}</p>`).join("")}</div></div>` : "") +
+    `<div class="dl-row dl-head"><span class="dl-lab">Open today</span><span></span></div>` +
+    d.shops.map((s) => `<div class="dl-row dl-shop"><span class="dl-lab">${esc(s.name)} <span class="sub">${esc(s.label.replace(/:00/g, "").replace(/ – /g, "–").replace(/12 PM/g, "noon").replace(/12 AM/g, "midnight"))}</span></span><div class="dl-track">` +
+      s.spans.map(([o, c]) => `<span class="dl-bar" style="left:${x(o)}%;width:${w(o, c)}%"></span>`).join("") + "</div></div>").join("") +
+    (d.closed.length ? `<p class="sub">Shut today: ${esc(d.closed.map((c) => `${c.name} (${c.why})`).join("; "))}</p>` : "");
+}
+
 function drawCash(v) {
   const pts = v.cash;
   if (!pts.length) { $("#route-cash").innerHTML = ""; return; }
@@ -418,14 +439,22 @@ const views = {
   },
 
   async morning() {
-    const v = await get("/api/morning");
-    $("#m-date").textContent = v.date;
-    const cc = v.cc;
-    $("#m-glance").textContent = `${v.money.toLocaleString()}g · ${v.weather}, tomorrow ${v.tomorrow} · luck ${v.luck > 0.02 ? "good" : v.luck < -0.02 ? "bad" : "neutral"} · Community Center ${cc.bundles_done}/${cc.bundles} bundles, ` +
-      `${cc.counts.ok + cc.counts.have} slots on track, ${cc.counts.blocked} need an unlock, ${cc.counts.luck} on luck (by ${cc.deadline})` +
-      (cc.gold.gap ? ` · gold: about ${cc.gold.gap.toLocaleString()}g short of the plan` : " · gold: on pace");
-    $("#m-first").innerHTML = v.first.length ? list(v.first.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing urgent. A good day to fish, mine or make friends.</p>';
-    $("#m-week").innerHTML = list(v.week.map((e) => li(`<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`, esc(e.date))));
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    const r = await fetch("/api/morning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(routeBody(routeState, "save")) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+    const v = await r.json();
+    $("#m-date").textContent = `${v.weekday}, ${v.date.replace(/, Year \d+/, "")}`;
+    const w = v.weather_words;
+    $("#m-glance").innerHTML = `<span><b>${esc(cap(w.today))}</b>, ${esc(w.tomorrow)} tomorrow${w.note ? ` · ${esc(w.note)}` : ""}</span>` +
+      `<span>The spirits: <b>${esc(v.mood)}</b>${v.mood_means ? ` · ${esc(v.mood_means)}` : ""}</span><span><b>${v.money.toLocaleString()}g</b></span>`;
+    drawDay(v.day);
+    const shown = new Set(v.day.blocks.flatMap((b) => b.lines));
+    const notes = v.today.filter((x) => x.kind !== "dish" || !v.day.blocks.some((b) => b.title === "The Saloon"))
+      .concat(v.do.filter((x) => !shown.has(x.title) && !shown.has(`Pick: ${x.title}`)));
+    $("#m-first").innerHTML = notes.length ? list(notes.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing else today.</p>';
+    const byDate = [];
+    v.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
+    $("#m-week").innerHTML = list(byDate.map((d) => li(`<b>${esc(d.date)}</b>`, d.items.map((e) => `<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`).join(" · "))));
   },
 
   async todo() {

@@ -38,7 +38,8 @@ def luck_words(luck: float) -> tuple[str, str]:
     return "in good humour", "slightly better odds in the Mines"
 
 
-def view(farm: Farm) -> dict:
+def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
+    """`agenda`: the route's steps (from plan.route), so today's purchases and chopping join the day."""
     s, w = farm.save, farm.when
     held = farm.held()
     today: list[dict] = []
@@ -130,12 +131,87 @@ def view(farm: Farm) -> dict:
         for e in events:
             week.append({"date": farm.label(d.days_played).rsplit(",", 1)[0], "kind": e.kind, "label": e.label,
                          "sure": e.sure})
+    todays = [a for a in agenda or [] if a["n"] == w.days_played]
+    events = farm.calendar.day(w, today_days_played=w.days_played)
     return {"date": farm.label(w.days_played), "weekday": WEEKDAYS[(w.days_played - 1) % 7],
+            "day": _schedule(farm, do, todays, events), "route": todays,
             "weather": s.weather, "tomorrow": s.weather_tomorrow, "weather_words": weather,
             "money": s.money, "luck": s.daily_luck, "mood": mood, "mood_means": means,
             "today": today, "do": do, "first": today + do, "week": week,
             "cc": {"deadline": plan["deadline"], "counts": plan["counts"], "gold": plan["gold"],
                    "bundles_done": sum(b.done for b in farm.bundles.all), "bundles": len(farm.bundles.all)}}
+
+
+DAY_START, DAY_END, EVENING = 600, 2600, 2000
+ERRAND = 60  # minutes allowed for walking to a shop and back and doing the business (a planning choice)
+
+
+def _minutes(t: int) -> int:
+    return t // 100 * 60 + t % 100
+
+
+def _clock(m: int) -> int:
+    return m // 60 * 100 + m % 60
+
+
+def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
+    """A suggested order for the day: the farm first, then each errand inside its shop's hours (the earliest to
+    close first), then the spare hours for the route's chopping or for earning, then the evening. Shops open
+    today are listed with their hours. The order is a planning suggestion; the hours are the game's."""
+    hours = {x["id"]: x for x in farm.hours_today()}
+    blocks: list[dict] = []
+    chores = [x["title"] for x in do if x["kind"] == "crops" and not x["title"].startswith(tuple("0123456789"))]
+    chores = [c for c in chores if c.startswith(("Water", "Harvest"))]
+    chores += [f"Pick: {x['title']}" for x in do if x["kind"] == "cc" and " tree" in x["text"]]  # your own trees
+    t = _minutes(DAY_START)
+    fest = next((e for e in events if e.kind == "festival" and e.start), None)
+    if chores:
+        end = t + min(180, 60 + 30 * len(chores))
+        blocks.append({"start": _clock(t), "end": _clock(end), "title": "On the farm", "lines": chores,
+                       "urgency": "now" if any(c.startswith("Water") for c in chores) else "soon"})
+        t = end
+    errands = [(a["shop"], a["text"], "soon") for a in todays if a.get("shop")]
+    errands += [("Blacksmith", x["title"], "plenty") for x in do if x.get("errand") == "clint"]
+    dish = farm.save.dish_of_the_day
+    placed_shops = set()
+    for shop, text, urgency in sorted(errands, key=lambda e: (hours.get(e[0], {}).get("spans") or [[0, 9999]])[0][1]):
+        spans = (hours.get(shop) or {}).get("spans") or []
+        for a, b in spans:
+            start = max(t, _minutes(a))
+            if start + ERRAND <= _minutes(b) and not (fest and _minutes(fest.start) <= start < _minutes(fest.end)):
+                same = next((x for x in blocks if x.get("shop") == shop), None)
+                if same:
+                    same["lines"].append(text)
+                else:
+                    blocks.append({"start": _clock(start), "end": _clock(start + ERRAND),
+                                   "title": hours[shop]["shop"], "lines": [text], "urgency": urgency, "shop": shop})
+                    t = start + ERRAND
+                placed_shops.add(shop)
+                break
+        else:
+            name = hours.get(shop, {}).get("shop", shop)
+            blocks.append({"start": None, "end": None, "title": text, "lines": [f"{name} isn't open in time today"],
+                           "urgency": "now", "shop": shop})
+    if fest:
+        blocks.append({"start": fest.start, "end": fest.end, "title": fest.label,
+                       "lines": [farm.place(fest.detail)] if fest.detail else [], "urgency": "plenty"})
+    evening = _minutes(EVENING)
+    spare_end = min(evening, _minutes(fest.start)) if fest and _minutes(fest.start) > t else evening
+    if spare_end - t >= 60:
+        busy = [a["text"] for a in todays if a["kind"] in ("chop", "mine", "fish", "get")]
+        save = next((a for a in todays if a["kind"] == "save"), None)
+        lines = busy or ["fish, forage or mine for gold" + (f": {save['text'][0].lower()}{save['text'][1:]}"
+                                                           if save else "")]
+        blocks.append({"start": _clock(t), "end": _clock(spare_end), "title": "The route" if busy else "Spare",
+                       "lines": lines, "urgency": "soon" if busy else "spare"})
+    if dish and (hours.get("Saloon") or {}).get("spans"):
+        blocks.append({"start": EVENING, "end": EVENING + 100, "title": "The Saloon",
+                       "lines": [f"{farm.name(dish[0])}, today's dish ({dish[1]} this morning)"], "urgency": "plenty"})
+    shops = [{"id": x["id"], "name": x["shop"], "spans": x["spans"], "label": ", ".join(x["open"])}
+             for x in hours.values() if x["spans"]]
+    closed = [{"name": x["shop"], "why": x["closed"]} for x in hours.values() if not x["spans"] and x["closed"]]
+    blocks.sort(key=lambda b: (b["start"] is None, b["start"] or 0))
+    return {"from": DAY_START, "to": DAY_END, "blocks": blocks, "shops": shops, "closed": closed}
 
 
 def _cart(farm: Farm) -> dict:

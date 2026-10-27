@@ -174,3 +174,27 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 button.ncard { font-family: inherit; color: inherit; text-align: left; cursor: pointer; }
 button.ncard:hover { box-shadow: 0 0 0 3px #A9CBD9; }
 .linkish { font: inherit; font-size: 0.8rem; border: 0; background: none; color: #2E6E8E; text-decoration: underline; cursor: pointer; padding: 0.3rem 0; }
+
+/* Morning: the day on one time axis */
+.m-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 1.5rem; }
+.m-glance { display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; color: var(--muted); }
+.m-glance b { color: var(--ink); }
+.dayline-wrap { overflow-x: auto; margin-top: 0.8rem; }
+.dayline { min-width: 760px; padding: 0.8rem 1rem; background: var(--panel); border: 2px solid var(--line); border-radius: 14px; }
+.dl-row { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0.8rem; align-items: center; min-height: 1.6rem; }
+.dl-lab { font-size: 0.9rem; }
+.dl-head .dl-lab { margin-top: 0.8rem; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); }
+.dl-track { position: relative; height: 1.4rem; }
+.dl-ticks .dl-track span { position: absolute; transform: translateX(-50%); font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.dl-ticks .dl-track span:first-child { transform: none; }
+.dl-ticks .dl-track span:last-child { transform: translateX(-100%); }
+.dl-plan { display: flex; gap: 6px; margin: 0.4rem 0; padding-left: 6px; border-left: 3px solid var(--accent); }
+.dl-block { min-width: 8.5rem; box-sizing: border-box; padding: 0.4rem 0.6rem; border-radius: 10px;
+            font-size: 0.8rem; line-height: 1.3; display: flex; flex-direction: column; gap: 0.1rem; }
+.dl-when { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; color: var(--muted); }
+.dl-block b { font-size: 0.85rem; }
+.u-spare { background: var(--panel-2); border: 2px dashed var(--line); color: var(--muted); }
+.u-spare b { color: var(--ink); }
+.dl-bar { position: absolute; top: 0.35rem; height: 0.7rem; border-radius: 0.35rem; background: var(--line); }
+.dl-hours { position: absolute; top: 0.05rem; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.dl-shop .dl-lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

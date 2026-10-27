@@ -70,3 +70,22 @@ def test_place_and_shop_names():
     assert _shop_label("SeedShop") == "Pierre's"
     assert _shop_label("Festival_EggFestival_Pierre") == "Pierre at the Egg Festival"
     assert _shop_label("DesertFestival_Jas") == "Jas at the Desert Festival"
+
+
+def test_morning_day_fits_shop_hours():
+    """The suggested day: blocks in order, each errand inside its shop's hours."""
+    from valley_planner.app import Planner
+    from valley_planner.views import morning
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    agenda = [{"n": farm.when.days_played, "kind": "buy", "text": "Buy a Duck: 1,200g", "why": "", "goal": "",
+               "gold": 1200, "shop": "AnimalShop"}]
+    day = morning.view(farm, agenda)["day"]
+    timed = [b for b in day["blocks"] if b["start"] is not None]
+    assert [b["start"] for b in timed] == sorted(b["start"] for b in timed)
+    hours = {s["id"]: s["spans"] for s in day["shops"]}
+    for b in timed:
+        if b.get("shop") in hours:
+            assert any(a <= b["start"] and b["end"] <= z for a, z in hours[b["shop"]])
