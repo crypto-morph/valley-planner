@@ -18,6 +18,7 @@ from .start import START_SEEDS
 
 YEAR_DAYS = 112
 RESERVE_DAYS = 7
+FLOAT = 500  # planning choice: cash never spent on seeds, so a day's lost income can't sink a planned purchase
 GREENHOUSE_TILES = 120
 
 
@@ -62,8 +63,11 @@ class Farmsim:
         return self._rates[key]
 
     def run(self, spends: list[tuple[int, int]], *, seed_maker_day: int | None = None,
-            greenhouse_day: int | None = None, days: int = YEAR_DAYS) -> Result:
-        """`spends`: (day, gold) bought that morning."""
+            greenhouse_day: int | None = None, days: int = YEAR_DAYS, income: dict[int, int] | None = None,
+            xp: dict[int, int] | None = None) -> Result:
+        """`spends`: (day, gold) bought that morning; `income` / `xp`: extra gold arriving and XP earned by day
+        (animal produce, fishing, petting)."""
+        income, extra_xp = income or {}, xp or {}
         crops = self.farm.crops
         cash, xp = self.start_cash, 0
         due: dict[int, int] = {}
@@ -74,7 +78,7 @@ class Farmsim:
         out = Result()
         parsnip = crops.by_seed.get("472")
         for d in range(1, days + 1):
-            cash += pay.pop(d, 0)
+            cash += pay.pop(d, 0) + income.get(d, 0)
             cash -= due.get(d, 0)
             season = season_of(d)
             season_end = ((d - 1) // 28 + 1) * 28
@@ -88,7 +92,7 @@ class Farmsim:
             if d == 1 and parsnip:  # the 15 Parsnip Seeds you start with
                 growing.append(self._planting(parsnip, d, START_SEEDS, season_end, False))
             free_seeds = seed_maker_day is not None and d >= seed_maker_day
-            reserve = sum(g for x, g in due.items() if d < x <= d + RESERVE_DAYS)
+            reserve = FLOAT + sum(g for x, g in due.items() if d < x <= d + RESERVE_DAYS)
             outdoor_used = sum(g[4] for g in growing if not g[7])
             r = self.rate(season, free_seeds) if season != "winter" else None
             if r and outdoor_used < self.tiles and d + r.first_harvest <= season_end:
@@ -110,6 +114,7 @@ class Farmsim:
                     if n > 0:
                         cash -= n * price
                         growing.append(self._planting_rate(gr, d, n, YEAR_DAYS * 2, True))
+            xp += extra_xp.get(d, 0)
             out.days.append(Day(d, cash, xp, outdoor_used, level_for(xp)))
         return out
 

@@ -119,7 +119,7 @@ class Planner:
                 blocked.append("a kitchen (the first house upgrade)")
                 keys.append("kitchen")
         way = self._way(src, item, blocked)
-        way.unlocks = keys
+        way.unlocks = keys + way.unlocks
         return way
 
     def _way(self, src: Source, item: str, blocked: list[str]) -> Way:
@@ -175,10 +175,13 @@ class Planner:
                 days = [d for d in range(ready, self.deadline + 1) if src.in_season(_season_of(d))]
                 if days:
                     return Way(src, days[0], days[-1], blocked)
+        sapling = src.inputs[0][0] if src.inputs else ""
         days = [d for d in range(self.today + 28, self.deadline + 1) if src.in_season(_season_of(d))]
         if days:
-            return Way(src, days[0], days[-1] - 0, [*blocked, f"planting a {src.label[:-5]} by "
-                                                     f"{self.farm.label(days[0] - 28)}"])
+            way = Way(src, days[0], days[-1], [*blocked, f"planting a {src.label[:-5]} by "
+                                                         f"{self.farm.label(days[-1] - 28)}"])
+            way.unlocks = [f"sapling:{sapling}"]
+            return way
         return Way(src, None, None, [*blocked, f"a {src.label[:-5]} planted a season earlier"])
 
     def _buyable_days(self, seed: str) -> set[int]:

@@ -86,6 +86,13 @@ class Unlocks:
             return Unlock(key, f"a {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {tool} from Clint",
                           TOOL_PRICES[lvl], [(TOOL_BARS[lvl], 5)], TOOL_DAYS,
                           [f"tool:{tool}@{lvl - 1}"] if lvl > 1 else [], done=have >= lvl)
+        if kind == "sapling":
+            price = next((int(e.get("Price") or 0) for e in (self.data.asset("Data/Shops").get("SeedShop") or {})
+                          .get("Items") or [] if e.get("ItemId") == f"(O){what}" and not e.get("Condition")), 0)
+            name = self.farm.name(f"(O){what}")
+            have = any(t.get("sapling_id") == what for t in getattr(s, "fruit_trees", []))
+            return Unlock(key, f"plant a {name}", price, [], 28, how="" if price else "no shop sells it",
+                          done=have)
         if kind == "floor":
             deepest = max(getattr(s, "mine_lowest", 0), getattr(s, "deepest_mine_level", 0))
             return Unlock(key, f"reach Mines floor {what}", how="mining", done=deepest >= int(what))
