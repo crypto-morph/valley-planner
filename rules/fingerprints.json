@@ -172,6 +172,7 @@
  "StardewValley.Menus.Bundle.getReward": "26ff107c9f87d81e1d7f723ef61cc099d0857a3f7f6aaa5a703f284caf471f87",
  "StardewValley.Menus.Bundle.tryToDepositThisItem": "0f82335e7b826ae06066675fb50118da772c1c438b550a18d98d17cd1970ce45",
  "StardewValley.Menus.BundleIngredientDescription.BundleIngredientDescription": "46561c8e69c59587da3753a432631584bf2a37a1a0b6f22b92ebb51a2f29e8a6",
+ "StardewValley.Menus.CraftingPage.clickCraftingRecipe": "8d1aecf25079293ee1ab5b2dda6915167592402e3c073da2ff0841643c13996a",
  "StardewValley.Menus.DiscreteColorPicker.getColorFromSelection": "c60e39f3c0d61f90152e4795e90edb39425e8e61000d53649bb2b73ad1b0798e",
  "StardewValley.Menus.JojaCDMenu.getPriceFromButtonNumber": "89c8507278629e50a7d727dd45a4dee43a2df76c9694b7d69c682d4dcdc6f692",
  "StardewValley.Menus.JojaCDMenu.receiveLeftClick": "4ffd9868bd88a5de669aafe4fd9a14d5ae9dd1adc41a2fd46331439c7262a858",

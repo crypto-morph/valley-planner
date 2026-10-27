@@ -555,6 +555,15 @@ const views = {
     const makes = (x) => x.can ? `${x.can}${x.worth && x.worth < x.can ? ` <span class="sub">(${x.worth} for a gain)</span>` : ""}` : "";
     $("#cook-now").innerHTML = v.now.length ? head + v.now.map((r) => row(r, makes)).join("") : '<tr><td class="sub">Nothing you can cook now beats selling its ingredients.</td></tr>';
     $("#cook-known").innerHTML = head + v.known.map((r) => row(r, makes)).join("");
+    const Q = [[0, "Normal"], [1, "Silver"], [2, "Gold"], [4, "Iridium"]];
+    $("#cook-quality").innerHTML = `<tr><th>Dish</th><th>Sells</th>${Q.map(([, n]) => `<th>${n}</th>`).join("")}<th>Cook with</th></tr>` +
+      v.now.concat(v.known).map((r) => {
+        const ok = Q.filter(([q]) => (r.by_quality[q] ?? -1) > 0).map(([, n]) => n.toLowerCase());
+        const advice = !ok.length ? "never for gold: sell the ingredients" : ok.length === 4 ? "any quality" : `${ok[0]}${ok.length > 1 ? ` to ${ok[ok.length - 1]}` : ""} only`;
+        return `<tr><td><b>${esc(r.name)}</b></td><td>${g(r.sells)}</td>` +
+          Q.map(([q]) => { const x = r.by_quality[q]; return `<td class="${x == null ? "" : x > 0 ? "ok" : "bad"}">${x == null ? "?" : sign(x)}</td>`; }).join("") +
+          `<td>${esc(advice)}</td></tr>`;
+      }).join("");
     $("#cook-learn").innerHTML = "<tr><th>Dish</th><th>Gain each</th><th>How to learn it</th></tr>" + v.learn.map((r) =>
       `<tr><td><b>${esc(r.name)}</b></td><td class="ok">${sign(r.profit)}</td><td>${esc(r.learn)}</td></tr>`).join("");
   },

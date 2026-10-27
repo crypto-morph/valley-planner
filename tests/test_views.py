@@ -181,3 +181,16 @@ def test_cook_uses_cheapest_units_first():
         if r["profit"] is not None and r["worst"] is not None:
             assert r["worst"] <= r["profit"]
             assert r["worth"] <= r["can"]
+
+
+def test_cook_quality_columns_only_fall():
+    """A dish has no quality, so better ingredients can only lower the gain."""
+    from valley_planner.app import Planner
+    from valley_planner.views import cook
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    for r in cook.view(farm)["known"]:
+        q = [r["by_quality"][k] for k in (0, 1, 2, 4) if r["by_quality"][k] is not None]
+        assert q == sorted(q, reverse=True)

@@ -12728,6 +12728,20 @@
    ],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "cook.quality",
+   "area": "Food",
+   "summary": "A cooked dish is normal quality; with Qi Seasoning in the backpack or fridge one is used up and the dish is gold. Ingredients of any quality match a recipe, and cooking takes them from the backpack's last slot backwards, then the fridge and other added containers, not the cheapest first. Data/CookingRecipes: ingredients (id or negative category, count) / unused / output id [count] / how learned.",
+   "checked_against": [
+    "StardewValley.Menus.CraftingPage.clickCraftingRecipe",
+    "StardewValley.CraftingRecipe.consumeIngredients"
+   ],
+   "data": [
+    "Data/CookingRecipes"
+   ],
+   "status": "verified",
+   "refs": []
   }
  ]
 }
