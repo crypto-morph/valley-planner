@@ -168,20 +168,33 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return {"objectives": [{"id": k, "label": v[0]} for k, v in CATALOG.items()],
                 "settings": Settings().__dict__, "spouses": spouses}
 
+    def route_args(ask: RouteAsk) -> tuple:
+        """(farm, targets, nice, settings, cave) from the page's ask, unknown goals and settings dropped."""
+        from .engine.route.plan import CATALOG, Settings
+        from .engine.route.start import new_farm
+        known = set(CATALOG)
+        kinds = {k: type(v) for k, v in Settings().__dict__.items()}
+        settings = Settings(**{k: kinds[k](v) for k, v in ask.settings.items() if k in kinds})
+        cave = ask.cave if ask.cave in ("best", "bats", "mushrooms") else "best"
+        farm = p().farm() if ask.start == "save" and p().path() is not None else new_farm(p().data)
+        return (farm, [t for t in ask.targets if t in known],
+                [n for n in ask.nice if n in known and n not in ask.targets], settings, cave)
+
     @app.post("/api/route")
     def route_view(ask: RouteAsk) -> dict:
         """The rest of this year (from the save, or a fresh farm) planned for these targets (in order) and
         nice-to-haves (in order)."""
-        from .engine.route.plan import CATALOG, Settings, route
-        from .engine.route.start import new_farm
-        known = set(CATALOG)
-        allowed = {k for k in Settings().__dict__}
-        kinds = {k: type(v) for k, v in Settings().__dict__.items()}
-        settings = Settings(**{k: kinds[k](v) for k, v in ask.settings.items() if k in allowed})
-        cave = ask.cave if ask.cave in ("best", "bats", "mushrooms") else "best"
-        farm = p().farm() if ask.start == "save" and p().path() is not None else new_farm(p().data)
-        return route(farm, [t for t in ask.targets if t in known],
-                     [n for n in ask.nice if n in known and n not in ask.targets], settings=settings, cave=cave)
+        from .engine.route.plan import route
+        farm, targets, nice, settings, cave = route_args(ask)
+        return route(farm, targets, nice, settings=settings, cave=cave)
+
+    @app.post("/api/needs")
+    def needs_view(ask: RouteAsk) -> dict:
+        """Everything these goals take, added up: gold, materials and days, what each is for, and every way
+        to get the items that have more than one."""
+        from .engine.route.needs import needs
+        farm, targets, nice, settings, cave = route_args(ask)
+        return needs(farm, targets, nice, settings=settings, cave=cave)
 
     @app.get("/api/ask")
     def ask_search(q: str = "") -> dict:
