@@ -22,11 +22,21 @@ from ..unlocks import Unlock
 from .simulate import YEAR_DAYS, Farmsim
 
 WOOD, STONE, HARDWOOD = "388", "390", "709"
-WOOD_PER_DAY = 100  # planning choice: Wood from a day spent chopping
-FLOORS_PER_DAY = 8  # planning choice: Mines floors gained in a day spent mining
-HARDWOOD_PER_DAY = 12  # planning choice: the Secret Woods' six large stumps, two Hardwood each
-FISH_GOLD_PER_DAY = 300  # planning choice: a spare day spent fishing, sold at normal quality
-MINE_GOLD_PER_DAY = 200  # planning choice: ore, gems, geodes and minerals sold from a day in the Mines
+@dataclass
+class Settings:
+    """The planning choices, all tunable from the page."""
+    tiles: int = 80  # tiles farmed
+    wood_per_day: int = 100  # Wood from a day spent chopping
+    floors_per_day: int = 8  # Mines floors gained in a day spent mining
+    hardwood_per_day: int = 12  # the Secret Woods' six large stumps, two Hardwood each
+    fish_gold: int = 300  # a spare day spent fishing, sold at normal quality
+    mine_gold: int = 200  # ore, gems, geodes and minerals sold from a day in the Mines
+    float: int = 500  # cash never spent on seeds
+
+
+WOOD_PER_DAY = Settings.wood_per_day
+FLOORS_PER_DAY = Settings.floors_per_day
+
 MINES_OPEN = 5  # the landslide clears on day 5
 BOUGHT = {"334": 5 * 75 + 150, "335": 5 * 150 + 150, "336": 5 * 400 + 150, "382": 150,  # Clint, Year 1
           "378": 75, "380": 150, "384": 400}
@@ -77,12 +87,14 @@ class Req:
 
 
 class Router:
-    def __init__(self, farm, *, tiles: int = 60, cave: str | None = None):
+    def __init__(self, farm, *, settings: Settings | None = None, cave: str | None = None):
         self.farm = farm
+        self.s = settings or Settings()
         self.cave = cave  # "bats" / "mushrooms" / None (not chosen yet)
-        self.sim = Farmsim(farm, tiles=tiles)
+        self.sim = Farmsim(farm, tiles=self.s.tiles, float_gold=self.s.float)
         self.spends: list[tuple[int, int]] = []
-        self.busy: dict[int, str] = {}  # day -> what it's spent on
+        self.busy: dict[int, tuple[str, str]] = {}  # day -> (what it's spent on, for which objective)
+        self.current = ""  # the objective being placed
         self.have: dict[str, int] = {}  # unlock key -> day it's ready
         self.seed_maker_day: int | None = None
         self.greenhouse_day: int | None = None
@@ -116,13 +128,13 @@ class Router:
                 income[d + 1] = income.get(d + 1, 0) + round(each)
                 xp[d] = xp.get(d, 0) + 5
         for d in range(2, YEAR_DAYS + 1):  # the rod arrives on day 2
-            what = self.busy.get(d, "fish")
+            what = self.busy.get(d, ("fish", ""))[0]
             if d in self.festivals:
                 continue
             if what == "fish" and (d - 1) // 28 % 4 != 3:
-                income[d + 1] = income.get(d + 1, 0) + FISH_GOLD_PER_DAY
+                income[d + 1] = income.get(d + 1, 0) + self.s.fish_gold
             elif what == "mine":
-                income[d + 1] = income.get(d + 1, 0) + MINE_GOLD_PER_DAY
+                income[d + 1] = income.get(d + 1, 0) + self.s.mine_gold
         return income, xp
 
     def _festival(self, d: int) -> bool:
@@ -232,7 +244,7 @@ class Router:
         if hardwood:  # Hardwood comes from stumps, which need a Steel Axe
             axe = [u for u in self.planner.unlocks.chain("tool:Axe@2") if u.key not in self.have]
             chain = axe + [u for u in chain if u.key not in {a.key for a in axe}]
-            wood += math.ceil(hardwood / HARDWOOD_PER_DAY) * WOOD_PER_DAY
+            wood += math.ceil(hardwood / self.s.hardwood_per_day) * self.s.wood_per_day
         for u in chain:
             if u.key in self.have or u.done:
                 continue
@@ -267,7 +279,7 @@ class Router:
                 if any(h in u.how or h in u.label for h in HARD):
                     problems.append(f"{u.label}: {u.how}")
                 # other recipes (letters, events, Clint's Furnace): assumed to come in time
-        return gold, math.ceil(wood / WOOD_PER_DAY) if wood else 0, gates, problems
+        return gold, math.ceil(wood / self.s.wood_per_day) if wood else 0, gates, problems
 
     def place(self, req: Req, deadline: int) -> tuple[Step | None, str]:
         if req.luck is not None:
@@ -338,7 +350,7 @@ class Router:
         before = dict(self.busy)
         base = min(x.cash for x in self.result().days)
         for d in days:
-            self.busy.setdefault(d, "chop")
+            self.busy.setdefault(d, ("chop", ""))
         try:
             low = min(x.cash for x in self.result([(day, gold)] if gold else []).days)
             return low < 0 and low < base  # it's this purchase that would take the cash below zero
@@ -348,14 +360,14 @@ class Router:
     def floor_by(self, day: int) -> int:
         """Deepest floor reached before `day` with the mining days booked so far."""
         have = self.farm.when.mine_lowest
-        return have + FLOORS_PER_DAY * sum(1 for d, w in self.busy.items() if w == "mine" and d < day)
+        return have + self.s.floors_per_day * sum(1 for d, w in self.busy.items() if w[0] == "mine" and d < day)
 
     def mining_days(self, floor: int, by: int) -> list[int] | None:
         """New mining days needed (before `by`) to have reached `floor`; [] if already there."""
         have = self.floor_by(by)
         if floor <= have:
             return []
-        n = math.ceil((floor - have) / FLOORS_PER_DAY)
+        n = math.ceil((floor - have) / self.s.floors_per_day)
         days = self.free_days(MINES_OPEN, by - 1)[-n:]  # the latest free days before it: cash is easier then
         return days if len(days) == n else None
 
@@ -379,18 +391,19 @@ class Router:
         if step.gold:
             self.spends.append((step.day, step.gold))
         for d in step.chop_days:
-            self.busy.setdefault(d, "chop")
+            self.busy.setdefault(d, ("chop", self.current))
         for d in step.mine_days:
-            self.busy.setdefault(d, "mine")
+            self.busy.setdefault(d, ("mine", self.current))
         if req.activity == "fish":
             self.fish_days.setdefault(req.season, step.ready)
-            self.busy.setdefault(step.ready, "fish")
+            self.busy.setdefault(step.ready, ("fish", self.current))
         for u in req.chain + self.cost_extras(req.chain):
             self.have.setdefault(u.key, step.day + u.days)
 
     def objective(self, oid: str, tier: str, deadline: int | None = None) -> Outcome:
         label, default = CATALOG.get(oid, (oid, YEAR_DAYS))
         out = Outcome(oid, label, tier, deadline or default)
+        self.current = oid
         reqs, paid, notes = self.requirements(oid)
         out.problems += notes
         reqs.sort(key=lambda r: (r.latest or 0) - r.lead)
@@ -432,27 +445,33 @@ def _season(d: int) -> int:
     return (d - 1) // 28
 
 
-def route(farm, targets: list[str], nice: list[str] = (), *, tiles: int = 60,
-          deadlines: dict[str, int] | None = None, cave: str = "best") -> dict:
+def route(farm, targets: list[str], nice: list[str] = (), *, settings: Settings | None = None,
+          deadlines: dict[str, int] | None = None, cave: str = "best", tiles: int | None = None) -> dict:
     """Plan targets (in order) then nice-to-haves (in order); what each achieves, when, and what can't be.
     `cave`: "bats" or "mushrooms", or "best" to plan both and keep the one that achieves more (targets first,
     then nice-to-haves, then the year's end cash)."""
+    settings = settings or Settings()
+    if tiles is not None:
+        settings = Settings(**{**settings.__dict__, "tiles": tiles})
     if cave == "best":
-        plans = [_route(farm, targets, nice, tiles, deadlines, c) for c in ("bats", "mushrooms")]
+        plans = [_route(farm, targets, nice, settings, deadlines, c) for c in ("bats", "mushrooms")]
 
         def score(p):
             ok = [o["status"] == "ok" for o in p["objectives"]]
-            return (sum(ok[:len(targets)]), sum(ok[len(targets):]), p["cash"][-1]["cash"] if p["cash"] else 0)
+            return (sum(ok[:len(targets)]), sum(ok[len(targets):]), p["end_cash"])
 
         best = max(plans, key=score)
         best["cave_options"] = [{"cave": p["cave"], "targets_ok": score(p)[0], "nice_ok": score(p)[1],
-                                 "end_cash": score(p)[2], "offer": p["cave_day"]} for p in plans]
+                                 "end_cash": p["end_cash"], "offer": p["cave_day"]} for p in plans]
         return best
-    return _route(farm, targets, nice, tiles, deadlines, cave)
+    return _route(farm, targets, nice, settings, deadlines, cave)
 
 
-def _route(farm, targets, nice, tiles, deadlines, cave) -> dict:
-    r = Router(farm, tiles=tiles, cave=cave)
+WEEKS = YEAR_DAYS // 7
+
+
+def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
+    r = Router(farm, settings=settings, cave=cave)
     outcomes = [r.objective(o, "target", (deadlines or {}).get(o)) for o in targets]
     outcomes += [r.objective(o, "nice", (deadlines or {}).get(o)) for o in nice]
     res = r.result()
@@ -460,15 +479,36 @@ def _route(farm, targets, nice, tiles, deadlines, cave) -> dict:
     def label(d):
         return farm.label(d) if d else ""
 
-    offer = r.result().earned_day(EARNINGS_TRIGGER)
+    def week(d):
+        return min(WEEKS - 1, (d - 1) // 7)
+
+    matrix = []
+    for o in outcomes:
+        cells = [{"buy": [], "ready": [], "gold": 0, "days": {}} for _ in range(WEEKS)]
+        for st in o.steps:
+            if st.gold:
+                c = cells[week(st.day)]
+                c["buy"].append(st.label)
+                c["gold"] += st.gold
+            if st.ready:
+                cells[week(st.ready)]["ready"].append(st.label)
+        for d, (what, owner) in r.busy.items():
+            if owner == o.id:
+                c = cells[week(d)]["days"]
+                c[what] = c.get(what, 0) + 1
+        matrix.append({"id": o.id, "cells": cells})
+    offer = res.earned_day(EARNINGS_TRIGGER)
     return {
-        "tiles": tiles, "cave": cave, "cave_day": label(offer),
+        "settings": settings.__dict__, "cave": cave, "cave_day": label(offer),
         "objectives": [{"id": o.id, "label": o.label, "tier": o.tier, "status": o.status,
                         "deadline": label(o.deadline), "finish": label(o.finish), "problems": o.problems,
-                        "steps": [{"what": s.label, "day": label(s.day), "ready": label(s.ready),
-                                   "gold": s.gold,
-                                   "chop_days": len(s.chop_days), "mine_days": len(s.mine_days)}
-                                  for s in o.steps]} for o in outcomes],
-        "cash": [{"day": label(d.day), "cash": d.cash, "farming": d.level} for d in res.days if d.day % 7 == 1],
-        "busy": {label(d): what for d, what in sorted(r.busy.items())},
+                        "gold": sum(st.gold for st in o.steps),
+                        "steps": [{"what": st.label, "day": label(st.day), "ready": label(st.ready),
+                                   "gold": st.gold, "chop_days": len(st.chop_days),
+                                   "mine_days": len(st.mine_days)} for st in o.steps]} for o in outcomes],
+        "weeks": [label(1 + 7 * w) for w in range(WEEKS)],
+        "matrix": matrix,
+        "cash": [{"day": d.day, "cash": d.cash, "earned": d.earned, "farming": d.level} for d in res.days],
+        "end_cash": res.days[-1].cash if res.days else 0,
+        "days": {k: sum(1 for w, _ in r.busy.values() if w == k) for k in ("chop", "mine", "fish")},
     }

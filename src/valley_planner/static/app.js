@@ -103,7 +103,162 @@ async function searchAsk() {
 
 const STATUS_TEXT = { have: "Set aside", ok: "On track", maybe: "Probably", luck: "Luck", blocked: "Unlock first", stuck: "No way yet" };
 
+// ----- Route: goals in priority order, planned for a fresh Year 1 -----
+const SETTING_LABELS = {
+  tiles: "Tiles you farm", wood_per_day: "Wood from a chopping day", floors_per_day: "Mines floors a day",
+  hardwood_per_day: "Hardwood from a stump day", fish_gold: "Gold from a fishing day", mine_gold: "Gold from a mining day",
+  float: "Cash kept back from seeds",
+};
+const TIERS = { target: "Target", nice: "Nice to have", off: "Off" };
+let routeState = null;
+let routeTimer;
+
+function loadRouteState(catalog) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("route") || "null"); } catch { saved = null; }
+  const ids = catalog.objectives.map((o) => o.id);
+  const goals = (saved && saved.goals ? saved.goals.filter((g) => ids.includes(g.id)) : []);
+  ids.filter((id) => !goals.some((g) => g.id === id)).forEach((id) =>
+    goals.push({ id, tier: ["greenhouse", "seed_maker"].includes(id) ? "target" : "nice" }));
+  return { goals, cave: (saved && saved.cave) || "best", settings: { ...catalog.settings, ...((saved && saved.settings) || {}) },
+           labels: Object.fromEntries(catalog.objectives.map((o) => [o.id, o.label])) };
+}
+function saveRouteState() {
+  try { localStorage.setItem("route", JSON.stringify({ goals: routeState.goals, cave: routeState.cave, settings: routeState.settings })); } catch { /* fine */ }
+}
+
+function drawGoals() {
+  const ol = $("#route-goals");
+  ol.innerHTML = routeState.goals.map((g, i) =>
+    `<li draggable="true" data-i="${i}" class="${g.tier === "off" ? "off" : ""}"><span class="grip" aria-hidden="true">⋮⋮</span>` +
+    `<span class="name">${esc(routeState.labels[g.id] || g.id)}</span>` +
+    `<select data-i="${i}" aria-label="How much it matters">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}" ${g.tier === k ? "selected" : ""}>${v}</option>`).join("")}</select></li>`
+  ).join("");
+  let from = null;
+  ol.querySelectorAll("li").forEach((li) => {
+    li.addEventListener("dragstart", () => { from = +li.dataset.i; li.classList.add("dragging"); });
+    li.addEventListener("dragend", () => li.classList.remove("dragging"));
+    li.addEventListener("dragover", (e) => e.preventDefault());
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const to = +li.dataset.i;
+      if (from === null || from === to) return;
+      const [g] = routeState.goals.splice(from, 1);
+      routeState.goals.splice(to, 0, g);
+      changed();
+    });
+  });
+  ol.querySelectorAll("select").forEach((sel) => sel.addEventListener("change", () => {
+    routeState.goals[+sel.dataset.i].tier = sel.value;
+    changed();
+  }));
+}
+
+function drawSettings() {
+  $("#route-settings").innerHTML = Object.entries(SETTING_LABELS).map(([k, label]) =>
+    `<label for="rs-${k}">${esc(label)}</label><input id="rs-${k}" type="number" min="0" step="1" data-k="${k}" value="${routeState.settings[k]}">`
+  ).join("");
+  document.querySelectorAll("#route-settings input").forEach((inp) => inp.addEventListener("input", () => {
+    routeState.settings[inp.dataset.k] = Math.max(0, parseInt(inp.value || "0", 10));
+    changed(600);
+  }));
+  $("#route-cave").value = routeState.cave;
+  $("#route-cave").onchange = () => { routeState.cave = $("#route-cave").value; changed(); };
+}
+
+function changed(wait = 150) {
+  saveRouteState();
+  drawGoals();
+  clearTimeout(routeTimer);
+  routeTimer = setTimeout(planRoute, wait);
+}
+
+const STATUS = { ok: "On track", luck: "Down to luck", impossible: "Can't, as things stand" };
+
+async function planRoute() {
+  const goals = routeState.goals;
+  const body = { targets: goals.filter((g) => g.tier === "target").map((g) => g.id),
+                 nice: goals.filter((g) => g.tier === "nice").map((g) => g.id),
+                 cave: routeState.cave, settings: routeState.settings };
+  $("#route-results").innerHTML = '<p class="sub">Planning the year…</p>';
+  const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { $("#route-results").innerHTML = `<p>Couldn't plan: ${esc(r.statusText)}</p>`; return; }
+  const v = await r.json();
+  const caveName = { bats: "fruit bats", mushrooms: "mushrooms" };
+  $("#route-cave-note").textContent = (v.cave_options
+    ? `Fruit bats or mushrooms: planned both, and ${caveName[v.cave] || v.cave} achieve more (` +
+      v.cave_options.map((c) => `${caveName[c.cave]}: ${c.targets_ok} target${c.targets_ok === 1 ? "" : "s"}, ${c.nice_ok} nice-to-have${c.nice_ok === 1 ? "" : "s"}, ${c.end_cash.toLocaleString()}g at the year's end`).join("; ") + ")."
+    : `Cave: ${caveName[v.cave] || v.cave}.`) + (v.cave_day ? ` Demetrius makes his offer on ${v.cave_day}.` : " Demetrius's offer doesn't come this year.");
+  $("#route-results").innerHTML = v.objectives.length ? v.objectives.map((o) =>
+    `<div class="route-result ${esc(o.status)}"><h3>${esc(o.label)} <span class="sub">· ${o.tier === "target" ? "target" : "nice to have"}</span></h3>` +
+    `<div><b>${esc(STATUS[o.status] || o.status)}</b>${o.finish ? ` · done by ${esc(o.finish)}` : ""} · deadline ${esc(o.deadline)}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div>` +
+    (o.problems.length ? "<ul>" + o.problems.map((p) => `<li>${esc(p)}</li>`).join("") + "</ul>" : "") + "</div>"
+  ).join("") : '<p class="sub">Pick at least one goal.</p>';
+  drawMatrix(v);
+  drawCash(v);
+}
+
+function drawMatrix(v) {
+  const short = (w) => w.replace(", Year 1", "").replace("Spring", "Sp").replace("Summer", "Su").replace("Fall", "Fa").replace("Winter", "Wi");
+  const head = "<tr><th class=\"row\">Goal</th>" + v.weeks.map((w) => `<th>${esc(short(w))}</th>`).join("") + "</tr>";
+  const rows = v.matrix.map((m) => {
+    const o = v.objectives.find((x) => x.id === m.id);
+    return `<tr><th class="row">${esc(o ? o.label : m.id)}</th>` + m.cells.map((c) => {
+      const days = Object.entries(c.days).map(([k, n]) => `${{ chop: "C", mine: "M", fish: "F" }[k] || k}${n}`).join(" ");
+      const tip = [c.buy.length ? `Buy: ${c.buy.join(", ")}` : "", c.ready.length ? `Arrives: ${c.ready.join(", ")}` : "", days ? `Days: ${days}` : ""].filter(Boolean).join("\n");
+      const cls = [(c.gold || days) ? "has" : "", c.ready.length ? "ready" : ""].filter(Boolean).join(" ");
+      return `<td class="${cls}" title="${esc(tip)}">${c.gold ? `<span class="g">${(c.gold / 1000).toFixed(c.gold < 10000 ? 1 : 0)}k</span>` : ""}${days ? esc(days) : ""}</td>`;
+    }).join("") + "</tr>";
+  }).join("");
+  $("#route-matrix").innerHTML = head + rows;
+}
+
+function drawCash(v) {
+  const pts = v.cash;
+  if (!pts.length) { $("#route-cash").innerHTML = ""; return; }
+  const W = 760, H = 220, L = 52, R = 10, T = 10, B = 26;
+  const max = Math.max(1000, ...pts.map((p) => p.cash)), min = Math.min(0, ...pts.map((p) => p.cash));
+  const x = (d) => L + (d - 1) / (pts.length - 1) * (W - L - R);
+  const y = (c) => T + (max - c) / (max - min) * (H - T - B);
+  const step = Math.pow(10, Math.floor(Math.log10(max))) * (max / Math.pow(10, Math.floor(Math.log10(max))) > 5 ? 2 : 1);
+  let grid = "";
+  for (let g = 0; g <= max; g += step) grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L - 6}" y="${y(g) + 4}" text-anchor="end">${g >= 1000 ? (g / 1000) + "k" : g}</text>`;
+  ["Spring", "Summer", "Fall", "Winter"].forEach((s, i) => {
+    const d = 1 + i * 28;
+    grid += `<line class="grid" x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${H - B}"/><text x="${x(d) + 4}" y="${H - 8}">${s}</text>`;
+  });
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.day).toFixed(1)},${y(p.cash).toFixed(1)}`).join("");
+  const zero = min < 0 ? `<line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>` : "";
+  $("#route-cash").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cash on hand through the year, from ${pts[0].cash}g to ${pts[pts.length - 1].cash}g">` +
+    `${grid}${zero}<path class="line" d="${line}"/><g class="hover" visibility="hidden"><line class="cross" y1="${T}" y2="${H - B}"/>` +
+    `<rect class="tipbox" rx="3" height="20" fill="var(--panel)" stroke="var(--wood-dark)"/><text class="tip" y="${T + 14}"></text></g>` +
+    `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" class="hit"/></svg>`;
+  const svg = $("#route-cash svg"), hov = svg.querySelector(".hover"), tip = svg.querySelector(".tip"), box = svg.querySelector(".tipbox");
+  svg.querySelector(".hit").addEventListener("mousemove", (e) => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(pts.length - 1, Math.round((px - L) / (W - L - R) * (pts.length - 1))));
+    const p = pts[i], cx = x(p.day);
+    hov.setAttribute("visibility", "visible");
+    hov.querySelector(".cross").setAttribute("x1", cx); hov.querySelector(".cross").setAttribute("x2", cx);
+    const seasons = ["Spring", "Summer", "Fall", "Winter"];
+    tip.textContent = `${seasons[Math.floor((p.day - 1) / 28) % 4]} ${(p.day - 1) % 28 + 1}: ${p.cash.toLocaleString()}g · Farming ${p.farming}`;
+    const tx = cx + 140 > W ? cx - 150 : cx + 6;
+    tip.setAttribute("x", tx + 6); box.setAttribute("x", tx); box.setAttribute("y", T); box.setAttribute("width", 144);
+  });
+  svg.querySelector(".hit").addEventListener("mouseleave", () => hov.setAttribute("visibility", "hidden"));
+}
+
 const views = {
+  async route() {
+    if (!routeState) {
+      routeState = loadRouteState(await get("/api/route/objectives"));
+      drawSettings();
+      drawGoals();
+    }
+    await planRoute();
+  },
+
   async morning() {
     const v = await get("/api/morning");
     $("#m-date").textContent = v.date;
@@ -244,6 +399,7 @@ async function searchCart() {
 }
 
 async function show(name) {
+  if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
   closeAsk();  // a tab button puts the search away, so the page you chose is what you see
   window.scrollTo(0, 0);
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
@@ -280,7 +436,8 @@ async function start() {
     if (e.key === "Escape") closeAsk();
     if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("#ask-q").focus(); }
   });
-  show("morning");
+  const first = location.hash.slice(1);
+  show(views[first] ? first : "morning");  // a link can open a tab: …/#route
 }
 
 start();

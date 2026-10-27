@@ -23,6 +23,7 @@
     <button type="button" data-view="crops">Crops</button>
     <button type="button" data-view="sell">Sell</button>
     <button type="button" data-view="plan">Plan</button>
+    <button type="button" data-view="route">Route</button>
     <button type="button" data-view="cart">Cart</button>
   </nav>
 
@@ -131,6 +132,41 @@
         <p class="sub" id="plan-gold"></p>
         <div class="table-wrap"><table class="sell-table" id="plan-unlocks"></table></div>
       </section>
+    </section>
+
+    <section id="view-route" class="view" hidden>
+      <div class="route-layout">
+        <section class="parch panel route-side">
+          <h2 class="sign">Your goals</h2>
+          <p class="sub">Drag to set the order. Targets must happen; nice-to-haves fit in around them.</p>
+          <ol id="route-goals" class="route-goals"></ol>
+          <h3>The farm cave</h3>
+          <select id="route-cave">
+            <option value="best">Plan both, pick the better</option>
+            <option value="bats">Fruit bats</option>
+            <option value="mushrooms">Mushrooms</option>
+          </select>
+          <h3>Planning choices</h3>
+          <div id="route-settings" class="route-settings"></div>
+          <p class="sub">A fresh Year 1. Prices and rules are the game's; these numbers are estimates you can change.</p>
+        </section>
+        <div class="route-main">
+          <section class="parch panel">
+            <h2 class="sign">What you can achieve</h2>
+            <p class="sub" id="route-cave-note"></p>
+            <div id="route-results" class="route-results"></div>
+          </section>
+          <section class="parch panel">
+            <h2 class="sign">Week by week</h2>
+            <p class="sub">Gold due each week, and days spent chopping (C), mining (M) and fishing for bundles (F). Hover a cell for what's bought and what arrives.</p>
+            <div class="table-wrap"><table class="route-matrix" id="route-matrix"></table></div>
+          </section>
+          <section class="parch panel">
+            <h2 class="sign">Cash through the year</h2>
+            <div id="route-cash" class="route-cash"></div>
+          </section>
+        </div>
+      </div>
     </section>
 
     <section id="view-cart" class="view" hidden>

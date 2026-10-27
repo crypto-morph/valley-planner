@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from .discover import find_game, find_saves_root, list_saves
 from .engine import cc, todo
@@ -53,6 +54,13 @@ class Planner:
             if self._farm is None or self._farm[0] != stamp:
                 self._farm = (stamp, Farm.load(self.data, path))
             return self._farm[1]
+
+
+class RouteAsk(BaseModel):
+    targets: list[str] = Field(default_factory=lambda: ["greenhouse", "seed_maker"])
+    nice: list[str] = Field(default_factory=lambda: ["kitchen", "cc"])
+    cave: str = "best"
+    settings: dict = Field(default_factory=dict)
 
 
 def create_app(planner: Planner | None = None) -> FastAPI:
@@ -145,6 +153,24 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         if name not in errands.ERRANDS:
             raise HTTPException(404, f"No errand called {name}")
         return errands.ERRANDS[name](p().farm())
+
+    @app.get("/api/route/objectives")
+    def route_objectives() -> dict:
+        from .engine.route.plan import CATALOG, Settings
+        return {"objectives": [{"id": k, "label": v[0]} for k, v in CATALOG.items()],
+                "settings": Settings().__dict__}
+
+    @app.post("/api/route")
+    def route_view(ask: RouteAsk) -> dict:
+        """A fresh Year 1 planned for these targets (in order) and nice-to-haves (in order)."""
+        from .engine.route.plan import CATALOG, Settings, route
+        from .engine.route.start import new_farm
+        known = set(CATALOG)
+        allowed = {k for k in Settings().__dict__}
+        settings = Settings(**{k: int(v) for k, v in ask.settings.items() if k in allowed})
+        cave = ask.cave if ask.cave in ("best", "bats", "mushrooms") else "best"
+        return route(new_farm(p().data), [t for t in ask.targets if t in known],
+                     [n for n in ask.nice if n in known and n not in ask.targets], settings=settings, cave=cave)
 
     @app.get("/api/ask")
     def ask_search(q: str = "") -> dict:

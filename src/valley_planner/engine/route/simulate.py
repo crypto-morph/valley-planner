@@ -54,9 +54,10 @@ def season_of(d: int) -> str:
 
 
 class Farmsim:
-    def __init__(self, farm, *, tiles: int = 60, start_cash: int = 500):
+    def __init__(self, farm, *, tiles: int = 60, start_cash: int = 500, float_gold: int = FLOAT):
         self.farm = farm
         self.tiles = tiles
+        self.float = float_gold
         self.start_cash = start_cash
         self._rates: dict[tuple[str, bool], CropRate | None] = {}
 
@@ -99,7 +100,7 @@ class Farmsim:
             if d == 1 and parsnip:  # the 15 Parsnip Seeds you start with
                 growing.append(self._planting(parsnip, d, START_SEEDS, season_end, False))
             free_seeds = seed_maker_day is not None and d >= seed_maker_day
-            reserve = FLOAT + sum(g for x, g in due.items() if d < x <= d + RESERVE_DAYS)
+            reserve = self.float + sum(g for x, g in due.items() if d < x <= d + RESERVE_DAYS)
             outdoor_used = sum(g[4] for g in growing if not g[7])
             r = self.rate(season, free_seeds) if season != "winter" else None
             if r and outdoor_used < self.tiles and d + r.first_harvest <= season_end:
