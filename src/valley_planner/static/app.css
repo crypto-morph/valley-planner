@@ -110,3 +110,51 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 #view-route > section, #view-route .two > section { min-width: 0; max-width: 100%; }
 .tree-wrap { width: 100%; max-width: 100%; overflow-x: auto; padding-top: 0.6rem; }
 .lane-head { position: sticky; left: 0; z-index: 3; background: var(--panel-2); padding: 0.3rem; border-radius: 8px; }
+
+/* Plan: what it all takes */
+.need-tiles { display: grid; gap: 0.8rem; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0.8rem; }
+@media (max-width: 1000px) { .need-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ntile { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.9rem 1.1rem; background: var(--panel-2); border: 2px solid var(--line); border-radius: 12px; min-width: 0; }
+.ntile.wide { grid-column: span 2; }
+@media (max-width: 640px) { .need-tiles { grid-template-columns: minmax(0, 1fr); } .ntile.wide { grid-column: auto; } }
+.n-lab { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); }
+.n-big { font-size: 2.1rem; line-height: 1.15; font-weight: 800; }
+.ntile.mid .n-big { font-size: 1.5rem; }
+.n-line { font-size: 0.9rem; line-height: 1.4; color: var(--muted); }
+.n-line.small { font-size: 0.82rem; }
+.n-line .ok { color: var(--accent); } .n-line .exp { color: var(--accent-dim); } .n-line .bad, .ntile .bad { color: var(--bad); }
+.nmeter { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #EFE3C8; }
+.nmeter .m-have { background: var(--accent); border-right: 2px solid var(--panel-2); }
+.nmeter .m-exp { background: #8DB36F; }
+.ngoal { border-bottom: 1px dashed var(--line); padding: 0.5rem 0; }
+.ngoal summary { cursor: pointer; list-style: none; display: grid; gap: 0.3rem; font-weight: 800; }
+.ngoal summary::-webkit-details-marker { display: none; }
+.ng-row { display: flex; justify-content: space-between; gap: 1rem; }
+.ng-row > span:first-child::before { content: "▸ "; color: var(--muted); }
+.ngoal[open] .ng-row > span:first-child::before { content: "▾ "; }
+.nbar { display: block; height: 8px; border-radius: 4px; background: #EFE3C8; }
+.nbar > span { display: block; height: 100%; border-radius: 4px; background: var(--warn); }
+.nitems { list-style: none; margin: 0.4rem 0 0 0.4rem; padding: 0 0 0 1rem; border-left: 2px solid var(--line); display: grid; gap: 0.25rem; font-size: 0.9rem; }
+.nitems li { display: flex; justify-content: space-between; gap: 1rem; }
+.nitems li > span:last-child, .ng-row > span:last-child { white-space: nowrap; }
+.also { color: #2E6E8E; }
+.later { font-size: 0.75rem; font-weight: 800; padding: 0 0.4rem; border: 1px dashed #8C857A; border-radius: 6px; color: #5F5A52; background: #ECE8E1; white-space: nowrap; }
+.ncompact { font-size: 0.9rem; color: var(--muted); }
+.ncompact b { color: var(--ink); }
+.choices { display: grid; gap: 0.8rem; margin-top: 0.8rem; }
+.nchoice { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem; align-items: center; padding: 0.9rem; background: var(--panel-2); border: 2px solid var(--line); border-radius: 12px; }
+@media (max-width: 700px) { .nchoice { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; } }
+.nc-item b { font-size: 1.1rem; }
+.nc-ways, .way { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.way { flex-wrap: nowrap; max-width: 100%; }
+.ncard { display: flex; flex-direction: column; width: 15rem; max-width: 100%; padding: 0.55rem 0.8rem; border-radius: 10px; font-size: 0.82rem; line-height: 1.35; background: #fff; border: 2px solid var(--line); }
+.ncard.first { width: 17rem; }
+.ncard .c-tag { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--muted); }
+.ncard .c-ttl { font-size: 0.95rem; }
+.c-planned { background: #EEF5E6; border: 3px solid var(--accent); } .c-planned .c-tag { color: var(--accent); }
+.c-luck { background: #FFF3D6; border: 2px dashed #B07A00; } .c-luck .c-tag { color: #7A4F00; }
+.c-planned.c-luck { border-width: 3px; }
+.c-no { background: #ECE8E1; border: 2px dashed #8C857A; color: #5F5A52; } .c-no .c-tag { color: #5F5A52; }
+.ncard.more { width: auto; min-height: 44px; font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
+.ncard.more:hover { border-color: var(--wood); }
+.or { padding: 0.15rem 0.6rem; border-radius: 999px; background: var(--muted); color: #fff; font-size: 0.75rem; font-weight: 800; }

@@ -151,12 +151,14 @@ function changed(wait = 150) {
 }
 
 
+// The body /api/route and /api/needs take, from the goals chosen on the Route tab.
+const routeBody = (rs, start) => ({ targets: rs.goals.filter((g) => g.tier === "target").map((g) => g.id),
+  nice: rs.goals.filter((g) => g.tier === "nice").map((g) => g.id), cave: rs.cave, start, settings: rs.settings });
+
 // The route's next week on the To-do: what to do each day, and which goal it's for.
 async function todoRoute() {
   const rs = routeState || loadRouteState(await get("/api/route/objectives"));
-  const body = { targets: rs.goals.filter((g) => g.tier === "target").map((g) => g.id),
-                 nice: rs.goals.filter((g) => g.tier === "nice").map((g) => g.id),
-                 cave: rs.cave, start: "save", settings: rs.settings };
+  const body = routeBody(rs, "save");
   $("#todo-route").innerHTML = '<p class="sub">Planning…</p>';
   const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) { $("#todo-route").innerHTML = ""; return; }
@@ -169,10 +171,7 @@ async function todoRoute() {
 }
 
 async function planRoute() {
-  const goals = routeState.goals;
-  const body = { targets: goals.filter((g) => g.tier === "target").map((g) => g.id),
-                 nice: goals.filter((g) => g.tier === "nice").map((g) => g.id),
-                 cave: routeState.cave, start: routeState.start, settings: routeState.settings };
+  const body = routeBody(routeState, routeState.start);
   $("#route-tree").classList.add("busy");
   const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   $("#route-tree").classList.remove("busy");
@@ -189,6 +188,86 @@ async function planRoute() {
   if (v.cave_chosen) $("#route-cave").value = v.cave; else $("#route-cave").value = routeState.cave;
   $("#route-cave").title = v.cave_chosen ? "Your save has already chosen; it can't be changed" : "";
   drawCash(v);
+}
+
+// ----- Plan: what every chosen goal needs, added up, and the items that can be got more than one way -----
+const BARS = ["copper_bar", "iron_bar", "gold_bar", "iridium_bar", "refined_quartz"];  // one "Bars" tile for these
+const num = (n) => Math.round(n).toLocaleString();
+const amt = (n, unit = "") => `${num(n)}${unit}`;
+const about = (n) => num(Math.round(n / 500) * 500);  // "about 105,500g": the forecast isn't exact
+const pct = (n, of) => (of ? Math.max(n > 0 ? 1 : 0, Math.min(100, (n / of) * 100)) : 0).toFixed(1);
+const also = (xs) => xs && xs.length ? ` <b class="also">· also ${esc(xs.map((x) => x.replace(/^The /, "the ")).join(" and "))}</b>` : "";
+const bar = (n, of) => `<span class="nbar" aria-hidden="true"><span style="width:${pct(n, of)}%"></span></span>`;
+
+function drawNeeds(v) {
+  const goals = v ? v.goals.filter((g) => g.tier !== "off") : [];
+  if (!goals.length) {
+    $("#needs-head").innerHTML = 'No goals chosen yet. Pick some on the <a href="#route" data-go="route">Route tab</a> and this adds up what they take.';
+    $("#needs-tiles").innerHTML = $("#needs-where").innerHTML = "";
+    $("#needs-choices-box").hidden = true;
+    $("#needs-head a").addEventListener("click", (e) => { e.preventDefault(); show("route"); });
+    return;
+  }
+  $("#needs-head").textContent = `Everything your goals need from ${v.today.replace(/, Year \d+/, "")} to ${v.end.replace(/, Year \d+/, "")}, added up. ` +
+    "Open any line to see what it is for. Where an item can be got more than one way, the ways are joined by OR, and the one the route plans is ticked.";
+  const res = v.resources.filter((x) => x.total > 0);
+  const gold = res.find((x) => x.id === "gold"), bars = res.filter((x) => BARS.includes(x.id));
+  const rest = res.filter((x) => x !== gold && !bars.includes(x));
+
+  // The tiles: gold first and wide, then each material, the bars together, then the days
+  const tile = (label, big, line, cls = "") => `<div class="ntile${cls}"><div class="n-lab">${esc(label)}</div><div class="n-big">${big}</div>${line ? `<div class="n-line">${line}</div>` : ""}</div>`;
+  let tiles = "";
+  if (gold) {
+    const g = gold, end = v.end.replace(/, Year \d+/, "");
+    tiles += `<div class="ntile wide"><div class="n-lab">Gold</div><div class="n-big">${amt(g.total, "g")}</div>` +
+      `<div class="nmeter" role="img" aria-label="${esc(`${num(g.have)}g in hand, about ${about(g.expected || 0)}g more expected, ${num(g.short)}g short`)}">` +
+      `<span class="m-have" style="width:${pct(g.have, g.total)}%"></span><span class="m-exp" style="width:${pct(g.expected || 0, g.total)}%"></span></div>` +
+      `<div class="n-line"><b class="ok">${amt(g.have, "g")}</b> in hand` +
+      (g.expected ? ` · <b class="exp">about ${about(g.expected)}g</b> more by ${esc(end)}${g.note ? ` ${esc(g.note)}` : ""}` : "") +
+      (g.short > 0 ? ` · <b class="bad">about ${about(g.short)}g short</b>` : ' · <b class="ok">covered</b>') + "</div>" +
+      (g.extra ? `<div class="n-line small">${esc(g.extra)}</div>` : "") + "</div>";
+  }
+  tiles += rest.map((x) => tile(x.label, amt(x.total, x.unit),
+    [x.have ? `${amt(x.have, x.unit)} in hand` : "", x.days ? `about <b>${x.days} ${esc(x.days_label)}</b>` : "", esc(x.note)].filter(Boolean).join(" · "))).join("");
+  if (bars.length) tiles += tile("Bars", bars.map((x) => `${num(x.total)} ${esc(x.label.replace(/ Bar$/, ""))}`).join(" · "),
+    bars.map((x) => `${esc(x.label.replace(/ Bar$/, ""))}: ${esc(x.note)}`).join(", "), " wide mid");
+  const d = v.days, spent = d.chop + d.stumps + d.mine + d.fish;
+  if (spent) tiles += tile("Days", `${spent}`, [["chopping", d.chop], ["stumps", d.stumps], ["mining", d.mine], ["fishing", d.fish]]
+    .filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(" · ") + ` · of ${d.left} days left` +
+    (spent > d.left ? ` <b class="bad">· ${spent - d.left} more than there are</b>` : ""));
+  $("#needs-tiles").innerHTML = tiles;
+
+  // Where it goes: a collapsible row per goal, its items under it
+  const where = (x) => x.breakdown.map((b, i) => `<details class="ngoal"${i ? "" : " open"}><summary><span class="ng-row"><span>${esc(b.label)}</span>` +
+    `<span>${amt(b.amount, x.unit)}</span></span>${bar(b.amount, x.total)}</summary><ul class="nitems">` + b.items.map((it) =>
+      `<li><span>${esc(it.label)}${it.how ? `: ${esc(it.how)}` : ""}${also(it.also)}${it.this_year === false ? ' <span class="later">not this year</span>' : ""}</span><span>${amt(it.amount, x.unit)}</span></li>`
+    ).join("") + "</ul></details>").join("");
+  const wood = rest.find((x) => x.id === "wood"), others = [...rest.filter((x) => x !== wood), ...bars];
+  const compact = others.map((x) => `<li><span><b>${esc(x.label)} ${amt(x.total, x.unit)}</b> · ` +
+    esc(x.breakdown.flatMap((b) => b.items.map((it) => `${it.label.replace(/^The /, "the ")} ${num(it.amount)}`)).join(", ")) + "</span></li>").join("");
+  $("#needs-where").innerHTML = (gold ? `<section class="parch panel"><h2 class="sign">Where the gold goes</h2>${where(gold)}</section>` : "") +
+    (wood || others.length ? '<section class="parch panel">' + (wood ? `<h2 class="sign">Where the ${esc(wood.label)} goes</h2>${where(wood)}` : "") +
+      (others.length ? `<h3>${esc(others.map((x) => x.label).join(", ").replace(/, ([^,]*)$/, " and $1"))}</h3><ul class="list ncompact">${compact}</ul>` : "") + "</section>" : "");
+
+  // Choose how: each way as a card, joined by OR
+  const TAG = { planned: "✓ PLANNED", luck: "LUCK", no: "✕ NOT THIS YEAR", later: "LATER", possible: "" };
+  const card = (o, i) => {
+    if (o.more) return `<button type="button" class="ncard more" aria-expanded="false" data-label="${esc(o.label)}" data-more="${esc(o.detail)}">${esc(o.label)}</button>`;
+    let tag = o.tag || TAG[o.state] || "";
+    if (o.state === "planned" && !tag.startsWith("✓")) tag = "✓ " + tag;
+    if (o.state === "no" && !tag.startsWith("✕")) tag = "✕ " + tag;
+    const cls = o.state === "planned" && o.odds != null ? "planned c-luck" : o.state;  // planned but on luck: amber, still ticked
+    const line = [o.detail, o.gold ? amt(o.gold, "g") : "", o.when].filter(Boolean).map(esc).join(" · ");
+    return `<div class="ncard c-${cls}${i ? "" : " first"}">${tag ? `<b class="c-tag">${esc(tag)}</b>` : ""}<b class="c-ttl">${esc(o.label)}</b>${line ? `<span>${line}</span>` : ""}</div>`;
+  };
+  $("#needs-choices-box").hidden = !v.choices.length;
+  $("#needs-choices").innerHTML = v.choices.map((c) => `<div class="nchoice"><div class="nc-item"><b>${esc(c.item)}</b><br><span class="sub">${esc(c.where)}</span></div>` +
+    `<div class="nc-ways">${c.options.map((o, i) => i ? `<span class="way"><span class="or">OR</span>${card(o, i)}</span>` : card(o, i)).join("")}</div></div>`).join("");
+  document.querySelectorAll("#needs-choices .more").forEach((b) => b.addEventListener("click", () => {
+    const open = b.getAttribute("aria-expanded") !== "true";
+    b.setAttribute("aria-expanded", open);
+    b.textContent = open && b.dataset.more ? `${b.dataset.label}: ${b.dataset.more}` : b.dataset.label;
+  }));
 }
 
 // The route as a tech tree: a lane per goal, weekly columns from today, cards coloured by the days they have
@@ -358,29 +437,14 @@ const views = {
   },
 
   async plan() {
-    const v = await get("/api/plan");
-    const c = v.counts;
-    $("#plan-head").textContent = `From ${v.today} to ${v.deadline}: ${c.have} set aside, ${c.ok} on track, ${c.maybe} probably, ${c.luck} on luck, ${c.blocked} waiting on an unlock, ${c.stuck} with no way yet.`;
-    $("#plan-rows").innerHTML = "<tr><th>Slot</th><th>Status</th><th>Best way</th><th>When</th><th>Also</th></tr>" + v.slots.map((r) => {
-      const b = r.best;
-      const when = !b ? "" : b.odds != null ? `${Math.round(b.odds * 100)}% by the deadline` : `from ${esc(b.earliest)}${b.last_start ? `, start by ${esc(b.last_start)}` : ""}`;
-      const also = r.others.slice(0, 3).map((o) => `${esc(o.label)}${o.odds != null ? ` (${Math.round(o.odds * 100)}%)` : ""}${o.blocked.length ? ` <span class="sub">after ${esc(o.blocked.join(", "))}</span>` : ""}`).join("<br>");
-      return `<tr><td>${esc(r.name)}${r.count > 1 ? ` ×${r.count}` : ""}${r.quality ? ` <span class="sub">(quality ${r.quality}+)</span>` : ""}<br><span class="sub">${esc(r.bundle)} · ${esc(r.room)}</span></td>` +
-        `<td class="status-${esc(r.status)}">${esc(STATUS_TEXT[r.status] || r.status)}</td>` +
-        `<td>${b ? esc(b.label) : ""}${b && b.blocked.length ? `<br><span class="sub">after ${esc(b.blocked.join(", "))}</span>` : ""}</td><td>${when}${b && b.earliest_after_unlock ? `<br><span class="sub">with the unlocks: ${esc(b.earliest_after_unlock)}</span>` : ""}</td><td class="sub">${also}</td></tr>`;
-    }).join("");
-    const g = v.gold;
-    const need = g.vault + g.unlocks;
-    $("#plan-gold").innerHTML = esc(`You have ${g.money.toLocaleString()}g. The Vault still needs ${g.vault.toLocaleString()}g and these unlocks ${g.unlocks.toLocaleString()}g (${need.toLocaleString()}g in all).`) + "<br>" +
-      esc(`By ${v.deadline}: about ${g.projected.toLocaleString()}g from ${g.streams.filter((x) => x.gold).map((x) => `${x.label} (${x.gold.toLocaleString()}g)`).join(", ")}`) +
-      (g.replant.gold ? esc(`, plus about ${g.replant.gold.toLocaleString()}g replanting your ${g.replant.tiles} tiles with ${g.replant.crop} (${g.replant.note})`) : "") + ". " +
-      (g.covered_by ? esc(`That covers it by ${g.covered_by}.`) : g.gap ? `<b>${esc(`About ${g.gap.toLocaleString()}g short`)}</b>${esc(": fishing, mining, machines or skipping the dearest unlocks would close it.")}` : esc("With replanting, that covers it."));
-    $("#plan-unlocks").innerHTML = "<tr><th>Unlock</th><th>Cost</th><th>Takes</th><th>Opens</th></tr>" + v.unlocks.map((u) =>
-      `<tr><td>${esc(u.label)}${u.how ? `<br><span class="sub">${esc(u.how)}</span>` : ""}</td><td>${u.gold ? `${u.gold.toLocaleString()}g` : ""}${u.materials.length ? `${u.gold ? " + " : ""}${esc(u.materials.map((m) => `${m.count} ${m.name}`).join(", "))}` : ""}</td>` +
-      `<td>${u.days ? `${u.days} day${u.days > 1 ? "s" : ""}` : ""}</td><td>${esc(u.slots.join(", "))}</td></tr>`
-    ).join("");
+    const rs = routeState || loadRouteState(await get("/api/route/objectives"));
+    const body = routeBody(rs, rs.start);
+    if (!body.targets.length && !body.nice.length) { drawNeeds(null); return; }
+    $("#needs-head").textContent = "Adding it up…";
+    const r = await fetch("/api/needs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+    drawNeeds(await r.json());
   },
-
 
   async today() {
     const [hours, cal] = await Promise.all([get("/api/hours"), get("/api/calendar?days=14")]);
