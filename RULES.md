@@ -645,6 +645,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `shop.clint-ore-year1` | In Year 1 Clint sells Copper Ore 75g, Iron Ore 150g, Coal 150g and Gold Ore 400g; from Year 2, 150 / 250 / 250 / 750g. A bar is 5 ore and 1 coal in a Furnace, so in Year 1 a Gold Bar can be bought for about 2,150g. | `Data/Shops Blacksmith (conditions !YEAR 2 / YEAR 2)`<br>`Data/Machines (BC)13` | verified |
 | `house.upgrade-costs` | House upgrades from Robin: first 10,000g + 450 Wood, second 65,000g + 100 Hardwood, third 100,000g; three days each. | `StardewValley.GameLocation.houseUpgradeAccept` | verified |
 | `robin.one-job` | Robin's carpenter menu (buildings, upgrades, the house) is only offered while no house upgrade is under way and no building is under construction (Game1.IsThereABuildingUnderConstruction), so she does one job at a time. A house upgrade under way is the player's daysUntilHouseUpgrade. | `StardewValley.GameLocation.carpenters`<br>`StardewValley.Game1.IsThereABuildingUnderConstruction` | verified |
+| `clint.one-tool` | Clint holds one tool at a time (the player's single toolBeingUpgraded): while daysLeftForToolUpgrade is above 0 he's still working, and once it's 0 the tool waits to be collected before another can go in. | `StardewValley.GameLocation.blacksmith`<br>`StardewValley.GameLocation.answerDialogueAction` | verified |
 
 ## Fishing
 

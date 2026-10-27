@@ -93,6 +93,10 @@ class Unlocks:
             tool, _, level = what.partition("@")
             lvl, have = int(level), self._tool_level(tool)
             name = TOOL_NAMES.get(tool, tool)
+            if getattr(s, "tool_at_clint", "") == tool and lvl == have + 1:  # already with Clint: just the wait
+                left = getattr(s, "tool_at_clint_days", 0)
+                return Unlock(key, f"Clint finishes the {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {name}",
+                              0, [], left, how="then collect it from him")
             return Unlock(key, f"a {('', 'Copper', 'Steel', 'Gold', 'Iridium')[lvl]} {name} from Clint",
                           TOOL_PRICES[lvl], [(TOOL_BARS[lvl], 5)], TOOL_DAYS,
                           [f"tool:{tool}@{lvl - 1}"] if lvl > 1 else [], done=have >= lvl)

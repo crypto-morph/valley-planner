@@ -12702,6 +12702,18 @@
    "data": [],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "clint.one-tool",
+   "area": "Economy & shops & selling",
+   "summary": "Clint holds one tool at a time (the player's single toolBeingUpgraded): while daysLeftForToolUpgrade is above 0 he's still working, and once it's 0 the tool waits to be collected before another can go in.",
+   "checked_against": [
+    "StardewValley.GameLocation.blacksmith",
+    "StardewValley.GameLocation.answerDialogueAction"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": []
   }
  ]
 }

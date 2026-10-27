@@ -284,3 +284,19 @@ def test_robin_one_job_at_a_time():
     v = route(farm, ["kitchen"], [], tiles=80, cave="bats")
     step = v["objectives"][0]["steps"][0]
     assert step["n"] >= farm.save.days_played + 3
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_clint_one_tool_at_a_time():
+    """Two tool upgrades never overlap at Clint's."""
+    from valley_planner.engine.route.plan import Router
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    farm.save.money = 60000
+    r = Router(farm, cave="bats")
+    for goal in ("pickaxe_steel", "can_steel"):
+        r.objective(goal, "target")
+    jobs = sorted(r.clint)
+    assert len(jobs) >= 2 and all(a[1] <= b[0] for a, b in zip(jobs, jobs[1:], strict=False))

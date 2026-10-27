@@ -173,6 +173,9 @@ class Router:
         self.robin: list[tuple[int, int]] = [(self.today, self.today + n) for n in
                                              list(getattr(farm.save, "building_days", {}).values())
                                              + [getattr(farm.save, "house_upgrade_days", 0)] if n > 0]
+        # Clint has one tool at a time (the save keeps a single toolBeingUpgraded): his jobs the same way
+        self.clint: list[tuple[int, int]] = ([(self.today, self.today + farm.save.tool_at_clint_days)]
+                                             if getattr(farm.save, "tool_at_clint", "") else [])
         self.misses: list[tuple[str, str]] = []  # the objective being placed: what can't be, and why
         self.info: list[str] = []
         self.planner = Planner(farm, self.end)
@@ -649,7 +652,7 @@ class Router:
         if after + lead > latest_ready:
             return None, (f"{req.label}: not in time: waiting on an earlier step, it can't be ready before "
                           f"{self.farm.label(after + lead)}")
-        why = {"days": 0, "cash": 0, "robin": 0}
+        why = {"days": 0, "cash": 0, "robin": 0, "clint": 0}
         for b in range(first, latest_ready - lead + 1):
             # the latest free days before it (after the Steel Axe, if Hardwood needs it)
             chop = self.free_days(self.today + axe_days, b - 1)[-chops:] if chops else []
@@ -662,6 +665,9 @@ class Router:
                 continue
             if any(s < e2 and s2 < e for s, e in self.robin_jobs(req.chain, b) for s2, e2 in self.robin):
                 why["robin"] += 1  # she's still on another job
+                continue
+            if any(s < e2 and s2 < e for s, e in self.clint_jobs(req.chain, b) for s2, e2 in self.clint):
+                why["clint"] += 1  # he still has another tool
                 continue
             if self.would_go_negative(b, gold, chop + mine):
                 why["cash"] += 1
@@ -686,6 +692,9 @@ class Router:
             return Step(req.label, b, act or ready, gold, chop, mine, needs, req.season, act,
                         last=last_start), ""
         last = max(1, latest_ready - lead)
+        if why["clint"] and why["clint"] >= why["days"] + why["cash"] + why["robin"]:
+            free = max(e for _s, e in self.clint)
+            return None, f"{req.label}: Clint has another tool until {self.farm.label(free)} (one at a time)"
         if why["robin"] and why["robin"] >= why["days"] + why["cash"]:
             free = max(e for _s, e in self.robin)
             return None, f"{req.label}: Robin is busy building until {self.farm.label(free)} (one job at a time)"
@@ -773,18 +782,27 @@ class Router:
 
     def robin_jobs(self, chain: list[Unlock], day: int) -> list[tuple[int, int]]:
         """The [order day, ready day) of each new building or house upgrade in a chain started on `day`."""
+        return self._jobs(chain, day, ("building:", "kitchen", "house:"), "Robin finishes")
+
+    def clint_jobs(self, chain: list[Unlock], day: int) -> list[tuple[int, int]]:
+        """The [hand-in day, collect day) of each new tool upgrade in a chain started on `day` (the Steel Axe a
+        Hardwood chain brings comes first)."""
+        return self._jobs(self.cost_extras(chain) + chain, day, ("tool:",), "Clint finishes")
+
+    def _jobs(self, chain: list[Unlock], day: int, keys: tuple[str, ...], ongoing: str) -> list[tuple[int, int]]:
         out, t = [], day
         for u in chain:
             if u.key in self.have:
                 t = max(t, self.have[u.key])
             elif not u.done:
                 start, t = t, t + u.days
-                if u.key.startswith(("building:", "kitchen", "house:")) and not u.label.startswith("Robin finishes"):
+                if u.key.startswith(keys) and not u.label.startswith(ongoing):
                     out.append((start, t))
         return out
 
     def commit(self, step: Step, req: Req) -> None:
         self.robin += self.robin_jobs(req.chain, step.day)
+        self.clint += self.clint_jobs(req.chain, step.day)
         wood = sum(n for u in req.chain if u.key not in self.have and not u.done for m, n in u.materials if m == WOOD)
         self.wood_left = max(0, self.wood_left - wood)
         if step.gold:
@@ -1078,7 +1096,7 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
             for n in new:
                 cost = ", ".join(([f"{n['gold']:,}g"] if n["gold"] else []) + n["materials"])
                 text = n["label"][0].upper() + n["label"][1:] + (f": {cost}" if cost else "")
-                if not n["gold"] and not n["materials"] and n["label"].startswith("Robin finishes"):
+                if not n["gold"] and not n["materials"] and n["label"].startswith(("Robin finishes", "Clint finishes")):
                     continue  # already paid for: nothing to do but wait
                 add(n["on"], "buy", text, f"for {st.label}", o.label, n["gold"], _shop_for(n))
                 if n["gold"] and today <= n["on"] < today + 2 * AGENDA_DAYS and saving is None \
