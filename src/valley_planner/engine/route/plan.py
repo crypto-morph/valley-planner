@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass, field
 
 from ...facts.bundles import VAULT
+from ...facts.cave import EARNINGS_TRIGGER, gives, nights_for
 from ..cc import Planner, Slot, Way
 from ..unlocks import Unlock
 from .simulate import YEAR_DAYS, Farmsim
@@ -76,8 +77,9 @@ class Req:
 
 
 class Router:
-    def __init__(self, farm, *, tiles: int = 60):
+    def __init__(self, farm, *, tiles: int = 60, cave: str | None = None):
         self.farm = farm
+        self.cave = cave  # "bats" / "mushrooms" / None (not chosen yet)
         self.sim = Farmsim(farm, tiles=tiles)
         self.spends: list[tuple[int, int]] = []
         self.busy: dict[int, str] = {}  # day -> what it's spent on
@@ -157,9 +159,26 @@ class Router:
             return min(ok, key=lambda w: (self.way_gold(w), len(w.unlocks), w.earliest))
         return s.best
 
+    def cave_day(self) -> int | None:
+        """The morning Demetrius makes his offer: lifetime earnings past 25,000g."""
+        return self.result().earned_day(EARNINGS_TRIGGER) if self.cave else None
+
+    def cave_req(self, s: Slot) -> Req | None:
+        """A free, likely way from the farm cave, if the choice gives this item in time."""
+        if not self.cave or not s.item.startswith("(O)") or s.item[3:] not in gives(self.cave):
+            return None
+        start, nights = self.cave_day(), nights_for(self.cave, s.item)
+        if start is None or nights is None or start + nights > YEAR_DAYS:
+            return None
+        cave = "fruit bats" if self.cave == "bats" else "mushroom boxes"
+        return Req(f"{s.name} ({s.bundle}), from the {cave}", start + nights, YEAR_DAYS, [], 0)
+
     def slot_req(self, s: Slot) -> Req | None:
         if s.have:
             return None
+        cave = self.cave_req(s)
+        if cave:
+            return cave
         w = self.pick(s)
         if w is None:
             return Req(f"{s.name} ({s.bundle})", 1, 0, [], 0)
@@ -337,7 +356,7 @@ class Router:
         if floor <= have:
             return []
         n = math.ceil((floor - have) / FLOORS_PER_DAY)
-        days = self.free_days(MINES_OPEN, by - 1)[:n]
+        days = self.free_days(MINES_OPEN, by - 1)[-n:]  # the latest free days before it: cash is easier then
         return days if len(days) == n else None
 
     def cost_extras(self, chain: list[Unlock]) -> list[Unlock]:
@@ -414,9 +433,26 @@ def _season(d: int) -> int:
 
 
 def route(farm, targets: list[str], nice: list[str] = (), *, tiles: int = 60,
-          deadlines: dict[str, int] | None = None) -> dict:
-    """Plan targets (in order) then nice-to-haves (in order); what each achieves, when, and what can't be."""
-    r = Router(farm, tiles=tiles)
+          deadlines: dict[str, int] | None = None, cave: str = "best") -> dict:
+    """Plan targets (in order) then nice-to-haves (in order); what each achieves, when, and what can't be.
+    `cave`: "bats" or "mushrooms", or "best" to plan both and keep the one that achieves more (targets first,
+    then nice-to-haves, then the year's end cash)."""
+    if cave == "best":
+        plans = [_route(farm, targets, nice, tiles, deadlines, c) for c in ("bats", "mushrooms")]
+
+        def score(p):
+            ok = [o["status"] == "ok" for o in p["objectives"]]
+            return (sum(ok[:len(targets)]), sum(ok[len(targets):]), p["cash"][-1]["cash"] if p["cash"] else 0)
+
+        best = max(plans, key=score)
+        best["cave_options"] = [{"cave": p["cave"], "targets_ok": score(p)[0], "nice_ok": score(p)[1],
+                                 "end_cash": score(p)[2], "offer": p["cave_day"]} for p in plans]
+        return best
+    return _route(farm, targets, nice, tiles, deadlines, cave)
+
+
+def _route(farm, targets, nice, tiles, deadlines, cave) -> dict:
+    r = Router(farm, tiles=tiles, cave=cave)
     outcomes = [r.objective(o, "target", (deadlines or {}).get(o)) for o in targets]
     outcomes += [r.objective(o, "nice", (deadlines or {}).get(o)) for o in nice]
     res = r.result()
@@ -424,8 +460,9 @@ def route(farm, targets: list[str], nice: list[str] = (), *, tiles: int = 60,
     def label(d):
         return farm.label(d) if d else ""
 
+    offer = r.result().earned_day(EARNINGS_TRIGGER)
     return {
-        "tiles": tiles,
+        "tiles": tiles, "cave": cave, "cave_day": label(offer),
         "objectives": [{"id": o.id, "label": o.label, "tier": o.tier, "status": o.status,
                         "deadline": label(o.deadline), "finish": label(o.finish), "problems": o.problems,
                         "steps": [{"what": s.label, "day": label(s.day), "ready": label(s.ready),

@@ -19,7 +19,7 @@ GAME = find_game()
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_fresh_year_route():
     """On a fresh farm with 80 tiles, the greenhouse (by Fall 28) and the Seed Maker fit as targets, the cash
-    never goes below the float, and the Community Center as a nice-to-have explains what doesn't fit."""
+    never goes below zero, and the Community Center as a nice-to-have says what it's left waiting on."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.simulate import FLOAT
     from valley_planner.engine.route.start import new_farm
@@ -30,4 +30,15 @@ def test_fresh_year_route():
     assert min(c["cash"] for c in v["cash"]) >= 0
     assert FLOAT >= 0
     cc = by_id["cc"]
-    assert cc["status"] == "impossible" and all(": " in p for p in cc["problems"])  # each says why
+    assert v["cave"] == "bats"  # the fruit bats save the saplings' cost and come early
+    assert cc["status"] in ("luck", "impossible") and all(": " in p for p in cc["problems"])  # each says why
+    assert any("Red Cabbage" in p and "luck" in p for p in cc["problems"])  # Year 1: only the cart
+
+
+def test_cave_odds():
+    from valley_planner.facts.cave import BATS, MUSHROOMS, nightly, nights_for
+    # bats: about 1.9 fruit a night; a Pomegranate is 3.6% of them (one in five fruit is a tree fruit,
+    # nine in ten of those one of five kinds)
+    assert 0.06 < nightly(BATS, "637") < 0.075
+    assert 20 <= nights_for(BATS, "637") <= 25
+    assert nights_for(MUSHROOMS, "637") is None and nightly(MUSHROOMS, "422") > 0.13  # six boxes, 2.5% each

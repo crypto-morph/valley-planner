@@ -2655,13 +2655,16 @@
   {
    "id": "route.not-needed-if",
    "area": "Community Center & bundles & route",
-   "summary": "Fruit bats (caveChoice 1) can bring a Pomegranate. Each night FarmCave.DayUpdate spawns fruit while random < 0.66 (mean about 1.9 a day). Each fruit is Salmonberry, Spice Berry, Wild Plum or Blackberry (1/5 each), otherwise 10% Apple or one of 634-638 (Apricot, Orange, Peach, Pomegranate, Cherry).",
+   "summary": "Fruit bats (caveChoice 1): each night FarmCave.DayUpdate spawns a fruit while a roll comes in under 0.66 (about 1.9 a night, every season), each Salmonberry, Spice Berry, Wild Plum or Blackberry (1/5 each) or a tree fruit (1/5): Apple 10%, otherwise Apricot, Orange, Peach, Pomegranate or Cherry evenly, so each of those five is 3.6% of the fruit, about 7% a night, 80% within about 22 nights. Mushrooms (caveChoice 2): six mushroom boxes, each a mushroom a day, the first of Purple 2.5%, Chanterelle 7.5%, Morel 9%, Red 15% to come up, else Common. Both are random and depend on a free tile, so the route counts them at 80% confidence.",
    "checked_against": [
-    "StardewValley.Locations.FarmCave.DayUpdate"
+    "StardewValley.Locations.FarmCave.DayUpdate",
+    "StardewValley.Locations.FarmCave.setUpMushroomHouse"
    ],
    "data": [],
-   "status": "to fix",
-   "fix": "Bats do not guarantee a Pomegranate. The chance per fruit is 0.2 x 0.9 x 0.2 = 3.6%, about 7% a day. That is likely within a few weeks but random, and a fruit only spawns on a free tile. Treat it as a luck source with odds rather than as fully covered."
+   "status": "verified",
+   "tests": [
+    "tests/test_route.py::test_cave_odds"
+   ]
   },
   {
    "id": "cc.fruit-any",

@@ -29,6 +29,7 @@ class Day:
     xp: int
     tiles: int
     level: int
+    earned: int = 0  # lifetime earnings so far (what Demetrius's offer waits for)
 
 
 @dataclass
@@ -40,6 +41,9 @@ class Result:
 
     def lowest_from(self, d: int) -> int:
         return min(x.cash for x in self.days[d - 1:]) if d <= len(self.days) else 0
+
+    def earned_day(self, gold: int) -> int | None:
+        return next((x.day for x in self.days if x.earned >= gold), None)
 
     def level_day(self, level: int) -> int | None:
         return next((x.day for x in self.days if x.level >= level), None)
@@ -77,8 +81,11 @@ class Farmsim:
         growing: list[list] = []  # [ripe day, harvest id, regrow, season end, count, xp each, gold each, indoor]
         out = Result()
         parsnip = crops.by_seed.get("472")
+        earned = 0
         for d in range(1, days + 1):
-            cash += pay.pop(d, 0) + income.get(d, 0)
+            arriving = pay.pop(d, 0) + income.get(d, 0)
+            earned += arriving
+            cash += arriving
             cash -= due.get(d, 0)
             season = season_of(d)
             season_end = ((d - 1) // 28 + 1) * 28
@@ -115,7 +122,7 @@ class Farmsim:
                         cash -= n * price
                         growing.append(self._planting_rate(gr, d, n, YEAR_DAYS * 2, True))
             xp += extra_xp.get(d, 0)
-            out.days.append(Day(d, cash, xp, outdoor_used, level_for(xp)))
+            out.days.append(Day(d, cash, xp, outdoor_used, level_for(xp), earned))
         return out
 
     def _planting(self, info, d: int, n: int, season_end: int, indoor: bool) -> list:
