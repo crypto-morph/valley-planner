@@ -197,6 +197,25 @@ class Animals:
         valid = [o for o in options if not (o[1] > 0 and friendship < o[1])]  # (vanilla lists have no conditions)
         return r.choose([o[0] for o in valid])
 
+    def deluxe_days(self, kind: str, confidence: float = 0.8, *, professions=frozenset(),
+                    limit: int = 336) -> int | None:
+        """Days from buying a newborn to `confidence` of at least one deluxe item: petted every day (+15
+        friendship, +15 more with the animal's happiness profession), full happiness, average luck."""
+        k = self.kinds[kind]
+        if not k.deluxe or k.care_divisor < 0:
+            return None
+        step = 15 + (15 if k.happiness_profession in professions else 0)
+        friendship, none, care = 0, 1.0, 255 * 1.5
+        for day in range(1, limit + 1):
+            friendship = min(1000, friendship + step)
+            if day <= k.days_to_mature or (day - k.days_to_mature) % k.days_to_produce:
+                continue
+            if friendship >= k.deluxe_min_friendship:
+                none *= 1 - min(1.0, (friendship + care) / k.care_divisor)
+                if 1 - none >= confidence:
+                    return day
+        return None
+
     def odds(self, a: Animal, *, professions=frozenset(), petted: bool = True) -> dict[str, float]:
         """Chances for tonight from today's state, if fed and petted: produce, deluxe, and each quality."""
         k = self.kinds[a.type]

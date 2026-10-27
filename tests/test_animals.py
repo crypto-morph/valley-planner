@@ -65,3 +65,11 @@ def test_odds_and_price():
     assert abs(o["iridium"] + o["gold"] + o["silver"] + o["normal"] - 1) < 1e-9
     assert o["iridium"] == 0 and a.odds(hen, professions={2})["iridium"] > 0  # Coopmaster reaches iridium
     assert a.sell_price(hen) == int(800 * 0.8)
+
+
+def test_deluxe_lead_time():
+    a = Animals(Data())
+    days = a.deluxe_days("White Chicken")
+    # 3 days to grow up, 200 friendship takes 14 days of petting, then (F + 382.5) / 1200 a day
+    assert 14 <= days <= 20 and a.deluxe_days("White Chicken", professions={2}) < days
+    assert a.deluxe_days("Sheep") is None  # no deluxe produce
