@@ -194,6 +194,7 @@ class Save:
     bundle_slots: dict[int, list[bool]] = field(default_factory=dict)
     areas_complete: list[bool] = field(default_factory=list)
     buildings: Counter = field(default_factory=Counter)  # built, including ones under construction
+    building_days: dict[str, int] = field(default_factory=dict)  # one Robin is still building: days left
     animals: list[dict] = field(default_factory=list)
     hay: int = 0
     fruit_trees: list[dict] = field(default_factory=list)
@@ -467,6 +468,7 @@ def read_save(path: Path, data=None) -> Save:
     farm = locations.get("Farm")
     flags = {"beachBridgeFixed"} if _bool(locations.get("Beach"), "bridgeFixed") else set()
     buildings: Counter = Counter()
+    building_days: dict[str, int] = {}
     animals = []
     for b in _or(_child(farm, "buildings"), []):
         btype = _text(b, "buildingType")
@@ -474,6 +476,9 @@ def read_save(path: Path, data=None) -> Save:
             continue
         upgrading = _text(b, "upgradeName") if _int(b, "daysUntilUpgrade") > 0 else ""
         buildings[upgrading or btype] += 1  # Robin finishes construction and upgrades on her own
+        left = max(_int(b, "daysOfConstructionLeft"), _int(b, "daysUntilUpgrade"))
+        if left > 0:  # not usable until she's done: no animals bought for it, nothing made in it
+            building_days[upgrading or btype] = left
     seen_animals = set()
     for el in root.iter():  # each animal is stored twice (its building's list and its home's), once by id
         if _tag(el) == "FarmAnimal" and _text(el, "myID") not in seen_animals:
@@ -594,7 +599,8 @@ def read_save(path: Path, data=None) -> Save:
         cooking_recipes={_flat(k) for k, _v in _dict(_child(player, "cookingRecipes"))},
         crafting_recipes={_flat(k) for k, _v in _dict(_child(player, "craftingRecipes"))},
         fish_caught=fish, museum=museum, bundle_data=bundle_data, bundle_slots=bundle_slots, areas_complete=areas,
-        buildings=buildings, animals=animals, hay=_int(farm, "piecesOfHay"), fruit_trees=fruit_trees,
+        buildings=buildings, building_days=building_days, animals=animals, hay=_int(farm, "piecesOfHay"),
+        fruit_trees=fruit_trees,
         machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
         special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
         special_orders_board=[o for o in board if o["type"] != "QiChallenge"],

@@ -64,6 +64,10 @@ class Unlocks:
         kind, _, what = key.partition(":")
         f, s = self.farm, self.save
         if kind == "building":
+            left = getattr(s, "building_days", {}).get(what, 0)
+            if left:  # paid for and under way: it only needs Robin's days
+                return Unlock(key, f"Robin finishes the {what}", 0, [], left, how=f"{left} more day"
+                              f"{'s' if left != 1 else ''} of building")
             b = self.data.asset("Data/Buildings").get(what) or {}
             prev = b.get("BuildingToUpgrade")
             return Unlock(key, f"build a {what}", int(b.get("BuildCost") or 0),

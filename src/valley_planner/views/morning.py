@@ -101,6 +101,9 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         left = 28 - (w.days_played - 1) % 28
         do.append({"kind": "crops", "title": f"{mine['dies']} crops won't ripen before {w.season.title()} ends",
                    "text": f"{left} day{'s' if left != 1 else ''} left: don't spend more on them"})
+    for name, left in getattr(s, "building_days", {}).items():
+        do.append({"kind": "building", "title": f"Robin is still building your {name}",
+                   "text": "ready tomorrow" if left == 1 else f"ready in {left} days: nothing can move in until then"})
     for t in crops.fruit_trees(farm):
         if t["first_n"] and 0 < t["first_n"] - w.days_played <= SOON and not t["on_tree"]:
             do.append({"kind": "tree", "title": f"Your {t['fruit']} tree: {t['text']}", "text": t["where"]})

@@ -1006,6 +1006,8 @@ def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
             for n in new:
                 cost = ", ".join(([f"{n['gold']:,}g"] if n["gold"] else []) + n["materials"])
                 text = n["label"][0].upper() + n["label"][1:] + (f": {cost}" if cost else "")
+                if not n["gold"] and not n["materials"] and n["label"].startswith("Robin finishes"):
+                    continue  # already paid for: nothing to do but wait
                 add(n["on"], "buy", text, f"for {st.label}", o.label, n["gold"], _shop_for(n))
                 if n["gold"] and today <= n["on"] < today + 2 * AGENDA_DAYS and saving is None \
                         and farm.save.money < n["gold"]:

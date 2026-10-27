@@ -232,3 +232,17 @@ def test_fruit_tree_schedule():
     assert pom["grown"] == fall25 + 15 and pom["first"] == 112 + 2 * 28 + 1
     assert schedule(fall25, 0, ["fall"], on_tree=2)["first"] == fall25
     assert schedule(fall25, 3, ["spring"], indoor=True)["first"] == fall25 + 3
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_building_under_way_waits_for_robin():
+    """A building Robin hasn't finished isn't usable yet: its animals are bought the day she's done."""
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.engine.unlocks import Unlocks
+    from valley_planner.gamedata import GameData
+    farm = new_farm(GameData(GAME))
+    farm.save.buildings["Coop"] = 1
+    farm.save.building_days["Coop"] = 2
+    u = Unlocks(farm).get("building:Coop")
+    assert not u.done and u.days == 2 and u.gold == 0 and not u.materials
