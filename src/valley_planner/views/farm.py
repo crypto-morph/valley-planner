@@ -127,6 +127,21 @@ class Farm:
                 out[it.qualified_id] = out.get(it.qualified_id, 0) + it.stack
         return out
 
+    def where_held(self, qid: str) -> list[str]:
+        """Where you keep this, as you'd look for it: 'the green chest (the farm)', 'your backpack'."""
+        return sorted({self.where_label(it.where, it.chest) for it in self.save.items if it.qualified_id == qid})
+
+    def where_label(self, label: str, chest: str = "") -> str:
+        """'FarmHouse fridge' -> 'the farmhouse (fridge)'; a chest by how it looks: 'the green chest (the farm)'."""
+        if label == "Backpack":
+            return "your backpack"
+        if chest and label.endswith(" chest") and label != "Junimo chest":
+            return f"the {chest} ({self.place(label[: -len(' chest')])})"
+        for kind in (" chest", " fridge", " auto-grabber"):
+            if label.endswith(kind) and label != "Junimo chest":
+                return f"{self.place(label[: -len(kind)])} ({kind.strip()})"
+        return label
+
     def hours_today(self) -> list[dict]:
         from .calendar import shop_hours
         return shop_hours(self)["shops"]

@@ -213,7 +213,7 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
                                                       "each": each, "kind": PRODUCE.get(cat, "Artifact"),
                                                       "where": set()})
             row["count"] += n
-            row["where"].add(_where(farm, it.where))
+            row["where"].add(farm.where_label(it.where, it.chest))
     sell_rows = sorted(({**r, "total": r["count"] * r["each"], "where": sorted(r["where"])} for r in sell.values()),
                        key=lambda r: -r["total"])
     proc_rows = sorted(({**r, "gain": int((r.pop("net_each") - r["each_raw"]) * r["count"])}
@@ -224,14 +224,6 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
             "sell": sell_rows, "process": proc_rows, "process_gain": sum(r["gain"] for r in proc_rows),
             "keep": keep_rows, "materials": sorted(materials.items(), key=lambda kv: -kv[1]),
             "filters": [{"id": k, "label": label, "on": bool(on[k]), **impact[k]} for k, label in FILTERS.items()]}
-
-
-def _where(farm: Farm, label: str) -> str:
-    """'FarmHouse fridge' -> 'the farmhouse (fridge)'; 'Coop chest' -> 'Coop (chest)'."""
-    for kind in (" chest", " fridge", " auto-grabber"):
-        if label.endswith(kind) and label != "Junimo chest":
-            return f"{farm.place(label[: -len(kind)])} ({kind.strip()})"
-    return label
 
 
 def _value(farm: Farm, qid: str) -> int:

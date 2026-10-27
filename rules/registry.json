@@ -12534,6 +12534,21 @@
    ],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "chest.colours",
+   "area": "Save file",
+   "summary": "A chest's colour is one of 20 on the colour bar (selection 1-20, fixed RGB values), saved as playerChoiceColor; selection 0 saves black and leaves the chest its plain look. Chest item ids: 130 Chest, 232 Stone Chest, BigChest, BigStoneChest.",
+   "checked_against": [
+    "StardewValley.Menus.DiscreteColorPicker.getColorFromSelection"
+   ],
+   "data": [
+    "Data/BigCraftables"
+   ],
+   "status": "verified",
+   "refs": [
+    "StardewValley.Objects.Chest"
+   ]
   }
  ]
 }

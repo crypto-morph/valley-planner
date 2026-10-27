@@ -17,6 +17,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .facts.chests import describe, ordinal
+
 XSI = "{http://www.w3.org/2001/XMLSchema-instance}"
 SEASONS = ("spring", "summer", "fall", "winter")
 CC_ROOMS = ("Pantry", "Crafts Room", "Fish Tank", "Boiler Room", "Vault", "Bulletin Board")  # areasComplete order
@@ -104,6 +106,7 @@ class Item:
     preserved_id: str = ""  # what went in
     spawned: bool = False  # found as forage (the Tiller bonus skips foraged fruit)
     uses: int = 0  # tackle wear
+    chest: str = ""  # which chest, as the player sees it: "green chest", "plain chest (left)"
 
     @property
     def qualified_id(self) -> str:
@@ -237,6 +240,14 @@ class Save:
 # --- reading ------------------------------------------------------------------------
 
 
+def _chest(el: ET.Element) -> tuple[str, int, int]:
+    """(how it looks, x, y) for a placed chest."""
+    c, t = _child(el, "playerChoiceColor"), _child(el, "tileLocation")
+    rgb = (_int(c, "R"), _int(c, "G"), _int(c, "B")) if c is not None else (0, 0, 0)
+    item_id = (_text(el, "itemId") or _text(el, "parentSheetIndex") or "130").removeprefix("(BC)")
+    return describe(item_id, *rgb), int(float(_text(t, "X") or 0)), int(float(_text(t, "Y") or 0))
+
+
 def _location_name(el: ET.Element, parents: dict) -> str:
     cur = parents.get(el)
     while cur is not None:
@@ -279,7 +290,7 @@ def _containers(root: ET.Element, player: ET.Element, parents: dict):
         yield f"{_location_name(loc_items, parents)} fridge", _child(loc_items, "items")
     for el in root.iter():
         if _tag(el) == "Object" and _type(el) == "Chest":
-            yield f"{_location_name(el, parents)} chest", _child(el, "items")
+            yield f"{_location_name(el, parents)} chest", _child(el, "items"), _chest(el)
         elif _tag(el) == "heldObject" and _type(el) == "Chest":  # auto-grabbers
             yield f"{_location_name(el, parents)} auto-grabber", _child(el, "items")
     for _k, v in _dict(_child(root, "globalInventories")):  # Junimo chests share one inventory
@@ -400,11 +411,19 @@ def read_save(path: Path, data=None) -> Save:
     shared.update({"180": "Egg (Brown)", "182": "Large Egg (Brown)"})  # the game's own wording for these two
 
     items = []
-    for where, container in _containers(root, player, parents):
-        for el in container if container is not None else []:
-            it = _item(el, where, shared)
-            if it:
-                items.append(it)
+    chests: dict[tuple[str, str], list[tuple[int, int, list[Item]]]] = {}  # (place, look) -> chests found
+    for where, container, *chest in _containers(root, player, parents):
+        held = [it for it in (_item(el, where, shared) for el in (container if container is not None else [])) if it]
+        items += held
+        if chest:
+            look, x, y = chest[0]
+            chests.setdefault((where, look), []).append((x, y, held))
+    for (_where, look), alike in chests.items():  # name each chest; alike ones by where they stand
+        alike.sort(key=lambda c: (c[0], c[1]))
+        for i, (_x, _y, held) in enumerate(alike):
+            label = look if len(alike) == 1 else f"{look} ({ordinal(i, len(alike))})"
+            for it in held:
+                it.chest = label
 
     weather, tomorrow, _ = _weather(root)
     stats = _child(player, "stats")

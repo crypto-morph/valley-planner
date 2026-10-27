@@ -939,6 +939,7 @@ Checked against Stardew Valley 1.6.15.24356. `scripts/rules.py check` flags any 
 | `mail.guild-quest` | 'guildQuest' (Marlon's letter) is queued for tomorrow when mine floor 5 is first generated; being a letter, it is in <mailbox> until read. | `StardewValley.Locations.MineShaft.addLevelChests`<br>`Data/mail guildQuest` | verified |
 | `mail.greenhouse` | Only 'ccPantry' is real mail (no-letter flag delivered next morning, by the CC Pantry or the Joja purchase). 'pantryUnlocked' does not exist in the game; 'greenhouseUnlocked' is a Farm field (<greenhouseUnlocked> on the Farm location), set from ccPantry when the Farm next resets, not a mail id. | `StardewValley.Farm.resetSharedState`<br>`StardewValley.Locations.CommunityCenter.doAreaCompleteReward` | to fix |
 | `mail.bus-repaired` | 'ccVault' is the real flag, queued (no letter) both when the CC Vault is completed and when the Joja bus development is bought. 'busFixed' and 'paidJoja' appear nowhere in the game code or data. | `StardewValley.Locations.CommunityCenter.doAreaCompleteReward`<br>`StardewValley.Menus.JojaCDMenu.receiveLeftClick` | to fix |
+| `chest.colours` | A chest's colour is one of 20 on the colour bar (selection 1-20, fixed RGB values), saved as playerChoiceColor; selection 0 saves black and leaves the chest its plain look. Chest item ids: 130 Chest, 232 Stone Chest, BigChest, BigStoneChest. | `StardewValley.Menus.DiscreteColorPicker.getColorFromSelection`<br>`Data/BigCraftables` | verified |
 
 ## Food
 

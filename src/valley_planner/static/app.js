@@ -45,20 +45,23 @@ function villagerCard(c) {
       (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
 }
 
+// " · in the green chest (the farm)" for where something is kept
+function inPlaces(where) { return where && where.length ? ` · in ${esc(where.join(", "))}` : ""; }
+
 function errandCard(name, c) {
   const head = `<h2 class="sign">${esc(c.title)}</h2>`;
   if (name === "gunther") {
     return head + `<p class="sub">${c.donated} donated so far.</p>` +
-      (c.take.length ? "<h3>Not donated yet</h3>" + list(c.take.map((x) => li(esc(x.name), `${x.kind}${x.held > 1 ? ` · you hold ${x.held}` : ""}`))) : '<p>Nothing you hold is new to the museum.</p>') +
+      (c.take.length ? "<h3>Not donated yet</h3>" + list(c.take.map((x) => li(esc(x.name), `${x.kind}${x.held > 1 ? ` · you hold ${x.held}` : ""}${inPlaces(x.where)}`))) : '<p>Nothing you hold is new to the museum.</p>') +
       (c.next_rewards.length ? "<h3>Closest rewards</h3>" + list(c.next_rewards.map((r) => li(esc(r.reward), `${r.left} more: ${esc(r.needs.join(", "))}`))) : "");
   }
   if (name === "clint") {
     return head + (c.busy ? `<p class="sub">${esc(c.busy)}.</p>` : "") +
-      (c.geodes.length ? "<h3>Geodes to crack</h3>" + list(c.geodes.map((g) => li(`${g.held} ${esc(g.name)}`, `${g.cost.toLocaleString()}g`))) : "<p>No geodes to crack.</p>") +
+      (c.geodes.length ? "<h3>Geodes to crack</h3>" + list(c.geodes.map((g) => li(`${g.held} ${esc(g.name)}`, `${g.cost.toLocaleString()}g${inPlaces(g.where)}`))) : "<p>No geodes to crack.</p>") +
       (c.upgrades.length ? "<h3>Tool upgrades</h3>" + list(c.upgrades.map((u) => li(`${esc(u.tool)}${u.can ? " · <b>you can do this now</b>" : ""}`, `${u.gold.toLocaleString()}g + ${esc(u.bars)} (you hold ${u.have_bars})`))) : "");
   }
   if (name === "cc") {
-    return head + (c.rooms.length ? c.rooms.map((r) => `<h3>${esc(r.room)}</h3>` + list(r.items.map((x) => li(`${x.count} ${esc(x.name)}${x.quality ? ` (${esc(x.quality)})` : ""}`, `${esc(x.bundle)}${x.open ? "" : " · room not open yet"}`)))).join("") : "<p>Nothing you hold fills an open slot right now.</p>") +
+    return head + (c.rooms.length ? c.rooms.map((r) => `<h3>${esc(r.room)}</h3>` + list(r.items.map((x) => li(`${x.count} ${esc(x.name)}${x.quality ? ` (${esc(x.quality)})` : ""}`, `${esc(x.bundle)}${x.open ? "" : " · room not open yet"}${inPlaces(x.where)}`)))).join("") : "<p>Nothing you hold fills an open slot right now.</p>") +
       (c.vault.length ? "<h3>Vault</h3>" + list(c.vault.map((v) => li(esc(v.bundle), v.gold <= c.money ? "<b>you can pay this now</b>" : `${(v.gold - c.money).toLocaleString()}g to go`))) : "");
   }
   if (name === "grange") {

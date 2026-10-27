@@ -34,7 +34,8 @@ def gunther(farm: Farm) -> dict:
         oid = qid.removeprefix("(O)")
         t = (objects.get(oid) or {}).get("Type")
         if qid.startswith("(O)") and t in ("Arch", "Minerals") and oid not in s.museum:
-            take.append({"name": farm.name(qid), "kind": "artifact" if t == "Arch" else "mineral", "held": n})
+            take.append({"name": farm.name(qid), "kind": "artifact" if t == "Arch" else "mineral", "held": n,
+                         "where": farm.where_held(qid)})
     donated_tags: dict[str, int] = defaultdict(int)
     for oid in s.museum:
         for tag in farm.machines.tags(Input(f"(O){oid}")):
@@ -55,7 +56,8 @@ def clint(farm: Farm) -> dict:
     s = farm.save
     held = farm.held()
     objects = farm.data.asset("Data/Objects")
-    geodes = [{"name": farm.name(q), "held": n, "cost": n * GEODE_PRICE} for q, n in held.items()
+    geodes = [{"name": farm.name(q), "held": n, "cost": n * GEODE_PRICE, "where": farm.where_held(q)}
+              for q, n in held.items()
               if q.startswith("(O)") and (objects.get(q[3:]) or {}).get("GeodeDropsDefaultItems")
               or (q.startswith("(O)") and (objects.get(q[3:]) or {}).get("GeodeDrops"))]
     upgrades = []
@@ -82,6 +84,7 @@ def community_center(farm: Farm) -> dict:
         b = farm.bundles.by_key[bkey]
         for qid, q, n in parts:
             rooms[b.room].append({"bundle": b.display, "name": farm.name(qid), "count": n,
+                                  "where": farm.where_held(qid),
                                   "quality": QUALITY.get(q, ""), "open": farm.bundles.notes_shown(b.area)})
     vault = [{"bundle": b.display, "gold": b.gold} for b in farm.bundles.in_area(VAULT) if not b.done]
     payable = [v for v in vault if v["gold"] <= s.money]
@@ -140,16 +143,16 @@ def grange(farm: Farm) -> dict:
         key = (e.item, e.quality, e.name)
         if key in held:
             held[key][1] += it.stack
-            held[key][2].add(it.where)
+            held[key][2].add(farm.where_label(it.where, it.chest))
         else:
-            held[key] = [e, it.stack, {it.where}]
+            held[key] = [e, it.stack, {farm.where_label(it.where, it.chest)}]
     picked = best([(e, n) for e, n, _ in held.values()])
     points = score(picked)
     place, tokens = prize(points)
     where = {(e.item, e.quality, e.name): w for e, _, w in held.values()}
     rows = [{"name": e.name, "quality": QUALITY.get(e.quality, ""), "kind": e.kind or "no kind bonus",
              "price": e.price, "points": e.points,
-             "pack": sorted(x for x in where[(e.item, e.quality, e.name)] if x != "Backpack")} for e in picked]
+             "pack": sorted(x for x in where[(e.item, e.quality, e.name)] if x != "your backpack")} for e in picked]
     kinds = sorted({e.kind for e in picked if e.kind})
     days = _days_until(farm, FAIR)
     return {"title": "Grange display for the Fair", "score": points, "place": place, "tokens": tokens,
