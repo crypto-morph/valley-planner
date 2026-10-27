@@ -218,7 +218,9 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
     evening = _minutes(EVENING)
     spare_end = min(evening, _minutes(fest.start)) if fest and _minutes(fest.start) > t else evening
     if spare_end - t >= 60:
-        busy = [a["text"] for a in todays if a["kind"] in ("chop", "mine", "fish", "get")]
+        picked = any(c.startswith("Pick: ") for c in chores)  # the farm block already picks your own trees
+        busy = [a["text"] for a in todays if a["kind"] in ("chop", "mine", "fish", "get")
+                and not (picked and " tree" in a["text"])]
         save = next((a for a in todays if a["kind"] == "save"), None)
         lines = busy or ["fish, forage or mine for gold" + (f": {save['text'][0].lower()}{save['text'][1:]}"
                                                            if save else "")]
@@ -236,7 +238,7 @@ def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:
 
 def _cart(farm: Farm) -> dict:
     """The cart today, and anything on it a bundle still needs."""
-    days = farm.cart.days(farm.when, count_days=1, guarantee=farm.save.cart_guarantee)
+    days = list(farm.cart.days(farm.when, count_days=1, guarantee=farm.save.cart_guarantee))
     want = {s["item"] for s in cc.plan(farm)["slots"] if s["status"] != "have"}
     hits = [f"{i.name} ({i.price:,}g)" for d in days for i in d.items if i.item in want]
     place = " & ".join(farm.place(p) for p in days[0].place.split(" & ")) if days else "the Forest"

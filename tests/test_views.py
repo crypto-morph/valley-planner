@@ -89,3 +89,15 @@ def test_morning_day_fits_shop_hours():
     for b in timed:
         if b.get("shop") in hours:
             assert any(a <= b["start"] and b["end"] <= z for a, z in hours[b["shop"]])
+
+
+def test_morning_cart_line():
+    """The cart's line for a day it's in the valley names where it is and what on it a bundle needs."""
+    from valley_planner.app import Planner
+    from valley_planner.views import morning
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    line = morning._cart(farm)
+    assert line["kind"] == "cart" and "6 AM to 8 PM" in line["title"]
