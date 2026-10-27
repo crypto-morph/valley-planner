@@ -58,3 +58,15 @@ def test_route_tree():
     shared = [st for st in cc["steps"] if st["shared"]]
     assert shared and all(st["shared"] == "The greenhouse" and st["gold"] == 0 for st in shared)
     assert {st["what"] for st in shared} <= {st["what"] for st in gh["steps"]}
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_route_agenda():
+    """The next week of the route, as days to act on, each naming the goal it serves."""
+    from valley_planner.engine.route.plan import AGENDA_DAYS, route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    v = route(new_farm(GameData(GAME)), ["greenhouse", "seed_maker"], [], tiles=80, cave="bats")
+    assert v["agenda"] and all(1 <= a["n"] < 1 + AGENDA_DAYS and a["goal"] and a["text"] for a in v["agenda"])
+    assert [a["n"] for a in v["agenda"]] == sorted(a["n"] for a in v["agenda"])

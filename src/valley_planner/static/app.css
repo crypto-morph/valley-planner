@@ -84,3 +84,5 @@ table.sell-table th, table.sell-table td { text-align: left; padding: 0.3rem 0.5
 .route-cash text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
 .route-cash .cross { stroke: var(--ink); stroke-width: 1; }
 .route-cash .tip { pointer-events: none; }
+.agenda .goal { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.agenda.save b { color: var(--warn); }

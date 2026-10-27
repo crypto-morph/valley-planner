@@ -177,6 +177,23 @@ function changed(wait = 150) {
 
 const STATUS = { done: "Done", ok: "On track", luck: "Down to luck", impossible: "Can't, as things stand" };
 
+// The route's next week on the To-do: what to do each day, and which goal it's for.
+async function todoRoute() {
+  const rs = routeState || loadRouteState(await get("/api/route/objectives"));
+  const body = { targets: rs.goals.filter((g) => g.tier === "target").map((g) => g.id),
+                 nice: rs.goals.filter((g) => g.tier === "nice").map((g) => g.id),
+                 cave: rs.cave, start: "save", settings: rs.settings };
+  $("#todo-route").innerHTML = '<p class="sub">Planning…</p>';
+  const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { $("#todo-route").innerHTML = ""; return; }
+  const v = await r.json();
+  const days = [...new Set(v.agenda.map((a) => a.day))];
+  const name = (d) => d === v.today ? "Today" : d.replace(/, Year \d+/, "");
+  $("#todo-route").innerHTML = days.length ? days.map((d) => `<h3>${esc(name(d))}</h3>` + list(v.agenda.filter((a) => a.day === d).map((a) =>
+    `<li class="agenda ${esc(a.kind)}"><span><b>${esc(a.text)}</b><br><span class="sub">${esc(a.why)}</span></span><span class="goal">${esc(a.goal)}</span></li>`))).join("")
+    : '<p class="sub">Nothing from the route this week: your goals are on track or out of reach (see the Route tab).</p>';
+}
+
 async function planRoute() {
   const goals = routeState.goals;
   const body = { targets: goals.filter((g) => g.tier === "target").map((g) => g.id),
@@ -326,6 +343,7 @@ const views = {
     }).join("") || '<p class="sub">Nothing on the list today.</p>';
     document.querySelectorAll("#todo-list input").forEach((box) => box.addEventListener("change", () =>
       fetch(`/api/todo/tick?task=${encodeURIComponent(box.dataset.task)}&done=${box.checked}`, { method: "PUT" })));
+    todoRoute();
     const y = v.yesterday;
     $("#todo-review-box").hidden = !y;
     if (y) {

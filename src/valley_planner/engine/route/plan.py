@@ -384,7 +384,7 @@ class Router:
 
     def needs(self, chain: list[Unlock], day: int) -> list[dict]:
         """The unlocks behind a step as the tree shows them: done already, planned for an earlier step, or new."""
-        out, t = [], day
+        out, t, start = [], day, None
         for u in chain + self.cost_extras(chain):
             if u.done:
                 state, when = "done", None
@@ -392,9 +392,11 @@ class Router:
                 state, when = "earlier", self.have[u.key]
                 t = max(t, when)
             else:
+                start = t
                 t += u.days
                 state, when = "new", t
-            out.append({"key": u.key, "label": u.label, "state": state, "ready": self.farm.label(when) if when else "",
+            out.append({"key": u.key, "label": u.label, "state": state, "on": start if state == "new" else None,
+                        "ready": self.farm.label(when) if when else "",
                         "gold": u.gold if state == "new" else 0, "how": u.how,
                         "materials": [f"{n} {self.farm.name(f'(O){m}')}" for m, n in u.materials]
                         if state == "new" else []})
@@ -522,6 +524,60 @@ class Router:
         return out
 
 
+AGENDA_DAYS = 7
+
+
+def _agenda(farm, outcomes: list[Outcome], today: int, res) -> list[dict]:
+    """The route's next week as things to do on the day, each saying which goal it serves."""
+    out: list[dict] = []
+    end = today + AGENDA_DAYS
+
+    def add(d, kind, text, why, goal, gold=0):
+        if today <= d < end:
+            out.append({"n": d, "day": farm.label(d), "kind": kind, "text": text, "why": why, "goal": goal,
+                        "gold": gold})
+
+    saving = None
+    for o in outcomes:
+        for st in o.steps:
+            if st.shared:
+                continue
+            new = [n for n in st.needs if n["state"] == "new"]
+            first = _thing(new[0]["label"]) if new else st.label
+            for d in st.chop_days:
+                add(d, "chop", "Chop Wood all day", f"Wood for {first}, for {st.label}", o.label)
+            for d in st.mine_days:
+                add(d, "mine", "Go down the Mines", f"deeper floors for {st.label}", o.label)
+            for n in new:
+                cost = ", ".join(([f"{n['gold']:,}g"] if n["gold"] else []) + n["materials"])
+                text = n["label"][0].upper() + n["label"][1:] + (f": {cost}" if cost else "")
+                add(n["on"], "buy", text, f"for {st.label}", o.label, n["gold"])
+                if n["gold"] and today <= n["on"] < today + 2 * AGENDA_DAYS and saving is None \
+                        and farm.save.money < n["gold"]:
+                    saving = (n, st, o)
+            if not new and st.gold:
+                add(st.day, "buy", f"Buy {st.label}: {st.gold:,}g", "", o.label, st.gold)
+            if st.act:
+                add(st.act, "fish", st.how[0].upper() + st.how[1:] if st.how else "Fish", f"for {st.label}", o.label)
+            elif st.how and not new and not st.gold:
+                add(st.ready, "get", f"Get {st.label.split(' (')[0]}: {st.how}", f"for {st.label}", o.label)
+    if saving:
+        n, st, o = saving
+        out.append({"n": today, "day": farm.label(today), "kind": "save",
+                    "text": f"Save up {n['gold']:,}g for {_thing(n['label'])} "
+                            f"by {farm.label(n['on'])}",
+                    "why": f"you have {farm.save.money:,}g; it's for {st.label}", "goal": o.label, "gold": n["gold"]})
+    out.sort(key=lambda a: (a["n"], a["kind"] != "save"))
+    return out
+
+
+def _thing(label: str) -> str:
+    """'build a Big Barn' -> 'a Big Barn'."""
+    for verb in ("build ", "buy ", "upgrade "):
+        label = label.removeprefix(verb)
+    return label
+
+
 def _span(farm, days: list[int]) -> str:
     """'Fall 22 – Fall 25' for a run of days, or the first and last of scattered ones."""
     if not days:
@@ -588,6 +644,7 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
                 c = cells[week(d)]["days"]
                 c[what] = c.get(what, 0) + 1
         matrix.append({"id": o.id, "cells": cells})
+    agenda = _agenda(farm, outcomes, r.today, res)
     offer = r.cave_day() if farm.save.cave_choice else res.earned_day(EARNINGS_TRIGGER)
     return {
         "settings": settings.__dict__, "cave": cave, "cave_day": label(offer),
@@ -605,6 +662,7 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
                        for o in outcomes],
         "weeks": [label(r.year_start + 1 + 7 * w) for w in range(WEEKS)],
         "today": label(r.today),
+        "agenda": agenda,
         "matrix": matrix,
         "cash": [{"day": d.day, "cash": d.cash, "earned": d.earned, "farming": d.level} for d in res.days],
         "end_cash": res.days[-1].cash if res.days else 0,
