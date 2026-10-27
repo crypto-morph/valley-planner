@@ -14,6 +14,22 @@ mid-spring; the Coop came on Summer 4 and the Barn on Summer 23; the Big Coop, k
 never came, so Duck Feather, Goat Milk, Wool, Truffle, Woodskip and Fried Egg were blocked by fall.
 Nothing had said in spring that a Big Coop was needed by early summer, or to bank Wood for it.
 
+## Milestones that pay for the rest
+
+Some objectives come before individual bundle slots because they make everything after them cheaper:
+
+- **The greenhouse by Fall 28.** It's the Pantry's reward (repaired the morning after the last Pantry
+  bundle), and it lets crops grow through winter. Planned backwards it sets early dates: fruit-tree
+  saplings planted by about Summer 1 (28 days to grow, then only their own season), a Coop and Barn,
+  then a Big Coop or Big Barn by mid-summer (the Animal bundle's fifth item), the Farming levels for
+  the Bee House (3), Preserves Jar (4) and Cheese Press (6), and the fall crops in time.
+- **The Seed Maker as early as possible.** Farming 9 (10,000 XP; each harvest gives
+  16·ln(0.018·price + 1), about 2-3 XP per tile per day whatever the crop), so it sets how many tiles to
+  farm from Spring 1: about 70 kept planted reaches it by mid-summer. It needs 25 Wood, 10 Coal and a
+  Gold Bar — in Year 1 Clint sells gold ore at 400g (copper 75g, iron 150g, coal 150g), so the bar can be
+  bought for about 2,000g rather than mined. With it, seeds stop costing money and planting can grow.
+- **Then the rest of the Community Center**, fitted around those.
+
 ## Stages
 
 1. **Requirements** (`engine/route/needs.py`): every bundle slot, its best route and its lead time from
