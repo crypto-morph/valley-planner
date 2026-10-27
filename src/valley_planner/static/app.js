@@ -120,11 +120,11 @@ function loadRouteState(catalog) {
   const goals = (saved && saved.goals ? saved.goals.filter((g) => ids.includes(g.id)) : []);
   ids.filter((id) => !goals.some((g) => g.id === id)).forEach((id) =>
     goals.push({ id, tier: ["greenhouse", "seed_maker"].includes(id) ? "target" : "nice" }));
-  return { goals, cave: (saved && saved.cave) || "best", settings: { ...catalog.settings, ...((saved && saved.settings) || {}) },
+  return { goals, cave: (saved && saved.cave) || "best", start: (saved && saved.start) || "save", settings: { ...catalog.settings, ...((saved && saved.settings) || {}) },
            labels: Object.fromEntries(catalog.objectives.map((o) => [o.id, o.label])) };
 }
 function saveRouteState() {
-  try { localStorage.setItem("route", JSON.stringify({ goals: routeState.goals, cave: routeState.cave, settings: routeState.settings })); } catch { /* fine */ }
+  try { localStorage.setItem("route", JSON.stringify({ goals: routeState.goals, cave: routeState.cave, start: routeState.start, settings: routeState.settings })); } catch { /* fine */ }
 }
 
 function drawGoals() {
@@ -162,6 +162,8 @@ function drawSettings() {
     routeState.settings[inp.dataset.k] = Math.max(0, parseInt(inp.value || "0", 10));
     changed(600);
   }));
+  $("#route-start").value = routeState.start;
+  $("#route-start").onchange = () => { routeState.start = $("#route-start").value; changed(); };
   $("#route-cave").value = routeState.cave;
   $("#route-cave").onchange = () => { routeState.cave = $("#route-cave").value; changed(); };
 }
@@ -173,13 +175,13 @@ function changed(wait = 150) {
   routeTimer = setTimeout(planRoute, wait);
 }
 
-const STATUS = { ok: "On track", luck: "Down to luck", impossible: "Can't, as things stand" };
+const STATUS = { done: "Done", ok: "On track", luck: "Down to luck", impossible: "Can't, as things stand" };
 
 async function planRoute() {
   const goals = routeState.goals;
   const body = { targets: goals.filter((g) => g.tier === "target").map((g) => g.id),
                  nice: goals.filter((g) => g.tier === "nice").map((g) => g.id),
-                 cave: routeState.cave, settings: routeState.settings };
+                 cave: routeState.cave, start: routeState.start, settings: routeState.settings };
   $("#route-results").innerHTML = '<p class="sub">Planning the year…</p>';
   const r = await fetch("/api/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) { $("#route-results").innerHTML = `<p>Couldn't plan: ${esc(r.statusText)}</p>`; return; }
@@ -192,18 +194,57 @@ async function planRoute() {
   $("#route-results").innerHTML = v.objectives.length ? v.objectives.map((o) =>
     `<div class="route-result ${esc(o.status)}"><h3>${esc(o.label)} <span class="sub">· ${o.tier === "target" ? "target" : "nice to have"}</span></h3>` +
     `<div><b>${esc(STATUS[o.status] || o.status)}</b>${o.finish ? ` · done by ${esc(o.finish)}` : ""} · deadline ${esc(o.deadline)}${o.gold ? ` · ${o.gold.toLocaleString()}g` : ""}</div>` +
-    (o.problems.length ? "<ul>" + o.problems.map((p) => `<li>${esc(p)}</li>`).join("") + "</ul>" : "") + "</div>"
+    routeTree(o) + "</div>"
   ).join("") : '<p class="sub">Pick at least one goal.</p>';
   drawMatrix(v);
   drawCash(v);
 }
 
+// One goal as a tree: each thing it needs, and under it the steps to get it, in order.
+function routeTree(o) {
+  if (o.status === "done") return '<p class="sub">Already done in your save.</p>';
+  const g = (n) => `${n.toLocaleString()}g`;
+  const leaf = (cls, text, when) => `<li class="${cls}"><span>${text}</span>${when ? `<span class="when">${esc(when)}</span>` : ""}</li>`;
+  const item = (st) => {
+    if (st.shared) {
+      return `<li class="shared"><span>${esc(st.what)}</span><span class="when">in hand ${esc(st.ready)} · planned under ${esc(st.shared)}</span></li>`;
+    }
+    const kids = [];
+    if (st.chop_days) kids.push(leaf("chop", `Chop Wood: ${st.chop_days} day${st.chop_days === 1 ? "" : "s"}`, st.chop));
+    if (st.mine_days) kids.push(leaf("mine", `Go down the Mines: ${st.mine_days} day${st.mine_days === 1 ? "" : "s"}`, st.mine));
+    for (const n of st.needs) {
+      if (n.state === "done") kids.push(leaf("done", `${esc(cap(n.label))} <span class="sub">(you have it)</span>`, ""));
+      else if (n.state === "earlier") kids.push(leaf("earlier", `${esc(cap(n.label))} <span class="sub">(planned above)</span>`, n.ready ? `ready ${n.ready}` : ""));
+      else {
+        const cost = [n.gold ? g(n.gold) : "", ...n.materials].filter(Boolean).join(", ");
+        kids.push(leaf("new", `${esc(cap(n.label))}${cost ? ` <span class="cost">${esc(cost)}</span>` : ""}`, n.ready ? `ready ${n.ready}` : ""));
+      }
+    }
+    if (st.how) kids.push(leaf("get", esc(cap(st.how)), st.act || st.ready));
+    return `<li class="node"><details${kids.length > 1 ? " open" : ""}><summary><span>${esc(st.what)}</span>` +
+      `<span class="when">in hand ${esc(st.ready)}</span></summary><ul>${kids.join("")}</ul></details></li>`;
+  };
+  const misses = (o.misses || []).map((m) => `<li class="node miss"><span>✗ ${esc(m.what)}</span><span class="why">${esc(m.why)}</span></li>`);
+  const notes = (o.notes || []).map((p) => `<li class="node miss"><span>✗ ${esc(p)}</span></li>`);
+  const rows = o.steps.map(item).concat(misses, notes);
+  return rows.length ? `<ul class="route-tree">${rows.join("")}</ul>` : "";
+}
+
+// "Fall 22, Year 1" after "Fall 20, Year 1"?
+function laterThan(a, b) {
+  const n = (s) => { const m = /(\w+) (\d+), Year (\d+)/.exec(s); return m ? (+m[3] - 1) * 112 + ["Spring", "Summer", "Fall", "Winter"].indexOf(m[1]) * 28 + +m[2] : 0; };
+  return n(a) > n(b);
+}
+
+function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+
 function drawMatrix(v) {
   const short = (w) => w.replace(", Year 1", "").replace("Spring", "Sp").replace("Summer", "Su").replace("Fall", "Fa").replace("Winter", "Wi");
-  const head = "<tr><th class=\"row\">Goal</th>" + v.weeks.map((w) => `<th>${esc(short(w))}</th>`).join("") + "</tr>";
+  const from = Math.max(0, v.weeks.filter((w) => !laterThan(w, v.today)).length - 1);  // from this week on
+  const head = "<tr><th class=\"row\">Goal</th>" + v.weeks.slice(from).map((w) => `<th>${esc(short(w))}</th>`).join("") + "</tr>";
   const rows = v.matrix.map((m) => {
     const o = v.objectives.find((x) => x.id === m.id);
-    return `<tr><th class="row">${esc(o ? o.label : m.id)}</th>` + m.cells.map((c) => {
+    return `<tr><th class="row">${esc(o ? o.label : m.id)}</th>` + m.cells.slice(from).map((c) => {
       const days = Object.entries(c.days).map(([k, n]) => `${{ chop: "C", mine: "M", fish: "F" }[k] || k}${n}`).join(" ");
       const tip = [c.buy.length ? `Buy: ${c.buy.join(", ")}` : "", c.ready.length ? `Arrives: ${c.ready.join(", ")}` : "", days ? `Days: ${days}` : ""].filter(Boolean).join("\n");
       const cls = [(c.gold || days) ? "has" : "", c.ready.length ? "ready" : ""].filter(Boolean).join(" ");
@@ -218,13 +259,16 @@ function drawCash(v) {
   if (!pts.length) { $("#route-cash").innerHTML = ""; return; }
   const W = 760, H = 220, L = 52, R = 10, T = 10, B = 26;
   const max = Math.max(1000, ...pts.map((p) => p.cash)), min = Math.min(0, ...pts.map((p) => p.cash));
-  const x = (d) => L + (d - 1) / (pts.length - 1) * (W - L - R);
+  const d0 = pts[0].day, d1 = pts[pts.length - 1].day;
+  const x = (d) => L + (d - d0) / Math.max(1, d1 - d0) * (W - L - R);
   const y = (c) => T + (max - c) / (max - min) * (H - T - B);
   const step = Math.pow(10, Math.floor(Math.log10(max))) * (max / Math.pow(10, Math.floor(Math.log10(max))) > 5 ? 2 : 1);
   let grid = "";
   for (let g = 0; g <= max; g += step) grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L - 6}" y="${y(g) + 4}" text-anchor="end">${g >= 1000 ? (g / 1000) + "k" : g}</text>`;
   ["Spring", "Summer", "Fall", "Winter"].forEach((s, i) => {
-    const d = 1 + i * 28;
+    const start = Math.floor((d0 - 1) / 112) * 112 + 1 + i * 28;
+    if (start + 27 < d0 || start > d1) return;
+    const d = Math.max(start, d0);
     grid += `<line class="grid" x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${H - B}"/><text x="${x(d) + 4}" y="${H - 8}">${s}</text>`;
   });
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.day).toFixed(1)},${y(p.cash).toFixed(1)}`).join("");

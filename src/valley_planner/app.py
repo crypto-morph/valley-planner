@@ -60,6 +60,7 @@ class RouteAsk(BaseModel):
     targets: list[str] = Field(default_factory=lambda: ["greenhouse", "seed_maker"])
     nice: list[str] = Field(default_factory=lambda: ["kitchen", "cc"])
     cave: str = "best"
+    start: str = "save"  # "save": from today in the chosen save; "fresh": a new farm on Spring 1
     settings: dict = Field(default_factory=dict)
 
 
@@ -162,14 +163,16 @@ def create_app(planner: Planner | None = None) -> FastAPI:
 
     @app.post("/api/route")
     def route_view(ask: RouteAsk) -> dict:
-        """A fresh Year 1 planned for these targets (in order) and nice-to-haves (in order)."""
+        """The rest of this year (from the save, or a fresh farm) planned for these targets (in order) and
+        nice-to-haves (in order)."""
         from .engine.route.plan import CATALOG, Settings, route
         from .engine.route.start import new_farm
         known = set(CATALOG)
         allowed = {k for k in Settings().__dict__}
         settings = Settings(**{k: int(v) for k, v in ask.settings.items() if k in allowed})
         cave = ask.cave if ask.cave in ("best", "bats", "mushrooms") else "best"
-        return route(new_farm(p().data), [t for t in ask.targets if t in known],
+        farm = p().farm() if ask.start == "save" and p().path() is not None else new_farm(p().data)
+        return route(farm, [t for t in ask.targets if t in known],
                      [n for n in ask.nice if n in known and n not in ask.targets], settings=settings, cave=cave)
 
     @app.get("/api/ask")

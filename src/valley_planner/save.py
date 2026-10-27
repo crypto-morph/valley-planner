@@ -176,6 +176,7 @@ class Save:
     deepest_mine_level: int = 0
     mine_lowest: int = 0  # lowest Mines level anyone reached (shop conditions use this)
     cave_choice: int = 0  # 0 not chosen yet, 1 fruit bats, 2 mushrooms
+    experience: dict[str, int] = field(default_factory=dict)  # skill -> XP points
     axe_level: int = 0
     rod_level: int = -1  # -1 no rod; 0 Bamboo, 1 Training, 2 Fiberglass, 3 Iridium, 4 Advanced Iridium
     tool_levels: dict[str, int] = field(default_factory=dict)  # Axe, Pickaxe, Hoe, WateringCan, Pan -> level
@@ -564,6 +565,8 @@ def read_save(path: Path, data=None) -> Save:
         max_stamina=_int(player, "maxStamina", 270), max_items=_int(player, "maxItems", 12),
         house_upgrade=house_upgrade, deepest_mine_level=_int(player, "deepestMineLevel"),
         cave_choice=_int(player, "caveChoice"),
+        experience=dict(zip(("farming", "fishing", "foraging", "mining", "combat", "luck"),
+                            (int(c.text or 0) for c in _or(_child(player, "experiencePoints"), [])), strict=False)),
         axe_level=max(0, _tool_level(player, "Axe", root)), rod_level=_tool_level(player, "FishingRod", root),
         tool_levels={t: _tool_level(player, t, root) for t in ("Axe", "Pickaxe", "Hoe", "WateringCan", "Pan")},
         tool_at_clint=_upgrading(player),

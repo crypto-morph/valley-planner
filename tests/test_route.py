@@ -42,3 +42,19 @@ def test_cave_odds():
     assert 0.06 < nightly(BATS, "637") < 0.075
     assert 20 <= nights_for(BATS, "637") <= 25
     assert nights_for(MUSHROOMS, "637") is None and nightly(MUSHROOMS, "422") > 0.13  # six boxes, 2.5% each
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
+def test_route_tree():
+    """Each step carries what's behind it in order, and a requirement two goals share is planned once."""
+    from valley_planner.engine.route.plan import route
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    v = route(new_farm(GameData(GAME)), ["greenhouse"], ["cc"], tiles=80, cave="bats")
+    gh, cc = v["objectives"]
+    built = [n for st in gh["steps"] for n in st["needs"] if n["state"] == "new"]
+    assert built and all(n["ready"] for n in built)
+    shared = [st for st in cc["steps"] if st["shared"]]
+    assert shared and all(st["shared"] == "The greenhouse" and st["gold"] == 0 for st in shared)
+    assert {st["what"] for st in shared} <= {st["what"] for st in gh["steps"]}

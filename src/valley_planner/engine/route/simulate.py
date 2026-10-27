@@ -37,10 +37,10 @@ class Result:
     days: list[Day] = field(default_factory=list)
 
     def cash(self, d: int) -> int:
-        return self.days[d - 1].cash
+        return next((x.cash for x in self.days if x.day == d), self.days[-1].cash if self.days else 0)
 
     def lowest_from(self, d: int) -> int:
-        return min(x.cash for x in self.days[d - 1:]) if d <= len(self.days) else 0
+        return min((x.cash for x in self.days if x.day >= d), default=0)
 
     def earned_day(self, gold: int) -> int | None:
         return next((x.day for x in self.days if x.earned >= gold), None)
@@ -54,11 +54,16 @@ def season_of(d: int) -> str:
 
 
 class Farmsim:
-    def __init__(self, farm, *, tiles: int = 60, start_cash: int = 500, float_gold: int = FLOAT):
+    def __init__(self, farm, *, tiles: int = 60, float_gold: int = FLOAT):
         self.farm = farm
         self.tiles = tiles
         self.float = float_gold
-        self.start_cash = start_cash
+        save = farm.save
+        self.today = save.days_played
+        self.end = ((self.today - 1) // YEAR_DAYS + 1) * YEAR_DAYS  # the end of this year
+        self.start_cash = save.money
+        self.start_xp = (getattr(save, "experience", {}) or {}).get("farming", 0)
+        self.start_earned = save.total_earned
         self._rates: dict[tuple[str, bool], CropRate | None] = {}
 
     def rate(self, season: str, free: bool) -> CropRate | None:
@@ -68,22 +73,23 @@ class Farmsim:
         return self._rates[key]
 
     def run(self, spends: list[tuple[int, int]], *, seed_maker_day: int | None = None,
-            greenhouse_day: int | None = None, days: int = YEAR_DAYS, income: dict[int, int] | None = None,
+            greenhouse_day: int | None = None, days: int | None = None, income: dict[int, int] | None = None,
             xp: dict[int, int] | None = None) -> Result:
         """`spends`: (day, gold) bought that morning; `income` / `xp`: extra gold arriving and XP earned by day
         (animal produce, fishing, petting)."""
         income, extra_xp = income or {}, xp or {}
         crops = self.farm.crops
-        cash, xp = self.start_cash, 0
+        cash, xp = self.start_cash, self.start_xp
+        last = days or self.end
         due: dict[int, int] = {}
         for d, g in spends:
             due[d] = due.get(d, 0) + g
         pay: dict[int, int] = {}  # income arriving that morning
-        growing: list[list] = []  # [ripe day, harvest id, regrow, season end, count, xp each, gold each, indoor]
+        growing: list[list] = self._planted()  # [ripe day, harvest id, regrow, season end, count, xp, gold, indoor]
         out = Result()
-        parsnip = crops.by_seed.get("472")
-        earned = 0
-        for d in range(1, days + 1):
+        parsnip = crops.by_seed.get("472") if self.today == 1 else None
+        earned = self.start_earned
+        for d in range(self.today, last + 1):
             arriving = pay.pop(d, 0) + income.get(d, 0)
             earned += arriving
             cash += arriving
@@ -97,7 +103,7 @@ class Farmsim:
                     xp += g[5] * g[4]
                     g[0] = d + g[2] if g[2] else 0
             growing = [g for g in growing if g[0] and (g[7] or g[0] <= g[3])]
-            if d == 1 and parsnip:  # the 15 Parsnip Seeds you start with
+            if d == self.today and parsnip:  # a new farm's 15 Parsnip Seeds
                 growing.append(self._planting(parsnip, d, START_SEEDS, season_end, False))
             free_seeds = seed_maker_day is not None and d >= seed_maker_day
             reserve = self.float + sum(g for x, g in due.items() if d < x <= d + RESERVE_DAYS)
@@ -121,9 +127,27 @@ class Farmsim:
                         n = min(n, max(0, (cash - reserve) // price))
                     if n > 0:
                         cash -= n * price
-                        growing.append(self._planting_rate(gr, d, n, YEAR_DAYS * 2, True))
+                        growing.append(self._planting_rate(gr, d, n, last + YEAR_DAYS, True))
             xp += extra_xp.get(d, 0)
             out.days.append(Day(d, cash, xp, outdoor_used, level_for(xp), earned))
+        return out
+
+    def _planted(self) -> list[list]:
+        """What the save already has growing, each tile as one planting that pays on its ripening day."""
+        out = []
+        for c in self.farm.save.crops:
+            if c.forage or c.dead or not c.harvest_id or c.harvest_id == "-1":
+                continue
+            info = self.farm.crops.get(c.seed_id) if c.seed_id else self.farm.crops.by_harvest.get(c.harvest_id)
+            item = self.farm.items.get(c.harvest_id)
+            if not info or not item:
+                continue
+            indoor = c.location == "Greenhouse" or c.location.startswith("Island")
+            season_end = ((self.today - 1) // 28 + 1) * 28
+            while season_of(season_end + 1) in info.seasons and season_end - self.today < YEAR_DAYS:
+                season_end += 28
+            out.append([self.today + c.days_left, c.harvest_id, info.regrow, season_end, 1,
+                        harvest_xp(item.price), item.price, indoor])
         return out
 
     def _planting(self, info, d: int, n: int, season_end: int, indoor: bool) -> list:
