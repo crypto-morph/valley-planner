@@ -65,3 +65,65 @@ def raw_pool(season: str, day: int, year: int, *, mine_lowest: int = 0, mine_bot
     ids |= set(SEASON[season])
     ids |= set(possible_crops(season, day <= 7, year, vault))
     return ids
+
+
+def quest_today(save, data, *, festival: bool = False) -> dict | None:
+    """The board's request this morning (Utility.getQuestOfTheDay, ItemDeliveryQuest.loadQuestInfo). It isn't in the
+    save, but it's a day-seeded roll: {"kind", "who", "item"} (who and item for deliveries), or None for no request."""
+    from .conditions import When, check
+    from .rng import NetRandom, day_save_random, random_seed
+    gid, day = int(save.unique_id), save.days_played
+    legacy = save.legacy_random
+    if day <= 1 or festival:
+        return None
+    w = When.from_save(save)
+    roll = day_save_random(day, gid, 100, day * 777, legacy=legacy).next_double()
+    if roll < 0.08:
+        return {"kind": "resource"}
+    if roll < 0.2 and save.deepest_mine_level > 0 and day > 5:
+        return {"kind": "slay"}
+    if roll < 0.5:
+        return None
+    if roll < 0.6:
+        return {"kind": "fishing"}
+    if roll < 0.66 and w.weekday == 1:
+        return {"kind": "socialize"}
+    people = [k for k, c in data.asset("Data/Characters").items()
+              if check(c.get("CanSocialize"), w) is not False
+              and (check(c["ItemDeliveryQuests"], w) if c.get("ItemDeliveryQuests") is not None
+                   else c.get("HomeRegion") == "Town")
+              and k in save.friends and str(c.get("Age")) != "Child" and save.friends[k].status != "Married"]
+    if not people:
+        return None
+    r = NetRandom(random_seed(gid, day, legacy=legacy))
+    who = people[r.next(len(people))]
+    vault = "ccVault" in save.mail
+    if who == "Wizard" and "wizardJunimoNote" not in save.mail and "JojaMember" not in save.mail:
+        who = "Demetrius"
+    if save.season != "winter" and r.next_double() < 0.15:
+        return {"kind": "delivery", "who": who,
+                "item": r.choose(possible_crops(save.season, save.day <= 7, save.year, vault))}
+    pool = list(BASE)
+    if save.deepest_mine_level > 40:
+        pool += MINES_40
+    if save.deepest_mine_level > 80:
+        pool += MINES_80
+    if vault:
+        pool += VAULT
+    if "Furnace" in save.crafting_recipes:
+        pool += FURNACE
+    if "Quartz Globe" in save.crafting_recipes:
+        pool += QUARTZ_GLOBE
+    pool += SEASON[save.season]
+    rng = NetRandom(random_seed(gid, day, 1000, legacy=legacy))
+    crops = possible_crops(save.season, save.day <= 7, save.year, vault)
+    recipes = data.asset("Data/CookingRecipes")
+    for name in save.cooking_order:
+        if rng.next_double() < 0.4 or name not in recipes:
+            continue
+        fields = recipes[name].split("/")
+        needs = fields[0].split()[::2]
+        if all(n in pool or n in crops or (n.startswith("-") and n not in ("-5", "-6")) for n in needs):
+            pool.append(fields[2].split()[0])
+    item = rng.choose(pool)
+    return {"kind": "delivery", "who": who, "item": {"-5": "176", "-6": "184"}.get(item, item)}

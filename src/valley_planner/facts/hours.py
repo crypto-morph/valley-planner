@@ -202,5 +202,6 @@ class Hours:
             windows += self._windows(shop, npc, days[0], when)
         out.open = _intersect(_merge(windows), lo, hi)
         if not out.open:
-            out.closed_why = f"{shop.owner if shop.owner != 'Any' else 'No one'} isn't at the counter today"
+            out.closed_why = (f"{shop.owner} isn't at the counter today" if shop.owner != "Any"
+                              else "no one's at the counter today")
         return out

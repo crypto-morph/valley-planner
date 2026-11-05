@@ -23,6 +23,7 @@
     <button type="button" data-view="crops">Crops</button>
     <button type="button" data-view="sell">Sell</button>
     <button type="button" data-view="cook">Cook</button>
+    <button type="button" data-view="romance">Romance</button>
     <button type="button" data-view="plan">Plan</button>
     <button type="button" data-view="route">Route</button>
     <button type="button" data-view="cart">Cart</button>
@@ -55,8 +56,24 @@
           <h2 class="sign" id="m-date"></h2>
           <div class="m-glance" id="m-glance"></div>
         </div>
+        <div id="m-priorities" class="priorities"></div>
         <div class="dayline-wrap"><div id="m-day" class="dayline"></div></div>
         <p class="sub">A suggested order: the farm first, then each errand while its shop is open. Shop hours are the game's.</p>
+      </section>
+      <section class="parch panel">
+        <h2 class="sign">Today's plan</h2>
+        <form id="t-form" class="t-form">
+          <label>Time <input id="t-time" type="time" step="600"></label>
+          <label>Energy <input id="t-energy" type="number" min="0" max="600"></label>
+          <label>Where <select id="t-where"></select></label>
+          <button type="submit">Recalculate</button>
+          <button type="button" id="t-reset">Back to this morning</button>
+        </form>
+        <div id="t-plan"></div>
+      </section>
+      <section class="parch panel">
+        <h2 class="sign">Skills</h2>
+        <div id="t-skills" class="t-skills"></div>
       </section>
       <div class="two">
         <section class="parch panel">
@@ -160,6 +177,36 @@
           <h2 class="sign">Hold on to</h2>
           <div id="sell-filters" class="filter-list"></div>
           <div id="sell-keep"></div>
+        </section>
+      </div>
+      <section class="parch panel" id="sell-hints-panel">
+        <h2 class="sign">Worth getting</h2>
+        <p class="sub">A machine you don't have at all, that would pay better than what you're doing with
+          what's left raw — with its recipe and what it takes to craft.</p>
+        <div id="sell-hints"></div>
+      </section>
+    </section>
+
+    <section id="view-romance" class="view" hidden>
+      <section class="parch panel">
+        <h2 class="sign">Who are you courting?</h2>
+        <select id="romance-target" class="romance-pick"><option value="">Choose someone…</option></select>
+      </section>
+      <div id="romance-body" hidden>
+        <section class="parch panel">
+          <h2 class="sign" id="romance-head"></h2>
+          <p class="sub" id="romance-status"></p>
+          <div id="romance-cap"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">Where to find them today</h2>
+          <div id="romance-where"></div>
+        </section>
+        <section class="parch panel">
+          <h2 class="sign">What you hold that would help</h2>
+          <p class="sub">Loved gifts give 80 points, liked 45 (×8 on their birthday); a heart is 250. Two gifts
+            count against the week, from Sunday.</p>
+          <div class="table-wrap"><table class="sell-table" id="romance-gifts"></table></div>
         </section>
       </div>
     </section>

@@ -12742,6 +12742,292 @@
    ],
    "status": "verified",
    "refs": []
+  },
+  {
+   "id": "bins.roll",
+   "area": "Garbage cans",
+   "summary": "Each can has its own day generator, seeded from (days played, game id / 2, 777 + hash of the can's id). It skips forward twice, each time Next(0, 100) NextDouble() draws, and the next NextDouble() is the roll: below 0.2 (DefaultBaseChance, unless the can sets its own) plus the day's luck, plus 0.2 with Book_Trash read, lets ordinary entries through. Chances are added as single-precision floats.",
+   "checked_against": [
+    "StardewValley.GameLocation.TryGetGarbageItem",
+    "StardewValley.Utility.CreateDaySaveRandom",
+    "StardewValley.Utility.CreateRandomSeed"
+   ],
+   "data": [
+    "Data/GarbageCans (DefaultBaseChance, BaseChance)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_garbage.py::test_the_rolls_match_the_game",
+    "tests/test_garbage.py::test_today_is_exact",
+    "tests/test_garbage.py::test_the_trash_book_lifts_the_base_chance_only"
+   ]
+  },
+  {
+   "id": "bins.walk",
+   "area": "Garbage cans",
+   "summary": "BeforeAll, the can's Items, then AfterAll are walked in order and the first entry that passes wins. An entry needs a passed roll unless IgnoreBaseChance is set. Conditions run left to right and stop at the first failure, so a RANDOM after a failed query draws nothing; RANDOM draws on the can's generator, SYNCED_RANDOM on its own day generator, and @addDailyLuck adds the luck. RandomItemId and random stack amounts then draw on the can's generator.",
+   "checked_against": [
+    "StardewValley.GameLocation.TryGetGarbageItem",
+    "StardewValley.GameStateQuery.CheckConditions/2",
+    "StardewValley.GameStateQuery.DefaultResolvers.RANDOM",
+    "StardewValley.GameStateQuery.DefaultResolvers.SYNCED_RANDOM",
+    "StardewValley.Utility.ApplyQuantityModifiers"
+   ],
+   "data": [
+    "Data/GarbageCans (BeforeAll, Items, AfterAll, IgnoreBaseChance)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_garbage.py::test_a_failed_roll_leaves_a_can_empty_unless_an_entry_ignores_the_base_chance",
+    "tests/test_garbage.py::test_an_unmet_query_skips_the_random_after_it",
+    "tests/test_garbage.py::test_special_order_rules_and_stacks"
+   ]
+  },
+  {
+   "id": "bins.luck-ahead",
+   "area": "Garbage cans",
+   "summary": "Today's luck is in the save (the Special Charm adds 0.025), so today's cans are exact. Tomorrow's is rolled overnight as Next(-100, 101) / 1000 from a generator seeded with the step count, after other draws, so it can't be known: another day is reported as the share of those 201 lucks that fill the can. Nothing else in a can's roll depends on the player, so opening order doesn't matter.",
+   "checked_against": [
+    "StardewValley.Game1._newDayAfterFade"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_garbage.py::test_another_day_gives_the_share_of_lucks_that_fill_it",
+    "tests/test_garbage.py::test_the_dish_is_only_known_today"
+   ]
+  },
+  {
+   "id": "bins.season-item",
+   "area": "Garbage cans",
+   "summary": "RANDOM_BASE_SEASON_ITEM picks with Next(count) from a list built from: nine always-available items; five more past Mines floor 40 and three past 80 (reaching the bottom implies both); four with ccVault; the four bars with the Furnace recipe, Refined Quartz with the Quartz Globe recipe; then the season's items, with duplicates kept.",
+   "checked_against": [
+    "StardewValley.Utility.getRandomItemFromSeason",
+    "StardewValley.Internal.ItemQueryResolver.DefaultResolvers.RANDOM_BASE_SEASON_ITEM"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_garbage.py::test_today_is_exact"
+   ]
+  },
+  {
+   "id": "bins.places",
+   "area": "Garbage cans",
+   "summary": "The town's eight cans are the 'Action Garbage <id>' tiles on the Town map: JodiAndKent, EmilyAndHaley, Mayor, Museum, Blacksmith, Saloon, Evelyn and JojaMart. The numeric ids 0-7 are old names for these. DesertFestival is a separate can in the desert that always holds Calico Eggs.",
+   "checked_against": [
+    "StardewValley.GameLocation.CheckGarbage"
+   ],
+   "data": [
+    "Data/GarbageCans",
+    "Maps/Town"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_garbage.py::test_today_is_exact"
+   ]
+  },
+  {
+   "id": "travel.minecarts",
+   "area": "Travel",
+   "summary": "The minecart network is free and opens when the host has ccBoilerRoom. Stops: Town and the Bus Stop always, the Mines once the landslide is cleared (landslideDone), the Quarry once the Crafts Room is done (ccCraftsRoom).",
+   "checked_against": [],
+   "data": [
+    "Data/Minecarts (UnlockCondition, Destinations, Condition, TargetTile)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_travel_pace.py::test_minecarts_open_with_the_boiler_room_and_each_stop_has_its_condition"
+   ]
+  },
+  {
+   "id": "travel.totems",
+   "area": "Travel",
+   "summary": "Using a warp totem spends it and warps you: Mountains (31,20), Beach (20,4), Desert (35,43), Island South (11,11), and the Farm to its map's WarpTotemEntry tile. Recipes: Farm at Foraging 8, Mountains at 7, Beach at 6. The Desert and Island recipes aren't skill-taught: Desert comes from the Desert Trader (10 Iridium Bars for the recipe, 3 Omni Geodes for a totem), Island from the Volcano shop (10,000g). The Casino sells the Farm totem, as does the Island Trader for 5 of item 830.",
+   "checked_against": [
+    "StardewValley.Object.totemWarpForReal"
+   ],
+   "data": [
+    "Data/CraftingRecipes",
+    "Data/Shops (Casino, DesertTrade, IslandTrade, VolcanoShop)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_travel_pace.py::test_totems_read_their_recipes"
+   ]
+  },
+  {
+   "id": "route.mines-pace",
+   "area": "Route",
+   "summary": "Planning choice: the Mines are planned at a weekly target (10 floors, one trip a week), so floor 120 takes twelve weeks. After two weeks and floor 5 the target moves halfway to the pace the save shows, kept between 5 and 40 a week. The save holds only the deepest floor, so a slow player and a busy one look alike.",
+   "checked_against": [],
+   "data": [],
+   "status": "planning choice",
+   "refs": [],
+   "tests": [
+    "tests/test_travel_pace.py::test_pace_moves_halfway_towards_what_the_save_shows",
+    "tests/test_travel_pace.py::test_a_faster_pace_needs_fewer_trips_and_they_stay_a_week_apart"
+   ]
+  },
+  {
+   "id": "route.goal-needs",
+   "area": "Route",
+   "summary": "Planning rule: a goal can depend on other goals. Choosing it brings them in just ahead of it, at its tier and within its deadline, and its steps wait for them. If one can't be done in time the goal says so and isn't planned. The Skull Cavern needs the bottom of the Mines (the Skull Key) and the bus (the Vault).",
+   "checked_against": [],
+   "data": [],
+   "status": "planning choice",
+   "refs": [],
+   "tests": [
+    "tests/test_travel_pace.py::test_a_goal_brings_in_what_it_depends_on",
+    "tests/test_travel_pace.py::test_a_goal_waits_for_the_goals_it_depends_on"
+   ]
+  },
+  {
+   "id": "route.cart-visits",
+   "area": "Route",
+   "summary": "Planning rule: once a real save gives the seed, each Traveling Cart visit selling an item is a way to get it on that day only, at that price, if it has enough stock in one go and the slot doesn't need better than normal quality. Visits compete with other ways on gold, so a cart Truffle can replace a Barn and pig. If a visit can't be placed the next-best way is tried, and a passed visit stops being offered when the plan is rebuilt from the next morning's save. Planning a fresh farm has no seed, so the cart stays a chance there. Ways are compared on gold alone: a building another goal wants anyway isn't credited.",
+   "checked_against": [],
+   "data": [],
+   "status": "planning choice",
+   "refs": [],
+   "tests": [
+    "tests/test_cart_route.py::test_a_known_seed_turns_the_carts_odds_into_dated_visits",
+    "tests/test_cart_route.py::test_with_no_seed_the_cart_stays_a_chance",
+    "tests/test_cart_route.py::test_a_missed_visit_stops_being_offered",
+    "tests/test_cart_route.py::test_a_visit_you_cant_afford_falls_back"
+   ]
+  },
+  {
+   "id": "walk.tiles",
+   "area": "Travel",
+   "summary": "A tile blocks walking if the map's Buildings layer has a tile there without a Passable property, or its Back tile is marked Passable F. A Water property alone doesn't block, which is how bridges work. Map exits are the Warp map property: x y target tx ty.",
+   "checked_against": [],
+   "data": [
+    "Maps/* (Back, Buildings, Warp)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_bridges_are_walkable_and_water_is_not",
+    "tests/test_today.py::test_the_south_of_the_forest_connects_over_the_bridge",
+    "tests/test_today.py::test_routes_cross_maps_and_read_as_words"
+   ]
+  },
+  {
+   "id": "walk.pace",
+   "area": "Travel",
+   "summary": "Planning choice: about 33 tiles in 10 game minutes, stretched 1.5x for a new player. A hoed or watered tile takes about 2.5 minutes and 2 energy. Taken from the first days of a real game; the plan doesn't yet learn the player's own pace.",
+   "checked_against": [],
+   "data": [],
+   "status": "planning choice",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_routes_cross_maps_and_read_as_words"
+   ]
+  },
+  {
+   "id": "weather.night-override",
+   "area": "Calendar & events & access",
+   "summary": "The save's forecast isn't final: overnight the game makes day 3 rain, days up to 4 and the first of a month sunny, and summer's 13th and 26th storms, whatever was forecast.",
+   "checked_against": [
+    "StardewValley.Game1.getWeatherModificationsForDate",
+    "StardewValley.Game1.UpdateWeatherForNewDay"
+   ],
+   "data": [],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_the_night_overrides_the_forecast"
+   ]
+  },
+  {
+   "id": "hw.predicted",
+   "area": "Quests",
+   "summary": "The board's request can be worked out from the morning's save: a day-seeded roll picks the kind. A delivery's person comes from a random seeded by game id and day over adult Town villagers you've met, in Data/Characters order, and its item from a second random seeded with 1000, with one draw per known cooking recipe first. Confirmed in play: a Leek for Robin on Spring 2.",
+   "checked_against": [
+    "StardewValley.Utility.getQuestOfTheDay",
+    "StardewValley.Quests.ItemDeliveryQuest.loadQuestInfo",
+    "StardewValley.Quests.ItemDeliveryQuest.GetValidTargetList"
+   ],
+   "data": [
+    "Data/Characters",
+    "Data/CookingRecipes"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_the_boards_request_matched_the_game"
+   ]
+  },
+  {
+   "id": "skills.xp",
+   "area": "Skills",
+   "summary": "Levels need 100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000 and 15000 XP. A crop gives 16 x ln(0.018 x price + 1); forage 7; a felled tree 14; a stone 1; a catch 3 x (quality + 1) + difficulty / 3; a Green Slime 3.",
+   "checked_against": [
+    "StardewValley.Farmer.getBaseExperienceForLevel",
+    "StardewValley.GameLocation.OnHarvestedForage"
+   ],
+   "data": [
+    "Data/Monsters"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_skills_say_what_the_next_level_takes"
+   ]
+  },
+  {
+   "id": "fish.bubbles",
+   "area": "Fish",
+   "summary": "Bubbles are rolled at every 10-minute tick on each outdoor map from a generator seeded with the day, the save, the time and the map width, so they're predictable. With none up: a coin-flip, then two tries at a random tile that's open water, fishable and 2 to 4 tiles from land. With some up: they end at 10% plus minutes up / 1800 once they've lasted over 60 minutes. A cast into them waits a quarter as long for a bite (half in a Fish Frenzy). Confirmed in play: the forecast spot and time matched on Spring 12 of a real game.",
+   "checked_against": [
+    "StardewValley.GameLocation.performTenMinuteUpdate",
+    "StardewValley.GameLocation.isOpenWater",
+    "StardewValley.Tools.FishingRod.distanceToLand"
+   ],
+   "data": [
+    "Maps/* (Water, NoFishing)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_bubbles_rise_in_fishable_water_near_land"
+   ]
+  },
+  {
+   "id": "geode.seeded",
+   "area": "Items",
+   "summary": "A geode's contents depend on the running count of geodes cracked (raised before the roll), the game id / 2 and the farmer's id / 2, not the day. An artifact before your first real artifact comes out as 5 Stone. Confirmed in play: four cracks in a row on one farm matched.",
+   "checked_against": [
+    "StardewValley.Utility.getTreasureFromGeode"
+   ],
+   "data": [
+    "Data/Objects (GeodeDrops, GeodeDropsDefaultItems)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_geodes_hang_on_the_count_alone"
+   ]
+  },
+  {
+   "id": "walk.learned-pace",
+   "area": "Travel",
+   "summary": "Planning choice: pressing Recalculate with a time and ticked stops compares your time with the morning plan's, and walking times use the average of the last seven days' ratios, kept between 0.5 and 3 times. A day's figure is replaced, so it counts once.",
+   "checked_against": [],
+   "data": [],
+   "status": "planning choice",
+   "refs": [],
+   "tests": [
+    "tests/test_today.py::test_pace_learns_from_the_day_and_counts_a_day_once"
+   ]
   }
  ]
 }

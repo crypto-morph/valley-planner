@@ -25,6 +25,11 @@ from ..views.farm import Farm
 from .unlocks import Unlocks
 
 
+def pace_file(name: str) -> Path:
+    """Where a save's measured walking pace is kept, beside its day lists."""
+    return data_root() / f"{name}.pace.json"
+
+
 def data_root(env: dict | None = None, platform: str | None = None) -> Path:
     """Where the planner keeps your day lists (never the game's folders)."""
     env = os.environ if env is None else env

@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .discover import find_game, find_saves_root, list_saves
 from .engine import cc, todo
 from .gamedata import GameData
-from .views import ask, calendar, cart, crops, errands, morning, sell
+from .views import ask, calendar, cart, crops, errands, morning, romance, sell
 from .views.farm import Farm
 
 STATIC = Path(__file__).parent / "static"
@@ -126,9 +126,27 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def sell_view(loved: bool = True, liked: bool = False, help_wanted: bool = True, seeds: bool = True) -> dict:
         return sell.view(p().farm(), {"loved": loved, "liked": liked, "help_wanted": help_wanted, "seeds": seeds})
 
+    @app.get("/api/romance")
+    def romance_view(target: str = "") -> dict:
+        return romance.view(p().farm(), target)
+
     @app.get("/api/morning")
     def morning_view() -> dict:
         return morning.view(p().farm())
+
+    @app.get("/api/today")
+    def today_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
+                   spouse: str = "") -> dict:
+        """The day's timed plan; time, energy and where for a recalculation from wherever you are."""
+        from .views import today
+        ticked = set(filter(None, done.split(",")))
+        farm, pl = p().farm(), p()
+        store = todo.pace_file(pl.path().parent.name) if pl.path() else None
+        pace = today.learned_pace(store, farm.save.days_played, None) if store else None
+        if store and time is not None and ticked:
+            ratio = today.pace_ratio(today.view(farm, spouse=spouse, pace=pace), time, ticked)
+            pace = today.learned_pace(store, farm.save.days_played, ratio)
+        return today.view(farm, time=time, energy=energy, where=where or None, done=ticked, spouse=spouse, pace=pace)
 
     @app.get("/api/cook")
     def cook_view() -> dict:

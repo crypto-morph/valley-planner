@@ -38,11 +38,20 @@ class Map:
     id: str
     properties: dict
     layers: dict[str, Layer]
+    blocked: set[tuple[int, int]] = field(default_factory=set)  # tiles nobody can walk on
+    water: set[tuple[int, int]] = field(default_factory=set)  # Back tiles with the Water property
+    no_fishing: set[tuple[int, int]] = field(default_factory=set)
+    rubble: set[tuple[int, int]] = field(default_factory=set)  # logs and rocks in the water (isOpenWater)
 
     def as_dict(self) -> dict:
-        """Plain data: {"Id", "Properties", "Layers": {id: {"Width", "Height", "Properties",
+        """Plain data: {"Id", "Properties", "Blocked": ["x,y"], "Layers": {id: {"Width", "Height", "Properties",
         "Tiles": {"x,y": props}}}}."""
-        return {"Id": self.id, "Properties": self.properties, "Layers": {
+        def tiles(found: set[tuple[int, int]]) -> list[str]:
+            return [f"{x},{y}" for x, y in sorted(found)]
+
+        return {"Id": self.id, "Properties": self.properties, "Blocked": tiles(self.blocked),
+                "Water": tiles(self.water), "NoFishing": tiles(self.no_fishing), "Rubble": tiles(self.rubble),
+                "Layers": {
             lid: {"Width": layer.width, "Height": layer.height, "Properties": layer.properties,
                   "Tiles": {f"{x},{y}": p for (x, y), p in layer.tile_properties.items()}}
             for lid, layer in self.layers.items()}}
@@ -92,11 +101,34 @@ def read_tbin(data: bytes) -> Map:
     map_id = r.string()
     r.string()  # description
     props = r.properties()
+    sheets: dict[str, dict] = {}
     for _ in range(r.i32()):  # tile sheets
-        r.string(), r.string(), r.string()  # id, description, image
+        sheet = r.string()
+        r.string(), r.string()  # description, image
         r.take(4 * 8)  # sheet size, tile size, margin, spacing
-        r.properties()
+        sheets[sheet] = r.properties()
     layers = {}
+    blocked: set[tuple[int, int]] = set()
+    water: set[tuple[int, int]] = set()
+    no_fishing: set[tuple[int, int]] = set()
+    rubble: set[tuple[int, int]] = set()
+
+    def walled(lid: str, x: int, y: int, sheet: str, index: int, own: dict) -> None:
+        """The game's walking rule: a Buildings tile blocks unless marked Passable; a Back tile only if marked
+        Passable F. Water alone doesn't block, which is how bridges work."""
+        props = sheets.get(sheet, {})
+        marked = props.get(f"@TileIndex@{index}@Passable")
+        passable = own.get("Passable", marked)
+        if (lid == "Buildings" and passable is None) or (lid == "Back" and str(passable).upper() == "F"):
+            blocked.add((x, y))
+        if lid == "Back":
+            if "Water" in own or f"@TileIndex@{index}@Water" in props:
+                water.add((x, y))
+            if "NoFishing" in own or f"@TileIndex@{index}@NoFishing" in props:
+                no_fishing.add((x, y))
+        if lid == "Buildings" and sheet == "outdoors" and index in (628, 629, 734, 759):
+            rubble.add((x, y))
+
     for _ in range(r.i32()):
         lid = r.string()
         r.byte()  # visible
@@ -104,38 +136,45 @@ def read_tbin(data: bytes) -> Map:
         w, h = r.i32(), r.i32()
         r.take(8)  # tile size
         layer = Layer(lid, w, h, r.properties())
+        sheet = ""  # named only when it changes, so it carries across rows
         for y in range(h):
             x = 0
             while x < w:
                 cmd = chr(r.byte())
                 if cmd == "T":
-                    r.string()
+                    sheet = r.string()
                 elif cmd == "N":
                     x += r.i32()
                 elif cmd == "S":
-                    r.take(5)  # index, blend mode
+                    index = r.i32()
+                    r.byte()  # blend mode
                     p = r.properties()
                     if p:
                         layer.tile_properties[(x, y)] = p
+                    walled(lid, x, y, sheet, index, p)
                     x += 1
                 elif cmd == "A":
                     r.take(4)  # frame interval
                     frames = r.i32()
+                    first = None
                     while frames:
                         c = chr(r.byte())
                         if c == "T":
-                            r.string()
+                            sheet = r.string()
                         elif c == "S":
-                            r.take(5)
+                            index = r.i32()
+                            r.byte()
                             r.properties()
+                            first = first if first is not None else index
                             frames -= 1
                         else:
                             raise TbinError(f"bad animated frame command {c!r}")
                     p = r.properties()
                     if p:
                         layer.tile_properties[(x, y)] = p
+                    walled(lid, x, y, sheet, first or 0, p)
                     x += 1
                 else:
                     raise TbinError(f"bad tile command {cmd!r} at {lid} {x},{y}")
         layers[lid] = layer
-    return Map(map_id, props, layers)
+    return Map(map_id, props, layers, blocked, water, no_fishing, rubble)

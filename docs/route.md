@@ -4,7 +4,7 @@ The facts layer answers "what is true" and the views answer "what's possible fro
 answers the question a player actually has in Spring: **what to do, and when, so the goal is met in
 time** — planning backwards from the deadline and forwards with the cash and materials you'll have.
 
-Goal (first): the Community Center by the end of Year 1, on a fresh farm. The engine starts from any
+Goal (first): the Community Center by the end of Year 1, on a fresh farm. `docs/paths.md` has where this is going. The engine starts from any
 state, so it can serve a save part-way through later.
 
 ## Why

@@ -10,7 +10,8 @@ In our words:
   taken modulo 2^31 - 1, keeping its sign, and cut to a 32-bit int; the five
   ints are hashed with 32-bit xxHash (seed 0) over their little-endian bytes.
   Saves that use "legacy random" add them up instead.
-- The day's shop random: (days played, game id / 2) (CreateDaySaveRandom).
+- The day's shop random: (days played, game id / 2) (CreateDaySaveRandom), plus
+  up to three more numbers when a use needs its own stream (a garbage can's).
 - SYNCED_RANDOM <interval> <key> <chance>: seeded from (hash of the key's
   UTF-8 text, the game id, days played for 'day' — or the hash of
   season + year / "year" + year).
@@ -55,6 +56,12 @@ class NetRandom:
                     a[i] += MBIG
         self._a, self._i, self._p = a, 0, 21
         self.draws = 0
+
+    def clone(self) -> NetRandom:
+        """A separate generator at the same point in the sequence."""
+        twin = object.__new__(NetRandom)
+        twin._a, twin._i, twin._p, twin.draws = self._a[:], self._i, self._p, self.draws
+        return twin
 
     def _sample(self) -> int:
         i = self._i + 1 if self._i < 55 else 1
@@ -134,8 +141,9 @@ def random_seed(*values: float, legacy: bool = False) -> int:
     return xxhash32(struct.pack("<5i", *(_i32(int(v)) for v in vals)))
 
 
-def day_save_random(days_played: int, game_id: int, *, legacy: bool = False) -> NetRandom:
-    return NetRandom(random_seed(days_played, game_id // 2, legacy=legacy))
+def day_save_random(days_played: int, game_id: int, *seeds: int, legacy: bool = False) -> NetRandom:
+    """Utility.CreateDaySaveRandom; `seeds` are its optional seedA..C (C# ints, so they wrap to 32 bits)."""
+    return NetRandom(random_seed(days_played, game_id // 2, *(_i32(s) for s in seeds), legacy=legacy))
 
 
 def synced_random(interval: str, key: str, *, game_id: int, days_played: int, season: str, year: int,

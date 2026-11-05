@@ -6,6 +6,8 @@ main { display: grid; gap: 1rem; }
 .foot { text-align: center; margin-top: 2rem; color: var(--bg); }
 .list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
 .list li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px dashed var(--line); padding-bottom: 0.3rem; }
+.list li.clickable { cursor: pointer; }
+.list li.clickable:hover { color: var(--accent); }
 .day { margin: 0.5rem 0; }
 .day h3 { font-size: 1rem; margin: 0 0 0.2rem; }
 .day.today h3::after { content: " · today"; color: var(--accent); }
@@ -207,3 +209,37 @@ button.ncard:hover { box-shadow: 0 0 0 3px #A9CBD9; }
 .spinner { width: 1.3rem; height: 1.3rem; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--line); } }
+
+/* --- Morning: priorities ------------------------------------------------------------ */
+.priorities { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.8rem 0; }
+.priorities .tcard { flex: 1 1 15.5rem; max-width: 22rem; min-height: 0; }
+button.tcard { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.tcard:hover { box-shadow: 0 0 0 3px #A9CBD9; }
+.priorities .t-det { margin-top: 0.15rem; }
+.u-note { background: var(--panel-2); border: 2px solid var(--line); color: var(--muted); }
+.u-note .t-tag { color: var(--muted); }
+.u-note .t-ttl { color: var(--ink); }
+
+/* a section a priority card jumps to, briefly outlined so the click's destination is obvious */
+.flash { animation: flash-ring 1.6s ease-out; }
+@keyframes flash-ring { 0% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; outline: 3px solid var(--accent); } }
+
+/* --- Sell: worth getting ----------------------------------------------------------- */
+.hint { padding: 0.6rem 0; border-bottom: 1px dashed var(--line); }
+.hint:last-child { border-bottom: 0; }
+.hint-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.hint-head span { color: var(--accent); font-weight: 700; }
+
+/* --- Romance ------------------------------------------------------------------------ */
+.romance-pick { width: 100%; max-width: 24rem; padding: 0.5rem; font: inherit; border: 3px solid var(--wood-dark); background: var(--panel-2); }
+
+.t-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 10px; }
+.t-form label { display: grid; gap: 2px; font-size: .85em; }
+.t-stop { display: block; }
+.t-stop label { display: block; }
+.t-stop input { margin-right: 6px; }
+.t-way { margin: 2px 0 6px 26px; padding: 0; font-size: .9em; }
+.t-skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.t-bar { height: 8px; background: rgba(0, 0, 0, .15); border-radius: 4px; overflow: hidden; margin: 3px 0; }
+.t-bar span { display: block; height: 100%; background: #5a8f3c; }

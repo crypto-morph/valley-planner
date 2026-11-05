@@ -137,6 +137,7 @@ def _per_item(condition: str | None, obj: dict) -> bool:
 class Cart:
     def __init__(self, data):
         self.data = data
+        self._calendars: dict[tuple, dict] = {}
 
     @cached_property
     def shop(self) -> dict:
@@ -314,6 +315,18 @@ class Cart:
             if places:
                 yield CartDay(dp, season, day, year, places[0] if len(places) == 1 else " & ".join(places),
                               self.stock(w))
+
+    def calendar(self, when: When, *, count_days: int = 112, guarantee: int = -1) -> dict[str, list]:
+        """Item -> its (day, stock entry) for each coming cart day that certainly sells it, soonest first."""
+        key = (when.days_played, when.game_id, count_days, guarantee)
+        if key not in self._calendars:
+            found: dict[str, list] = {}
+            for d in self.days(when, count_days=count_days, guarantee=guarantee):
+                for i in d.items:
+                    if i.sure:
+                        found.setdefault(i.item, []).append((d, i))
+            self._calendars[key] = found
+        return self._calendars[key]
 
     def find(self, when: When, item_ids: set[str], **kw) -> list[tuple[CartDay, CartItem]]:
         """Each upcoming cart day that sells any of these (qualified) items."""

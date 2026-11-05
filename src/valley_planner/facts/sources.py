@@ -58,6 +58,7 @@ class Source:
     chance: float | None = None  # per try/day, when random
     inputs: tuple[tuple[str, int], ...] = ()  # items it takes (machines, recipes)
     notes: tuple[str, ...] = field(default=())
+    on: int | None = None  # a known day it can be got, and only that day (a Traveling Cart visit)
 
     def in_season(self, season: str) -> bool:
         return self.seasons is None or season in self.seasons
@@ -191,14 +192,14 @@ class Sources:
                         kind = item.split()[1] if len(item.split()) > 1 else ""
                         tags = [t for trig in rule.get("Triggers") or [] for t in trig.get("RequiredTags") or []]
                         if kind in FLAVOR_BASE:
-                            add(FLAVOR_BASE[kind], Source("machine", f"machine {mid}", needs=(f"machine:{mid}",),
+                            add(FLAVOR_BASE[kind], Source("machine", self._machine(mid), needs=(f"machine:{mid}",),
                                                           notes=tuple(tags[:3])))
                         continue
                     if not item.startswith("(O)") or " " in item:
                         continue
                     trig = next((t for t in rule.get("Triggers") or [] if t.get("RequiredItemId")), None)
                     inputs = ((_unq(trig["RequiredItemId"]), trig.get("RequiredCount") or 1),) if trig else ()
-                    add(item[3:], Source("machine", f"machine {mid}", needs=(f"machine:{mid}",), inputs=inputs,
+                    add(item[3:], Source("machine", self._machine(mid), needs=(f"machine:{mid}",), inputs=inputs,
                                          lead=max(1, int((rule.get("MinutesUntilReady") or 0) // 1600))
                                          if (rule.get("MinutesUntilReady") or 0) >= 1600 else 0))
         for kind, table in (("cooking", "Data/CookingRecipes"), ("crafting", "Data/CraftingRecipes")):
@@ -251,6 +252,11 @@ class Sources:
     def _farm_here(self, loc: str) -> bool:
         from .fish import FARM_TYPES
         return loc == f"Farm_{FARM_TYPES.get(self.farm_type, 'Standard')}"
+
+    def _machine(self, mid: str) -> str:
+        """'(BC)128' -> 'a Mushroom Log'-style name for reading."""
+        name = (self.data.asset("Data/BigCraftables").get(mid.removeprefix("(BC)")) or {}).get("Name")
+        return f"a {name}" if name else f"machine {mid}"
 
     def of(self, item: str, *, cart: bool = True) -> list[Source]:
         oid = _unq(item)

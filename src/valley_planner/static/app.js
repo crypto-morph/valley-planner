@@ -36,13 +36,18 @@ function itemCard(c) {
   return parts.join("");
 }
 
+// Where a villager is today, from /api/ask/villager's "today" (one entry, or two on a rain-coinflip day)
+function whereToday(today) {
+  return today.map((d) => (today.length > 1 ? `<p class="sub">${Math.round(d.chance * 100)}% chance:</p>` : "") +
+    (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
+}
+
 function villagerCard(c) {
   const f = c.met ? `${c.hearts} hearts (${c.points} points) · ${c.gifts_this_week}/2 gifts this week${c.gifted_today ? " · gifted today" : ""}${c.talked_today ? " · talked today" : ""}` : "Not met yet";
   return `<h2 class="sign">${esc(c.name)}</h2><p class="sub">Birthday ${esc(c.birthday)} · ${esc(f)}</p>` +
     "<h3>Loves</h3>" + list(c.loves.map((x) => li(esc(x.name), x.held ? `you hold ${x.held}` : ""))) +
     (c.likes_held.length ? `<h3>Likes that you hold</h3><p>${esc(c.likes_held.join(", "))}</p>` : "") +
-    "<h3>Today</h3>" + c.today.map((d) => (c.today.length > 1 ? `<p class="sub">${Math.round(d.chance * 100)}% chance:</p>` : "") +
-      (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
+    "<h3>Today</h3>" + whereToday(c.today);
 }
 
 // " · in the green chest (the farm)" for where something is kept
@@ -113,7 +118,7 @@ const STATUS_TEXT = { have: "Set aside", ok: "On track", maybe: "Probably", luck
 
 // ----- Route: goals in priority order, planned for a fresh Year 1 -----
 const SETTING_LABELS = {
-  tiles: "Tiles you farm", wood_per_day: "Wood from a chopping day", floors_per_day: "Mines floors a day",
+  tiles: "Tiles you farm", wood_per_day: "Wood from a chopping day", floors_per_week: "Mines floors a week (your target)",
   hardwood_per_day: "Hardwood from a stump day", fish_gold: "Gold from a fishing day", mine_gold: "Gold from a mining day",
   float: "Cash kept back from seeds", quartz_per_day: "Quartz from a mining day", gift_points: "Friendship from each gift",
   jars: "Preserves Jars to have", kegs: "Kegs to have", tappers: "Tappers on oaks (for Kegs)",
@@ -447,6 +452,53 @@ function drawCash(v) {
   svg.querySelector(".hit").addEventListener("mouseleave", () => hov.setAttribute("visibility", "hidden"));
 }
 
+// ----- Romance: hearts with your chosen partner, and what you hold that would raise them -----
+function drawRomance(v, today) {
+  $("#romance-body").hidden = !v.target;
+  if (!v.target) return;
+  $("#romance-head").textContent = `${v.name}: ${v.hearts}♥ (${v.points.toLocaleString()} points)${v.status !== "Friendly" ? ` · ${v.status}` : ""}`;
+  const line = [v.talked_today ? "talked today" : "haven't talked today", v.gifted_today ? "gifted today" : `${v.gifts_left} gift${v.gifts_left === 1 ? "" : "s"} left this week`,
+    v.birthday_today ? "it's their birthday today: gifts give 8×" : `birthday ${esc(v.birthday)}`].join(" · ");
+  $("#romance-status").innerHTML = esc(line);
+  $("#romance-cap").innerHTML = v.at_cap
+    ? `<p class="bad">Stuck at ${v.cap_hearts}♥ until you give them ${esc(v.unlock.item)} (${v.unlock.gold.toLocaleString()}g · ${esc(v.unlock.how)}).</p>`
+    : `<p class="sub">${v.points_to_next.toLocaleString()} points to ${v.next_heart}♥.</p>`;
+  $("#romance-where").innerHTML = whereToday(today);
+  $("#romance-gifts").innerHTML = v.gifts.length ? "<tr><th>Gift</th><th>You hold</th><th>Taste</th><th>Points</th><th>Where</th></tr>" +
+    v.gifts.map((g) => `<tr><td>${esc(g.name)}</td><td>${g.held}</td><td class="q-${g.taste === "love" ? "gold" : "silver"}">${esc(g.taste)}</td><td>+${g.points}</td><td class="sub">${esc(g.where.join(", "))}</td></tr>`).join("")
+    : '<tr><td class="sub">Nothing you hold is a loved or liked gift for them.</td></tr>';
+}
+
+// The Morning tab's priority strip: a few ranked, clickable pointers to the tab (or errand card) with the detail.
+// The tag is the days left, in the server's own words ("TOMORROW", "5 DAYS") — no legend needed. A severity of
+// "plenty" here only ever means "no deadline, just worth knowing" (a capped romance partner, a Sell hint), so
+// it gets a plain neutral style rather than Route's "2+ weeks spare" green, which would mean something else.
+const SEVERITY_CLASS = { now: "u-now", soon: "u-soon", plenty: "u-note" };
+function drawPriorities(list) {
+  $("#m-priorities").hidden = !list.length;
+  $("#m-priorities").innerHTML = list.map((p) =>
+    `<button type="button" class="tcard ${SEVERITY_CLASS[p.severity] || "u-note"}" data-tab="${esc(p.tab || "")}" data-anchor="${esc(p.anchor || "")}" data-errand="${esc(p.errand || "")}" data-target="${esc(p.target || "")}">` +
+    `<div class="t-tag">${esc(p.tag)}</div><div class="t-ttl">${esc(p.title)}</div><div class="t-det">${esc(p.text)}</div></button>`
+  ).join("");
+  document.querySelectorAll("#m-priorities button").forEach((b) => b.addEventListener("click", async () => {
+    if (b.dataset.target) { try { localStorage.setItem("romanceTarget", b.dataset.target); } catch { /* fine */ } }
+    if (b.dataset.errand) { showErrand(b.dataset.errand); return; }
+    if (!b.dataset.tab) return;
+    await show(b.dataset.tab);
+    if (b.dataset.anchor) flashInto(b.dataset.anchor);
+  }));
+}
+
+// Jump to a section on the tab just switched to, and flash it so it's clear what the click was about
+function flashInto(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 1600);
+}
+
+const todayDone = new Set();
 const views = {
   async route() {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
@@ -454,7 +506,36 @@ const views = {
     await planRoute();
   },
 
+  async dayPlan(ask = {}) {
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    const q = new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "" });
+    const v = await get(`/api/today?${q}`);
+    const where = $("#t-where");
+    if (!where.childElementCount) where.innerHTML = v.places.map((p) => `<option>${esc(p)}</option>`).join("");
+    if (!$("#t-energy").value) $("#t-energy").value = v.energy.now;
+    const row = (x) => `<li class="t-stop"><label><input type="checkbox" data-stop="${esc(x.id)}"><b>${esc(x.time)}</b> ${esc(x.title)}</label>` +
+      `<span class="sub">${esc(x.why)}${x.near ? ` · ${esc(x.near)}` : ""} · ${x.energy_after} energy after</span>` +
+      (x.way.length ? `<ol class="t-way">${x.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") + "</li>";
+    $("#t-plan").innerHTML = `<p class="sub">Energy this morning: <b>${v.energy.now}/${v.energy.max}</b>. ${v.notes.map(esc).join(" ")}</p>` +
+      (v.plan.length ? `<ul class="list t-list">${v.plan.map(row).join("")}</ul>` : '<p class="sub">Nothing left to plan today.</p>') +
+      (v.passing.length ? `<p class="sub">On your way (optional, extra cash): ${v.passing.map((x) => `${esc(x.title)} ${x.gold}g${x.near ? `, ${esc(x.near)}` : ""}`).join("; ")}</p>` : "") +
+      (v.geodes.length ? `<p class="sub">Geodes, in cracking order: ${v.geodes.map((g) => `#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(" or ")}`).join("; ")}</p>` : "") +
+      (v.pace !== 1 ? `<p class="sub">Walking times use your pace: ${v.pace}x the first estimate.</p>` : "") +
+      (v.bring.length ? `<p class="sub">From the Chest: ${v.bring.map((x) => `${x.count > 1 ? `${x.count} ` : ""}${esc(x.name)} (${esc(x.why)})`).join("; ")}</p>` : "") +
+      (v.fishing ? `<p class="sub">Fish at ${esc(v.fishing.place)} for ${v.fishing.fish.map(esc).join(", ")}${v.fishing.bubbles.length ? `. Bubbles: ${v.fishing.bubbles.map(esc).join("; ")}` : ""}.</p>` : "") +
+      (v.spare.length ? `<p class="sub">Energy to spare: ${v.spare.map(esc).join(", or ")}.</p>` : "") +
+      (v.home ? `<p class="sub">Home by about ${esc(v.home)}.</p>` : "") +
+      (v.left.length ? `<p class="sub">Doesn't fit: ${v.left.map((x) => `${esc(x.title)} (${esc(x.why)})`).join("; ")}</p>` : "");
+    document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => {
+      if (c.checked) todayDone.add(c.dataset.stop); else todayDone.delete(c.dataset.stop);
+    }));
+    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="t-skill"><b>${esc(cap(k.name))} ${k.level}</b>` +
+      `<div class="t-bar"><span style="width:${Math.round(k.share * 100)}%"></span></div>` +
+      `<span class="sub">${k.next ? `${k.to_go} XP to level ${k.level + 1}: ${k.ways.map(esc).join(", or ")}` : "Maxed"}</span></div>`).join("");
+  },
+
   async morning() {
+    await views.dayPlan();
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     const r = await fetch("/api/morning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(routeBody(routeState, "save")) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -463,11 +544,15 @@ const views = {
     const w = v.weather_words;
     $("#m-glance").innerHTML = `<span><b>${esc(cap(w.today))}</b>, ${esc(w.tomorrow)} tomorrow${w.note ? ` · ${esc(w.note)}` : ""}</span>` +
       `<span>The spirits: <b>${esc(v.mood)}</b>${v.mood_means ? ` · ${esc(v.mood_means)}` : ""}</span><span><b>${v.money.toLocaleString()}g</b></span>`;
+    drawPriorities(v.priorities);
     drawDay(v.day);
     const shown = new Set(v.day.blocks.flatMap((b) => b.lines));
     const notes = v.today.filter((x) => x.kind !== "dish" || !v.day.blocks.some((b) => b.title === "The Saloon"))
       .concat(v.do.filter((x) => !shown.has(x.title) && !shown.has(`Pick: ${x.title}`)));
-    $("#m-first").innerHTML = notes.length ? list(notes.map((x) => li(`<b>${esc(x.title)}</b>`, esc(x.text)))) : '<p class="sub">Nothing else today.</p>';
+    $("#m-first").innerHTML = notes.length ? "<ul class=\"list\">" + notes.map((x) =>
+      `<li${x.errand ? ` class="clickable" data-errand="${esc(x.errand)}"` : ""}><span><b>${esc(x.title)}</b></span><span class="sub">${esc(x.text)}</span></li>`
+    ).join("") + "</ul>" : '<p class="sub">Nothing else today.</p>';
+    document.querySelectorAll("#m-first li[data-errand]").forEach((el) => el.addEventListener("click", () => showErrand(el.dataset.errand)));
     drawQuests(v.quests);
     const byDate = [];
     v.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
@@ -588,6 +673,27 @@ const views = {
     $("#sell-keep").innerHTML = '<ul class="list">' + v.keep.map((r) =>
       `<li><span>${r.count} ${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</span><span class="sub">${esc(r.why)}</span></li>`
     ).join("") + "</ul>";
+    $("#sell-hints").innerHTML = v.hints.length ? v.hints.map((h) => `<div class="hint">` +
+      `<div class="hint-head"><b>${esc(h.machine)}</b><span>+${h.gain_each.toLocaleString()}g each · about ${h.gain_total.toLocaleString()}g on the ${h.count} ${esc(h.name)} you'd put through it now</span></div>` +
+      `<p class="sub">${esc(h.name)} → ${esc(h.product)}</p><ul class="list">` + h.steps.map((st) =>
+        `<li><span>${esc(st.label)}</span><span class="sub">${[st.gold ? `${st.gold.toLocaleString()}g` : "", st.materials.join(", "), st.how].filter(Boolean).map(esc).join(" · ")}</span></li>`
+      ).join("") + "</ul></div>"
+    ).join("") : '<p class="sub">Nothing you don\'t already have would pay better right now.</p>';
+  },
+
+  async romance() {
+    let target = "";
+    try { target = localStorage.getItem("romanceTarget") || ""; } catch { target = ""; }
+    const [v, today] = await Promise.all([
+      get(`/api/romance?target=${encodeURIComponent(target)}`),
+      target ? get(`/api/ask/villager/${encodeURIComponent(target)}`).then((c) => c.today) : Promise.resolve(null),
+    ]);
+    const sel = $("#romance-target");
+    sel.innerHTML = '<option value="">Choose someone…</option>' + v.partners.map((p) =>
+      `<option value="${esc(p.name)}">${esc(p.display)} (${p.hearts}♥${p.status !== "Friendly" ? `, ${esc(p.status)}` : ""})</option>`
+    ).join("");
+    sel.value = v.target || "";
+    drawRomance(v, today);
   },
 
   async cart() {
@@ -631,7 +737,8 @@ async function busy(text, work) {
   }
 }
 const LOADING = { morning: "Reading your save…", route: "Planning the rest of the year…", plan: "Adding up what your goals take…",
-                  todo: "Reading your save…", sell: "Pricing what you hold…", cook: "Pricing your recipes…" };
+                  todo: "Reading your save…", sell: "Pricing what you hold…", cook: "Pricing your recipes…",
+                  romance: "Looking through your chests…" };
 
 async function show(name) {
   if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
@@ -661,6 +768,10 @@ async function start() {
     $("#status").textContent = e.message;
   }
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+  $("#romance-target").addEventListener("change", (e) => {
+    try { localStorage.setItem("romanceTarget", e.target.value); } catch { /* fine */ }
+    busy(LOADING.romance, views.romance);
+  });
   let timer;
   $("#cart-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchCart, 250); });
   let askTimer;
@@ -676,3 +787,14 @@ async function start() {
 }
 
 start();
+
+$("#t-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const ask = {};
+  const time = $("#t-time").value;
+  if (time) ask.time = Number(time.replace(":", ""));
+  if ($("#t-energy").value !== "") ask.energy = Number($("#t-energy").value);
+  ask.where = $("#t-where").value;
+  views.dayPlan(ask);
+});
+$("#t-reset").addEventListener("click", () => { todayDone.clear(); $("#t-time").value = ""; $("#t-energy").value = ""; views.dayPlan(); });

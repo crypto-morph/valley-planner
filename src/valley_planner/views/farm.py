@@ -12,6 +12,7 @@ from ..facts.cart import Cart
 from ..facts.conditions import SEASONS, When
 from ..facts.crops import Crops
 from ..facts.fish import Fish
+from ..facts.garbage import GarbageCans
 from ..facts.gifts import Gifts
 from ..facts.hours import Hours
 from ..facts.items import Items
@@ -20,6 +21,8 @@ from ..facts.places import Places
 from ..facts.schedules import Schedules
 from ..facts.sell import Farmer
 from ..facts.shops import Shops
+from ..facts.travel import Travel
+from ..facts.walk import Walker
 from ..save import Save, read_save
 
 REGULAR_SEED_SHOPS = ("SeedShop", "Joja", "Sandy")  # shops that are open most days (the cart is separate)
@@ -60,6 +63,18 @@ class Farm:
     @cached_property
     def cart(self) -> Cart:
         return Cart(self.data)
+
+    @cached_property
+    def walker(self) -> Walker:
+        return Walker(self.data, self.save.farm_type, bridge_fixed="beachBridgeFixed" in self.save.flags)
+
+    @cached_property
+    def travel(self) -> Travel:
+        return Travel(self.data)
+
+    @cached_property
+    def bins(self) -> GarbageCans:
+        return GarbageCans(self.data)
 
     @cached_property
     def calendar(self) -> Calendar:

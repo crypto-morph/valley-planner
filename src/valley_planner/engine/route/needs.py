@@ -18,6 +18,8 @@ from ...views.sell import view as sell_view
 from ..cc import YEAR, Planner, Slot, Way
 from ..income import project
 from ..unlocks import Unlock
+from .objectives import with_needs
+from .objectives.courtship import sweetheart
 from .plan import BOUGHT, HARDWOOD, QUARTZ, REFINED_QUARTZ, STONE, WOOD, Req, Router, Settings, route
 
 DESERT = "place:Desert"
@@ -131,7 +133,7 @@ def _record(r: Router) -> dict[str, tuple]:
 
 def _courtship_rest(r: Router, reqs: list[Req], misses: list[tuple[str, str]]) -> list[Req]:
     """What marriage still takes after the route stopped short: the Bouquet and the Mermaid's Pendant."""
-    name = r.sweetheart()
+    name = sweetheart(r)
     if not name:
         return []
     have = {q.label for q in reqs}
@@ -160,6 +162,7 @@ def needs(farm, targets: list[str], nice: list[str] = (), *, settings: Settings 
           cave: str = "best") -> dict:
     """Everything these goals take, added up, with what each part is for and every way to get each item."""
     settings = settings or Settings()
+    targets, nice = with_needs(targets, nice)
     plan = route(farm, targets, nice, settings=settings, cave=cave)
     r = Router(farm, settings=settings, cave=plan["cave"])
     asked = _record(r)
@@ -210,7 +213,7 @@ def needs(farm, targets: list[str], nice: list[str] = (), *, settings: Settings 
     if rq and mining:
         rq["days"], rq["days_label"] = mining, "days in the Mines for the Quartz"
     if floor > farm.when.mine_lowest:
-        mining += math.ceil((floor - farm.when.mine_lowest) / r.s.floors_per_day)
+        mining += math.ceil((floor - farm.when.mine_lowest) / r.pace.floors_per_week)
     days = {"chop": by["wood"]["days"] or 0, "stumps": by["hardwood"]["days"] or 0, "mine": mining,
             "fish": len(fish), "left": r.end - r.today + 1}
     return {"today": farm.label(r.today), "end": farm.label(r.end), "days_left": r.end - r.today + 1,

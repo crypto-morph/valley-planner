@@ -74,7 +74,8 @@ def test_misses_counted(saved):
     plan = {o["id"]: o for o in route(saved, *ALL)["objectives"]}
     items = [(g["goal"], i) for r in v["resources"] for g in r["breakdown"] for i in g["items"]]
     for oid, o in plan.items():
-        if o["misses"] and o["status"] != "done":
+        costly = [m for m in o["misses"] if not m["what"].startswith("the wedding")]  # a date, with nothing to buy
+        if costly and o["status"] != "done":
             assert any(goal == oid and not i["this_year"] for goal, i in items), oid
     if plan["marriage"]["status"] != "done" and any(m["what"] == "the Mermaid's Pendant"
                                                      for m in plan["marriage"]["misses"]):

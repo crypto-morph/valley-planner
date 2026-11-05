@@ -2,17 +2,27 @@
 
 "Happening today" is the day itself: a birthday (with a loved gift you hold, and which chest it's in), a
 festival, the Queen of Sauce, the Traveling Cart (and anything on it your bundles need), the bookseller, the
-Saloon's dish, shops that are shut, the weather today and tomorrow, and the spirits' mood (the TV fortune:
-TV.getFortuneForecast, luck below -0.07 / -0.02, above 0.02 / 0.07, the extremes at ±0.12).
+Saloon's dish, shops that are shut, the garbage cans with something in them (exact today, odds for the week
+ahead, since a future day's luck can't be known), the weather today and tomorrow, and the spirits' mood (the TV
+fortune: TV.getFortuneForecast, luck below -0.07 / -0.02, above 0.02 / 0.07, the extremes at ±0.12).
 "Get done" is the farm and the errands: crops ready or dry, crops that won't finish before the season ends,
 Community Center items with a last safe day close, things you hold for open bundles, the museum, geodes.
 The route's own steps for today are added by the page from the Route tab's goals.
+
+"Priorities" is a short, ranked list of things with a clock on them that aren't already in today's plan (the
+dayline below handles today's own chores): a Community Center item's last safe day, a special order or quest
+running out, a birthday tomorrow, gold still short of the Community Center with its deadline close. The tag
+on each is the days left, in Route's own words ("this week" = now, "1-2 weeks" = soon). Two sources have no
+clock at all — anyone capped on hearts for want of a Bouquet or the Pendant, and the single best "worth
+getting" machine from the Sell tab — and sort to the bottom, styled plainly so they don't read as urgent.
+Each points at its tab (or opens the errand card) for the full picture.
 """
 
 from __future__ import annotations
 
 from ..engine import cc
-from . import crops, errands
+from ..facts import romance
+from . import crops, errands, sell
 from .farm import Farm
 
 SOON = 3  # days: a last safe day this close goes in "get done"
@@ -79,15 +89,7 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         today.append({"kind": "dish", "title": f"The Saloon's dish of the day: {farm.name(qid)}",
                       "text": f"{n} this morning" + (f", but the Saloon is out of reach ({saloon['closed']})"
                                                     if saloon.get("closed") else "")})
-    shut = [x for x in farm.hours_today() if x["closed"] and "desert" not in x["closed"].lower()]
-    by_why: dict[str, list[str]] = {}
-    for x in shut:  # one line per reason: a festival shuts a whole map's shops at once
-        by_why.setdefault(x["closed"], []).append(x["shop"])
-    for why, names in by_why.items():
-        verb = "is" if len(names) == 1 else "are"
-        title = f"{', '.join(names)} {verb} out of reach today" if ":" in why else f"{names[0]} is shut today"
-        today.append({"kind": "closed", "title": title, "text": why})
-
+    today.append(_bins(farm))
     mine = crops.mine(farm)
     rain_now = s.weather in ("rain", "storm", "green rain")
     weather = {"today": WEATHER.get(s.weather, s.weather),
@@ -125,10 +127,13 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         if o["hunt"]:
             do.append({"kind": "order", "title": "Hunt the prismatic slime in the Mines", "text": o["hunt"]})
     plan = cc.plan(farm)
+    growing = _growing(farm)
     for slot in plan["slots"]:
         b = slot["best"]
-        if not b or slot["status"] in ("have", "stuck") or not b.get("last_start"):
+        if not b or slot["status"] in ("have", "stuck") or not b.get("last_start") or slot["name"] in growing:
             continue
+        if any("bus" in str(x) for x in b.get("blocked") or []):
+            continue  # a place you can't reach yet is no deadline
         last = _day_number(b["last_start"])
         if last is not None and last - w.days_played <= SOON:
             do.append({"kind": "cc", "title": f"{slot['name']} for the {slot['bundle']} bundle",
@@ -136,7 +141,9 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
     fest = farm.hours.festivals.get((w.season, w.day))
     town_shut = bool(fest and fest[2] == "Town" and fest[1] >= 1900)  # the evening festival keeps you out of town
     later = f" (not until {_time(fest[1])}: {fest[0]})" if town_shut else ""
-    turn_in = sum(len(r["items"]) for r in errands.community_center(farm)["rooms"])
+    turn_in = 0  # the bundles can't be filled until the Wizard's lets you read the Junimos' notes
+    if "canReadJunimoText" in s.mail:
+        turn_in = sum(1 for r in errands.community_center(farm)["rooms"] for i in r["items"] if i["open"])
     if turn_in:
         do.append({"kind": "errand", "errand": "cc", "title": f"Take {turn_in} things to the Community Center",
                    "text": "you hold them for open bundles" + later})
@@ -157,6 +164,10 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         for e in events:
             week.append({"date": farm.label(d.days_played).rsplit(",", 1)[0], "kind": e.kind, "label": e.label,
                          "sure": e.sure})
+        bins = _bins_ahead(farm, d.days_played)
+        if bins:
+            week.append({"date": farm.label(d.days_played).rsplit(",", 1)[0], "kind": "bins", "label": bins,
+                         "sure": True})
     todays = [a for a in agenda or [] if a["n"] == w.days_played]
     todays += [{"kind": "deliver", "text": o["deliver"], "shop": "", "n": w.days_played}
                for o in orders if o["deliver"]]
@@ -171,13 +182,110 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
     todays += [{"kind": "mine", "text": "the Mines: hunt the prismatic slime on slime floors (1–29, 41–79)",
                 "shop": "", "n": w.days_played} for o in orders if o["hunt"]]
     events = farm.calendar.day(w, today_days_played=w.days_played)
+    cc_info = {"deadline": plan["deadline"], "counts": plan["counts"], "gold": plan["gold"],
+              "bundles_done": sum(b.done for b in farm.bundles.all), "bundles": len(farm.bundles.all)}
     return {"date": farm.label(w.days_played), "weekday": WEEKDAYS[(w.days_played - 1) % 7],
             "day": _schedule(farm, do, todays, events), "route": todays, "quests": log,
             "weather": s.weather, "tomorrow": s.weather_tomorrow, "weather_words": weather,
             "money": s.money, "luck": s.daily_luck, "mood": mood, "mood_means": means,
-            "today": today, "do": do, "first": today + do, "week": week,
-            "cc": {"deadline": plan["deadline"], "counts": plan["counts"], "gold": plan["gold"],
-                   "bundles_done": sum(b.done for b in farm.bundles.all), "bundles": len(farm.bundles.all)}}
+            "today": today, "do": do, "first": today + do, "week": week, "cc": cc_info,
+            "priorities": _priorities(farm, mine, plan, cc_info, orders, log, held)}
+
+
+SEVERITY = {"now": 0, "soon": 1, "plenty": 2}
+MAX_PRIORITIES = 6
+DEADLINE_WINDOW = 13  # a deadline further out than this (Route's own "2+ weeks spare") isn't worth a card yet
+WORTH_GETTING = 200  # a "worth getting" hint has to clear this much gold to be worth a mention
+
+
+def _severity(days: int) -> str:
+    """Route's own bands, so the same colour means the same thing on both tabs: this week, 1-2 weeks, more."""
+    return "now" if days <= 6 else "soon" if days <= DEADLINE_WINDOW else "plenty"
+
+
+def _tag(days: int) -> str:
+    return "TODAY" if days <= 0 else "TOMORROW" if days == 1 else f"{days} DAYS"
+
+
+def _priorities(farm: Farm, mine: dict, plan: dict, cc_info: dict, orders: list[dict], quests_log: dict,
+                held: dict) -> list[dict]:
+    """A short, ranked list of things with a clock on them, not already covered by today's dayline. Sources
+    with no clock (a capped romance partner, the best unowned machine from Sell) sort last and carry no
+    day-count tag, so they don't compete for attention with what's actually running out."""
+    w = farm.when
+    out: list[dict] = []
+
+    def add(kind: str, severity: str, title: str, text: str, tag: str, **link) -> None:
+        out.append({"kind": kind, "severity": severity, "title": title, "text": text, "tag": tag, **link})
+
+    if mine["dies"]:
+        left = 28 - (w.days_played - 1) % 28
+        add("crops", _severity(left), f"{mine['dies']} crops won't ripen before {w.season.title()} ends",
+            "don't spend more on them", _tag(left), tab="crops")
+
+    growing = _growing(farm)
+    for slot in plan["slots"]:
+        b = slot["best"]
+        if not b or slot["status"] in ("have", "stuck") or not b.get("last_start") or slot["name"] in growing:
+            continue
+        if any("bus" in str(x) for x in slot.get("blocked") or b.get("blocked") or []):
+            continue  # a place you can't reach yet is no deadline
+        last = _day_number(b["last_start"])
+        days = None if last is None else last - w.days_played
+        if days is not None and 0 <= days <= DEADLINE_WINDOW:
+            add("cc", _severity(days), f"{slot['name']} for the {slot['bundle']} bundle", b["label"], _tag(days),
+                errand="cc")
+    if cc_info["bundles_done"] < cc_info["bundles"] and cc_info["gold"]["short"] > 0:
+        deadline = _day_number(cc_info["deadline"])
+        days = None if deadline is None else deadline - w.days_played
+        if days is not None and 0 <= days <= DEADLINE_WINDOW:
+            add("cc", _severity(days), f"{cc_info['gold']['short']:,}g short of the Community Center",
+                "the Vault and what's left to unlock", _tag(days), errand="cc")
+
+    for o in orders:
+        if o["days_left"] is not None and 0 <= o["days_left"] <= DEADLINE_WINDOW:
+            add("order", _severity(o["days_left"]), f"{o['name']} ({o['who']})", o["text"].split(" · ")[0],
+                _tag(o["days_left"]))
+
+    for q in quests_log["quests"]:
+        if q["days_left"] is not None and not q["deliver_to"] and 0 <= q["days_left"] <= DEADLINE_WINDOW:
+            add("quest", _severity(q["days_left"]), q["title"], q["objective"], _tag(q["days_left"]))
+
+    for npc in farm.calendar.birthdays(w.on(w.days_played + 1)):
+        has = any(farm.gifts.giftable(q) and farm.gifts.taste(npc, q) in ("love", "like") for q in held)
+        add("birthday", "soon", f"{npc}'s birthday tomorrow",
+            "you hold a gift for them" if has else "you hold nothing they love or like yet", "TOMORROW")
+
+    for p in _capped_partners(farm):
+        item = "the Mermaid's Pendant" if p["dating"] else "a Bouquet"
+        add("romance", "plenty", f"{p['name']} is capped at {p['hearts']}♥", f"give them {item} to raise it further",
+            "CAPPED", tab="romance", target=p["name"])
+
+    hints = sell.view(farm)["hints"]
+    if hints and hints[0]["gain_total"] >= WORTH_GETTING:
+        h = hints[0]
+        add("sell", "plenty", f"Worth getting: a {h['machine']}",
+            f"about {h['gain_total']:,}g more on the {h['name']} you already hold", "NO DEADLINE",
+            tab="sell", anchor="sell-hints-panel")
+
+    out.sort(key=lambda p: SEVERITY[p["severity"]])
+    return out[:MAX_PRIORITIES]
+
+
+def _capped_partners(farm: Farm) -> list[dict]:
+    """Anyone you could date (or are dating) who's hit the friendship cap and needs a Bouquet or the Pendant."""
+    s = farm.save
+    out = []
+    for name, c in farm.data.asset("Data/Characters").items():
+        if not c.get("CanBeRomanced"):
+            continue
+        f = s.friends.get(name)
+        if not f or f.status in ("Engaged", "Married"):
+            continue
+        dating = f.status == "Dating"
+        if f.points >= (romance.CAP_DATING if dating else romance.CAP_FRIEND):
+            out.append({"name": name, "hearts": f.hearts, "dating": dating})
+    return out
 
 
 DAY_START, DAY_END, EVENING = 600, 2600, 2000
@@ -295,6 +403,28 @@ def special_orders(farm: Farm) -> list[dict]:
                     "text": f"next: {step} · {when} (until {farm.label(o['due_date'])})",
                     "hunt": hunt, "deliver": deliver, "days_left": left})
     return out
+
+
+def _growing(farm: Farm) -> set[str]:
+    """What's already in the ground, by name: a slot for one of these isn't waiting on you to start it."""
+    return {farm.name(f"(O){c.harvest_id}") for c in farm.save.crops if not c.dead and not c.forage}
+
+
+def _bins(farm: Farm) -> dict:
+    """The garbage cans with something in them today: exact, since today's luck is in the save."""
+    full = [c for c in farm.bins.day(farm.save, farm.when) if c.loot]
+    if not full:
+        return {"kind": "bins", "title": "Every garbage can is empty today", "text": ""}
+    n = len(full)
+    return {"kind": "bins", "title": f"{n} garbage can{'s have' if n != 1 else ' has'} something today",
+            "text": " · ".join(f"{c.place}: {c.loot.label}" for c in full)}
+
+
+def _bins_ahead(farm: Farm, days_played: int) -> str:
+    """Another day's cans: certain ones first, then those that hang on the day's luck, likeliest first."""
+    cans = sorted((c for c in farm.bins.day(farm.save, farm.when.on(days_played)) if c.loot), key=lambda c: -c.odds)
+    parts = [f"{c.place}: {c.loot.label}" + ("" if c.odds == 1 else f" ({round(c.odds * 100)}%)") for c in cans]
+    return f"Bins: {', '.join(parts)}" if parts else ""
 
 
 def _cart(farm: Farm) -> dict:

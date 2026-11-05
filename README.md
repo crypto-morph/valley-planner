@@ -42,6 +42,14 @@ decoded data is cached beside it, per game version. Nothing leaves your computer
 Stardew only saves when you sleep, so the planner always shows the *morning* of the day you're on. Play a
 day, go to bed, refresh the page.
 
+The Morning tab's plan is timed and fits your energy, the clock and what you can walk to, with directions in
+words. Follow it, or tick what you've done, enter the time, your energy and where you are, and press
+Recalculate. Recalculating also teaches it your walking pace.
+
+What's worked out from your save's seed each day: the Traveling Cart's stock, the garbage cans, the Help Wanted
+request, forage on the map, fish bubbles and what your next geodes hold. On days ahead, bins are odds, because
+the day's luck can't be known until that morning.
+
 ## Development
 
 ```bash

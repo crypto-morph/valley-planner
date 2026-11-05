@@ -72,9 +72,8 @@ class GameData:
             if key in self._memory:
                 return self._memory[key]
             cached = self.cache / f"{key}.json"
-            if cached.is_file():
-                value = json.loads(cached.read_text(encoding="utf-8"))
-            else:
+            value = json.loads(cached.read_text(encoding="utf-8")) if cached.is_file() else None
+            if value is None or (key.startswith("Maps/") and "Water" not in value):  # maps decoded before walking
                 value = self._reader.read(self.install.content / f"{key}.xnb")
                 cached.parent.mkdir(parents=True, exist_ok=True)
                 tmp = cached.with_suffix(".tmp")

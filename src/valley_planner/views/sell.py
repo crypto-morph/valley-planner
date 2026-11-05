@@ -14,6 +14,11 @@ ask for this season (they pay 3x), and one of each crop you hold no seeds
 for (a Seed Maker turns it into seeds).
 Machines: each machine you own takes one batch (we can't see which are
 busy), when its product sells for at least 1.3x the raw goods.
+
+Worth getting: for whatever's left raw (or whatever your own machines manage), we also check every machine
+in the game's data, owned or not. One you don't have at all, that would pay better than what you're doing
+now, is a hint — with its crafting recipe's materials and how it's learned (engine/unlocks), the same chain
+the Route tab prices.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
+from ..engine.unlocks import Unlocks
 from ..facts.help_wanted import raw_pool
 from ..facts.machines import Input
 from ..facts.sell import item_sell_price, sell_price
@@ -161,6 +167,7 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
     # Process, then sell
     capacity = dict(owned)
     spare = {qid: sum(x.left for x in st) for qid, st in by_id.items()}  # what's left after the holds
+    spare_snapshot = dict(spare)  # for the "worth getting" hints, below, unaffected by what gets processed
     sell: dict[tuple[str, int], dict] = {}
     process: dict[tuple[str, str], dict] = {}
     materials: dict[str, int] = defaultdict(int)
@@ -174,23 +181,8 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
                     materials[farm.name(qid)] += n
                 continue
             each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
-            best = None
-            for mid, cap in capacity.items():
-                if cap <= 0 or mid == SEED_MAKER:
-                    continue
-                out = farm.machines.output(mid, Input(qid, n, it.quality, it.preserve or None, it.preserved_id or None),
-                                           w, professions=set(s.professions))
-                if not out or not out.item or out.uses > n:
-                    continue
-                if any(spare.get(a, 0) < k for a, k in out.also):
-                    continue  # you don't hold what else it burns (coal)
-                o = objects.get(out.item.removeprefix("(O)")) or {}
-                prod = sell_price(out.price, out.quality, farm.farmer, out.item, out.name, o.get("Category"),
-                                  o.get("Type") or "", profit_margin=s.profit_margin, preserve=out.preserve)
-                burnt = sum(k * _value(farm, a) for a, k in out.also)
-                per_input = (prod * out.stack[0] - burnt) / out.uses
-                if per_input >= each * PROCESS_GAIN and (best is None or per_input > best[1]):
-                    best = (mid, per_input, out, prod)
+            mids = [mid for mid, cap in capacity.items() if cap > 0 and mid != SEED_MAKER]
+            best = _best_output(farm, qid, it, n, w, mids, spare, objects)
             if best:
                 mid, per_input, out, prod = best
                 use = min(n, capacity[mid] * out.uses)
@@ -220,10 +212,67 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
                         for r in process.values()), key=lambda r: -r["gain"]) + seed_jobs
     keep_rows = [{"name": farm.name(qid), "quality": QUALITY_WORD.get(q, ""), "count": n, "why": why}
                  for (qid, q, why), n in sorted(keep.items(), key=lambda kv: (kv[0][2], kv[0][0]))]
+    hint_rows = _hints(farm, by_id, spare_snapshot, owned, objects, produce)
     return {"total": sum(r["total"] for r in sell_rows), "count": sum(r["count"] for r in sell_rows),
             "sell": sell_rows, "process": proc_rows, "process_gain": sum(r["gain"] for r in proc_rows),
             "keep": keep_rows, "materials": sorted(materials.items(), key=lambda kv: -kv[1]),
-            "filters": [{"id": k, "label": label, "on": bool(on[k]), **impact[k]} for k, label in FILTERS.items()]}
+            "filters": [{"id": k, "label": label, "on": bool(on[k]), **impact[k]} for k, label in FILTERS.items()],
+            "hints": hint_rows}
+
+
+def _best_output(farm: Farm, qid: str, it, n: int, w, mids: list[str], spare: dict[str, int], objects: dict):
+    """The best of `mids` for `n` of `it`, if its product beats selling it raw by PROCESS_GAIN (mid, per-input
+    gold, the Output, its sell price), else None."""
+    s = farm.save
+    each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+    best = None
+    for mid in mids:
+        out = farm.machines.output(mid, Input(qid, n, it.quality, it.preserve or None, it.preserved_id or None),
+                                   w, professions=set(s.professions))
+        if not out or not out.item or out.uses > n:
+            continue
+        if any(spare.get(a, 0) < k for a, k in out.also):
+            continue  # you don't hold what else it burns (coal)
+        o = objects.get(out.item.removeprefix("(O)")) or {}
+        prod = sell_price(out.price, out.quality, farm.farmer, out.item, out.name, o.get("Category"),
+                          o.get("Type") or "", profit_margin=s.profit_margin, preserve=out.preserve)
+        burnt = sum(k * _value(farm, a) for a, k in out.also)
+        per_input = (prod * out.stack[0] - burnt) / out.uses
+        if per_input >= each * PROCESS_GAIN and (best is None or per_input > best[1]):
+            best = (mid, per_input, out, prod)
+    return best
+
+
+def _hints(farm: Farm, by_id: dict, spare: dict[str, int], owned: dict[str, int], objects: dict, produce) -> list[dict]:
+    """A machine you own none of that would pay better, for whatever's left after holding and processing with
+    what you have, with how to get it (engine.unlocks: the recipe, then the machine's own materials)."""
+    all_mids = [m for m in farm.data.asset("Data/Machines") if m != SEED_MAKER]
+    unlocks = Unlocks(farm)
+    out: dict[str, dict] = {}
+    for qid, stacks in by_id.items():
+        n = spare.get(qid, 0)
+        if not n:
+            continue
+        sample = min(stacks, key=lambda st: st.it.quality).it
+        if not produce(qid, sample):
+            continue
+        each = item_sell_price(sample, farm.farmer, profit_margin=farm.save.profit_margin)
+        owned_best = _best_output(farm, qid, sample, n, farm.when, [m for m in owned if m != SEED_MAKER], spare,
+                                  objects)
+        any_best = _best_output(farm, qid, sample, n, farm.when, all_mids, spare, objects)
+        if not any_best or owned.get(any_best[0], 0) > 0:
+            continue
+        mid, per_input, output, _prod = any_best
+        current = owned_best[1] if owned_best else each
+        if per_input <= current:
+            continue
+        gain_each = int(per_input - current)
+        steps = [{"label": u.label, "gold": u.gold, "how": u.how,
+                 "materials": [f"{c} {_material_name(farm, m)}" for m, c in u.materials]}
+                for u in unlocks.chain(f"machine:{mid}")]
+        out[qid] = {"name": farm.name(qid), "machine": _machine_name(farm, mid), "product": output.name,
+                   "gain_each": gain_each, "count": n, "gain_total": gain_each * n, "steps": steps}
+    return sorted(out.values(), key=lambda r: -r["gain_total"])
 
 
 def _value(farm: Farm, qid: str) -> int:
@@ -242,3 +291,9 @@ def _machine_id(farm: Farm, name: str) -> str:
 def _machine_name(farm: Farm, mid: str) -> str:
     b = farm.data.asset("Data/BigCraftables").get(mid.removeprefix("(BC)")) or {}
     return farm.data.text(b.get("DisplayName")) or b.get("Name") or mid
+
+
+def _material_name(farm: Farm, qid: str) -> str:
+    """A crafting material by id: a plain object id ("388"), or a big craftable it already qualifies ("(BC)13",
+    a Furnace, for the Heavy Furnace's own recipe)."""
+    return _machine_name(farm, qid) if qid.startswith("(BC)") else farm.name(f"(O){qid}")

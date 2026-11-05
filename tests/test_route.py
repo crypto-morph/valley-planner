@@ -122,7 +122,7 @@ def test_new_goals_fresh():
     farm = new_farm(GameData(GAME))
     for g in ("deluxe_barn", "deluxe_coop", "silo", "axe_steel", "pickaxe_steel", "can_steel", "mines_bottom",
               "skull_cavern", "jars", "kegs", "house_3"):
-        o = route(farm, [g], [], tiles=80, cave="bats")["objectives"][0]
+        o = next(x for x in route(farm, [g], [], tiles=80, cave="bats")["objectives"] if x["id"] == g)
         assert o["status"] == "ok" or (o["problems"] and all(": " in p for p in o["problems"])), (g, o)
         if o["status"] == "ok":
             assert o["steps"] and o["finish"], g
@@ -193,14 +193,17 @@ def test_skull_cavern_needs_the_vault():
     from valley_planner.engine.route.start import new_farm
     from valley_planner.gamedata import GameData
     farm = new_farm(GameData(GAME))
-    o = route(farm, ["skull_cavern"], [], deadlines={"skull_cavern": 40}, tiles=80, cave="bats")["objectives"][0]
-    assert o["status"] == "impossible" and any("Vault" in p for p in o["problems"])
-    assert any("Vault" in i for i in o["info"])
-    alone = route(farm, ["skull_cavern"], [], tiles=80, cave="bats")["objectives"][0]
-    assert alone["status"] == "ok" and alone["steps"][0]["what"].startswith("pay the Vault")
-    v = route(farm, ["skull_cavern"], ["cc"], tiles=80, cave="bats")
-    sc, cc = v["objectives"]
-    assert [st for st in cc["steps"] if st["what"].startswith("pay the Vault") and st["shared"] == "The Skull Cavern"]
+    def goals(*args, **kw):
+        return {o["id"]: o for o in route(farm, *args, tiles=80, cave="bats", **kw)["objectives"]}
+
+    tight = goals(["skull_cavern"], [], deadlines={"skull_cavern": 40})
+    assert tight["bus"]["status"] == "impossible" and any("Vault" in p for p in tight["bus"]["problems"])
+    assert any("Vault" in i for i in tight["bus"]["info"])
+    assert tight["skull_cavern"]["status"] == "impossible"
+    alone = goals(["skull_cavern"])
+    assert alone["skull_cavern"]["status"] == "ok" and alone["bus"]["steps"][0]["what"].startswith("pay the Vault")
+    cc = goals(["skull_cavern"], ["cc"])["cc"]
+    assert [st for st in cc["steps"] if st["what"].startswith("pay the Vault") and st["shared"] == "The bus to the Desert"]
     assert not [st for st in cc["steps"] if st["what"].startswith("pay the Vault") and not st["shared"]]
 
 

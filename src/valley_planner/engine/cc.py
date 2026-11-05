@@ -10,7 +10,10 @@ the days from today to the deadline:
 - animal: once you have that animal (and it's grown), or after buying one.
 - machine / cooking: once you own the machine or know the recipe and hold
   the inputs.
-- cart / monster: random; the chance of at least one by the deadline.
+- cart: exact once the seed is known (a real save): each visit selling it is a way of its own, on that day only,
+  at that price, so a missed visit simply stops being offered. With no seed (planning a fresh farm) it's random:
+  the chance of at least one by the deadline.
+- monster: random, the same way.
 A slot is "have" if the bundle plan has already set aside what you hold.
 Pick-N bundles use the slots you can fill soonest. Everything stays a
 day number (Spring 1, Year 1 = 1).
@@ -90,9 +93,29 @@ class Planner:
         self.today = farm.save.days_played
         self.held = farm.held()
         self.unlocks = Unlocks(farm)
+        self.seed_known = farm.save.mtime > 0  # a real save, not a farm made up for planning
+
+    def ways(self, item: str, *, count: int = 1, quality: int = 0) -> list[Way]:
+        """Every way to get an item, with the cart's actual visits in place of its odds once the seed is known."""
+        if not self.seed_known:
+            return [self.way(s, item) for s in self.sources.of(item)]
+        ways = [self.way(s, item) for s in self.sources.of(item) if s.kind != "cart"]
+        return ways + self._cart_ways(item, count, quality)
+
+    def _cart_ways(self, item: str, count: int, quality: int) -> list[Way]:
+        """The cart sells at normal quality; a visit counts if it has enough for the slot in one go."""
+        f = self.farm
+        if quality or not item.startswith("("):
+            return []
+        days = f.cart.calendar(f.when, count_days=YEAR, guarantee=f.save.cart_guarantee).get(item, [])
+        return [self.way(Source("cart_day", f"the Traveling Cart on {d.label.rsplit(',', 1)[0]} ({i.price:,}g)",
+                                cost=i.price * count, on=d.days_played), item)
+                for d, i in days if d.days_played <= self.deadline and i.stock >= count]
 
     def way(self, src: Source, item: str) -> Way:
         f, w = self.farm, self.farm.when
+        if src.on is not None:
+            return Way(src, src.on, src.on)
         blocked, keys = [], []
         for need in src.needs:
             kind, _, what = need.partition(":")
@@ -222,7 +245,7 @@ class Planner:
                 have = (b.key, ing.index) in plan.reserved
                 item = ing.item or f"category {ing.category}"
                 name = f.name(ing.item) if ing.item else f"any {item}"
-                ways = [] if have or not ing.item else [self.way(s, ing.item) for s in self.sources.of(ing.item)]
+                ways = [] if have or not ing.item else self.ways(ing.item, count=ing.stack, quality=ing.quality)
                 slot = Slot(b.display, b.room, item, name, ing.stack, ing.quality, have, ways)
                 slot.best = _best(ways)
                 cands.append(slot)
@@ -241,7 +264,7 @@ class Planner:
                 have = (b.key, ing.index) in plan.reserved
                 item = ing.item or f"category {ing.category}"
                 name = f.name(ing.item) if ing.item else f"any {item}"
-                ways = [] if have or not ing.item else [self.way(s, ing.item) for s in self.sources.of(ing.item)]
+                ways = [] if have or not ing.item else self.ways(ing.item, count=ing.stack, quality=ing.quality)
                 dish = f.save.dish_of_the_day
                 if not have and dish and ing.item == dish[0] and dish[1] >= ing.stack:
                     ways.insert(0, Way(Source("shop", "today's dish at the Saloon"), self.today, self.today))
@@ -285,15 +308,20 @@ def _best(ways: list[Way]) -> Way | None:
     """The soonest certain way you can use now; else a likely random one; else the certain way with the
     least to unlock first (random ways stay listed as the backup)."""
     open_ = [x for x in ways if not x.blocked and x.odds is None and x.earliest is not None]
-    if open_:
-        return min(open_, key=lambda x: (not x.sure, x.earliest))
+    steady = [x for x in open_ if x.source.on is None]  # a single cart visit isn't a deadline: other ways stay open
+    if steady:
+        return min(steady, key=lambda x: (not x.sure, x.earliest))
     luck = sorted((x for x in ways if not x.blocked and x.odds is not None), key=lambda x: -x.odds)
     if luck and luck[0].odds >= LIKELY:
         return luck[0]
     gated = [x for x in ways if x.blocked and x.earliest is not None and x.source.kind != "monster"]
     if gated:
         return min(gated, key=lambda x: (len(x.blocked), x.earliest))
-    return luck[0] if luck else (ways[0] if ways else None)
+    if luck:
+        return luck[0]
+    if open_:  # only the cart has it, so its next visit does matter
+        return min(open_, key=lambda x: x.earliest)
+    return ways[0] if ways else None
 
 
 def _slot_order(s: Slot) -> tuple:

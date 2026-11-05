@@ -131,6 +131,14 @@ class Crop:
 
 
 @dataclass
+class Forage:
+    name: str
+    item: str  # qualified id
+    location: str
+    tile: tuple[int, int]
+
+
+@dataclass
 class Friend:
     points: int
     gifts_this_week: int
@@ -164,6 +172,9 @@ class Save:
     daily_luck: float
     items: list[Item] = field(default_factory=list)
     crops: list[Crop] = field(default_factory=list)
+    forage: list[Forage] = field(default_factory=list)  # spawned forage lying around this morning
+    stamina: int = 270  # energy this morning
+    farmer_id: int = 0  # seeds geodes
     mail: set[str] = field(default_factory=set)  # received
     mailbox: set[str] = field(default_factory=set)  # arrived, not read yet
     mail_tomorrow: set[str] = field(default_factory=set)  # arrives tomorrow morning
@@ -189,6 +200,7 @@ class Save:
     friends: dict[str, Friend] = field(default_factory=dict)
     spouse: str | None = None
     cooking_recipes: set[str] = field(default_factory=set)
+    cooking_order: list[str] = field(default_factory=list)  # as the save lists them: seeded rolls go in this order
     crafting_recipes: set[str] = field(default_factory=set)
     fish_caught: dict[str, int] = field(default_factory=dict)  # unqualified id -> count
     museum: set[str] = field(default_factory=set)  # donated item ids
@@ -298,6 +310,40 @@ def _containers(root: ET.Element, player: ET.Element, parents: dict):
             yield f"{_location_name(el, parents)} auto-grabber", _child(el, "items")
     for _k, v in _dict(_child(root, "globalInventories")):  # Junimo chests share one inventory
         yield "Junimo chest", _or(_child(v, "ArrayOfItem"), v)
+
+
+def night_override(days_played: int, day: int, season: str, raw: str) -> str:
+    """Tomorrow's weather as it will be: Game1.getWeatherModificationsForDate runs overnight, after the save's
+    forecast was written. The first of a month and days up to 4 are sunny, and day 3 is always rain; on Year 1
+    that beats whatever the forecast says. Summer's 13th and 26th storm."""
+    next_day = days_played + 1
+    next_month_day = day % 28 + 1
+    if next_day == 3:
+        return "rain"
+    if next_month_day == 1 or next_day <= 4:
+        return "sun"
+    if season == "summer" and next_month_day % 13 == 0:
+        return "storm"
+    return raw
+
+
+def _forage(root: ET.Element) -> list[Forage]:
+    """What the game has spawned on the outdoor maps: isSpawnedObject objects, each on its own tile."""
+    out = []
+    for loc in _or(_child(root, "locations"), []):
+        name = _text(loc, "name")
+        if not name or name.startswith("Island"):
+            continue
+        for k, v in _dict(_child(loc, "objects")):
+            obj = _or(_child(v, "Object"), v)
+            if not _bool(obj, "isSpawnedObject"):
+                continue
+            tile = _child(k, "Vector2")
+            oid = _text(obj, "itemId") or _text(obj, "parentSheetIndex")
+            if tile is not None and oid:
+                out.append(Forage(_text(obj, "name"), f"(O){oid}", name,
+                                  (int(float(_text(tile, "X", "0"))), int(float(_text(tile, "Y", "0"))))))
+    return out
 
 
 def _weather(root: ET.Element) -> tuple[str, str, bool]:
@@ -584,7 +630,11 @@ def read_save(path: Path, data=None) -> Save:
         day=_int(root, "dayOfMonth", 1), year=_int(root, "year", 1), days_played=days_played,
         money=_int(player, "money"), total_earned=_int(player, "totalMoneyEarned"),
         unique_id=_text(root, "uniqueIDForThisGame"), legacy_random=_bool(root, "useLegacyRandom"),
-        weather=weather, weather_tomorrow=tomorrow,
+        weather=weather,
+        weather_tomorrow=night_override(days_played, _int(root, "dayOfMonth", 1),
+                                        (_text(root, "currentSeason", "spring") or "spring").lower(), tomorrow),
+        farmer_id=int(_text(player, "UniqueMultiplayerID", "0") or 0),
+        forage=_forage(root), stamina=int(float(_text(player, "stamina", "270") or 270)),
         daily_luck=max(-0.2, min(0.2, luck + (0.025 if "HasSpecialCharm" in mail else 0))),
         items=items, crops=crops, mail=mail, mailbox=set(_strings(_child(player, "mailbox"))),
         mail_tomorrow=set(_strings(_child(player, "mailForTomorrow"))),
@@ -604,6 +654,7 @@ def read_save(path: Path, data=None) -> Save:
         tool_at_clint_days=max(0, _int(player, "daysLeftForToolUpgrade")) if _upgrading(player) else 0,
         friends=friends, spouse=spouse,
         cooking_recipes={_flat(k) for k, _v in _dict(_child(player, "cookingRecipes"))},
+        cooking_order=[_flat(k) for k, _v in _dict(_child(player, "cookingRecipes"))],
         crafting_recipes={_flat(k) for k, _v in _dict(_child(player, "craftingRecipes"))},
         fish_caught=fish, museum=museum, bundle_data=bundle_data, bundle_slots=bundle_slots, areas_complete=areas,
         buildings=buildings, building_days=building_days, animals=animals, hay=_int(farm, "piecesOfHay"),
