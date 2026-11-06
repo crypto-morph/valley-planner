@@ -203,7 +203,8 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
             row = sell.setdefault((qid, it.quality), {"name": farm.name(qid) if not it.preserve else it.name,
                                                       "quality": QUALITY_WORD.get(it.quality, ""), "count": 0,
                                                       "each": each, "kind": PRODUCE.get(cat, "Artifact"),
-                                                      "where": set()})
+                                                      "where": set(), "id": qid, "category": it.category,
+                                                      "q": it.quality})
             row["count"] += n
             row["where"].add(farm.where_label(it.where, it.chest))
     sell_rows = sorted(({**r, "total": r["count"] * r["each"], "where": sorted(r["where"])} for r in sell.values()),
@@ -297,3 +298,10 @@ def _material_name(farm: Farm, qid: str) -> str:
     """A crafting material by id: a plain object id ("388"), or a big craftable it already qualifies ("(BC)13",
     a Furnace, for the Heavy Furnace's own recipe)."""
     return _machine_name(farm, qid) if qid.startswith("(BC)") else farm.name(f"(O){qid}")
+
+
+def default(farm: Farm) -> dict:
+    """The default view, worked out once per save: the day plan asks for it several times."""
+    if not hasattr(farm, "_sold"):
+        farm._sold = view(farm)
+    return farm._sold

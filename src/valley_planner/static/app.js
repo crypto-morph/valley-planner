@@ -15,25 +15,26 @@ const li = (left, right = "") => `<li><span>${left}</span><span class="sub">${ri
 const mins = (m, d) => (d ? `${d} day${d > 1 ? "s" : ""}` : m >= 1440 ? `${(m / 1600).toFixed(1)} machine days` : m >= 60 ? `${Math.round(m / 6) / 10} h` : `${m} min`);
 
 function itemCard(c) {
-  const parts = [`<h2 class="sign">${esc(c.name)}</h2><p class="sub">${c.held ? `You hold ${c.held}` : "You hold none"}${c.museum ? ` · museum: ${esc(c.museum)}` : ""}${c.help_wanted ? " · a Help Wanted request can ask for it this season" : ""}</p>`];
-  if (c.sells.length) parts.push("<h3>Sells for</h3>" + list(c.sells.map((x) => li(x.quality || "normal", `${x.each}g`))));
-  if (c.bundles.length) parts.push("<h3>Bundles</h3>" + list(c.bundles.map((b) => li(`${esc(b.bundle)} <span class="sub">(${esc(b.room)})</span>`, `${b.count}${b.quality ? `, quality ${b.quality}+` : ""}${b.open ? "" : " · room not open yet"}`))));
-  if (c.grows) parts.push(`<h3>Grows</h3><p>From ${esc(c.grows.seed)} in ${esc(c.grows.seasons.join(", "))}: ${c.grows.days} days${c.grows.regrow ? `, then every ${c.grows.regrow}` : ""}.</p>`);
-  if (c.plant) parts.push(`<h3>Plant it</h3><p>Grows ${esc(c.plant.crop)} in ${esc(c.plant.seasons.join(", "))}: ${c.plant.days} days${c.plant.regrow ? `, then every ${c.plant.regrow}` : ""}.</p>`);
+  const parts = [], get_ = [], use = [];
+  const head = (`<h2>${esc(c.name)}</h2><p class="muted">${c.held ? `You hold ${c.held}` : "You hold none"}${c.museum ? ` · museum: ${esc(c.museum)}` : ""}${c.help_wanted ? " · a Help Wanted request can ask for it this season" : ""}</p>`);
+  if (c.sells.length) use.push("<h3>Sells for</h3>" + list(c.sells.map((x) => li(x.quality || "normal", `${x.each}g`))));
+  if (c.bundles.length) use.push("<h3>Bundles</h3>" + list(c.bundles.map((b) => li(`${esc(b.bundle)} <span class="sub">(${esc(b.room)})</span>`, `${b.count}${b.quality ? `, quality ${b.quality}+` : ""}${b.open ? "" : " · room not open yet"}`))));
+  if (c.grows) get_.push(`<h3>Grows</h3><p>From ${esc(c.grows.seed)} in ${esc(c.grows.seasons.join(", "))}: ${c.grows.days} days${c.grows.regrow ? `, then every ${c.grows.regrow}` : ""}.</p>`);
+  if (c.plant) use.push(`<h3>Plant it</h3><p>Grows ${esc(c.plant.crop)} in ${esc(c.plant.seasons.join(", "))}: ${c.plant.days} days${c.plant.regrow ? `, then every ${c.plant.regrow}` : ""}.</p>`);
   if (c.fish) {
     const f = c.fish;
-    parts.push("<h3>Catch it</h3>" + (f.trap ? `<p>Crab pot, ${esc(f.water)} water.</p>` :
+    get_.push("<h3>Catch it</h3>" + (f.trap ? `<p>Crab pot, ${esc(f.water)} water.</p>` :
       `<p>${f.here_now.length ? `This season: ${esc(f.here_now.join(", "))}` : "Not this season"}${f.other_seasons.length ? ` · also ${esc(f.other_seasons.join(", "))}` : ""}<br>${esc(f.times.join(", "))} · ${esc(f.weather === "both" ? "any weather" : f.weather)}${f.min_level ? ` · fishing level ${f.min_level}` : ""} · difficulty ${f.difficulty}</p>`));
   }
-  if (c.shops_today.length || c.shops_other.length) parts.push("<h3>Buy it</h3>" + list([
+  if (c.shops_today.length || c.shops_other.length) get_.push("<h3>Buy it</h3>" + list([
     ...c.shops_today.map((o) => li(`${esc(o.shop)} today${unsure(o.sure)}`, o.trade ? `${o.trade_amount} ${esc(o.trade)}` : `${o.price}g`)),
     ...c.shops_other.map((o) => li(`${esc(o.shop)} <span class="sub">(${esc(o.when || "other days")})</span>`, o.trade ? `${o.trade_amount} ${esc(o.trade)}` : `${o.price}g`)),
   ]));
-  if (c.recipes && c.recipes.length) parts.push("<h3>The recipe</h3>" + list(c.recipes.map((r) => li(`${esc(r.shop)}${r.known ? " · you know it" : ""}`, `${r.price}g`))));
-  if (c.cart.length) parts.push("<h3>At the cart</h3>" + list(c.cart.map((x) => li(`${esc(x.date)}${unsure(x.sure)}`, `${x.price.toLocaleString()}g`))));
-  if (c.machines.length) parts.push("<h3>Machines</h3>" + list(c.machines.map((m) => li(`${esc(m.machine)}: ${m.uses > 1 ? `${m.uses} → ` : ""}${esc(m.product)}${m.owned ? ` <span class="sub">(you have ${m.owned})</span>` : ""}`, `${m.sells}g · ${mins(m.minutes, m.days)}`))));
-  if (c.gifts) parts.push("<h3>Gift tastes</h3>" + list(["love", "like", "dislike", "hate"].filter((t) => c.gifts[t].length).map((t) => li(t, esc(c.gifts[t].join(", "))))));
-  return parts.join("");
+  if (c.recipes && c.recipes.length) get_.push("<h3>The recipe</h3>" + list(c.recipes.map((r) => li(`${esc(r.shop)}${r.known ? " · you know it" : ""}`, `${r.price}g`))));
+  if (c.cart.length) get_.push("<h3>At the cart</h3>" + list(c.cart.map((x) => li(`${esc(x.date)}${unsure(x.sure)}`, `${x.price.toLocaleString()}g`))));
+  if (c.machines.length) use.push("<h3>Machines</h3>" + list(c.machines.map((m) => li(`${esc(m.machine)}: ${m.uses > 1 ? `${m.uses} → ` : ""}${esc(m.product)}${m.owned ? ` <span class="sub">(you have ${m.owned})</span>` : ""}`, `${m.sells}g · ${mins(m.minutes, m.days)}`))));
+  if (c.gifts) use.push("<h3>Gift tastes</h3>" + list(["love", "like", "dislike", "hate"].filter((t) => c.gifts[t].length).map((t) => li(t, esc(c.gifts[t].join(", "))))));
+  return head + tabbed([["Use it", use.join("")], ["Get it", get_.join("")]]);
 }
 
 // Where a villager is today, from /api/ask/villager's "today" (one entry, or two on a rain-coinflip day)
@@ -42,12 +43,28 @@ function whereToday(today) {
     (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
 }
 
+// A card's sections as tabs, so a long card opens on one short list instead of everything at once.
+function tabbed(sections) {
+  const shown = sections.filter(([, html]) => html);
+  if (shown.length < 2) return shown.map(([, html]) => html).join("");
+  return `<div class="seg card-tabs" role="group">${shown.map(([name], i) => `<button type="button" class="${i ? "" : "on"}" data-pane="${i}">${esc(name)}</button>`).join("")}</div>` +
+    shown.map(([, html], i) => `<div class="card-pane" data-pane="${i}"${i ? " hidden" : ""}>${html}</div>`).join("");
+}
+function wireTabs(root) {
+  root.querySelectorAll(".card-tabs button").forEach((b) => b.addEventListener("click", () => {
+    root.querySelectorAll(".card-tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    root.querySelectorAll(".card-pane").forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.pane; });
+  }));
+}
+
 function villagerCard(c) {
   const f = c.met ? `${c.hearts} hearts (${c.points} points) · ${c.gifts_this_week}/2 gifts this week${c.gifted_today ? " · gifted today" : ""}${c.talked_today ? " · talked today" : ""}` : "Not met yet";
-  return `<h2 class="sign">${esc(c.name)}</h2><p class="sub">Birthday ${esc(c.birthday)} · ${esc(f)}</p>` +
-    "<h3>Loves</h3>" + list(c.loves.map((x) => li(esc(x.name), x.held ? `you hold ${x.held}` : ""))) +
-    (c.likes_held.length ? `<h3>Likes that you hold</h3><p>${esc(c.likes_held.join(", "))}</p>` : "") +
-    "<h3>Today</h3>" + whereToday(c.today);
+  const usual = c.loves.filter((x) => !x.rare || x.held), rare = c.loves.filter((x) => x.rare && !x.held);
+  const gifts = (c.likes_held.length ? `<h3>Likes, that you hold</h3><p>${esc(c.likes_held.join(", "))}</p>` : "") +
+    "<h3>Loves</h3>" + list(usual.map((x) => li(esc(x.name), x.held ? `you hold ${x.held}` : ""))) +
+    (rare.length ? `<details class="fold plain"><summary>Rare things (${rare.length})</summary><p class="muted">${rare.map((x) => esc(x.name)).join(", ")}</p></details>` : "");
+  return `<h2>${esc(c.name)}</h2><p class="muted">Birthday ${esc(c.birthday)} · ${esc(f)}</p>` +
+    tabbed([["Today", whereToday(c.today)], ["Gifts", gifts]]);
 }
 
 // " · in the green chest (the farm)" for where something is kept
@@ -96,6 +113,7 @@ async function showErrand(name) {
 async function showCard(kind, id) {
   const c = await get(`/api/ask/${kind}/${encodeURIComponent(id)}`);
   $("#ask-card-body").innerHTML = kind === "item" ? itemCard(c) : villagerCard(c);
+  wireTabs($("#ask-card-body"));
   $("#ask-card").hidden = false;
 }
 
@@ -199,6 +217,8 @@ async function planRoute() {
     : `Cave: ${caveName[v.cave] || v.cave}.`) + (v.cave_chosen ? " You've already chosen, so the plan uses it from today."
     : v.cave_day ? ` Demetrius makes his offer on ${v.cave_day}.` : " Demetrius's offer doesn't come this year.");
   drawTree(v);
+  drawGoals(v);
+  tuckAwayOff();
   $("#route-cave").disabled = !!v.cave_chosen;
   if (v.cave_chosen) $("#route-cave").value = v.cave; else $("#route-cave").value = routeState.cave;
   $("#route-cave").title = v.cave_chosen ? "Your save has already chosen; it can't be changed" : "";
@@ -499,6 +519,86 @@ function flashInto(id) {
 }
 
 const todayDone = new Set();
+let dayAsk = {}, lastDay = null, morningView = null;
+
+function loadDone(date) {
+  todayDone.clear();
+  try { (JSON.parse(localStorage.getItem(`done:${date}`) || "[]")).forEach((x) => todayDone.add(x)); } catch { /* fine */ }
+  todayDone.date = date;
+}
+function saveDone() {
+  try { localStorage.setItem(`done:${todayDone.date}`, JSON.stringify([...todayDone])); } catch { /* fine */ }
+}
+function tick(id, on) {
+  if (on) todayDone.add(id); else todayDone.delete(id);
+  saveDone();
+  drawNext(lastDay);
+}
+
+const extras = (rows) => rows.map((x) => `${esc(x.title)} ${x.gold}g${x.near ? ` (${esc(x.near)})` : ` (${esc(x.place)})`}`).join("; ");
+
+// The one thing to do next, and everything after it. Ticking moves on without asking the server.
+function drawNext(v) {
+  const rows = v.plan.filter((x) => !todayDone.has(x.id));
+  const first = rows[0];
+  $("#t-next").innerHTML = first
+    ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
+      (first.way.length ? `<ol>${first.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") +
+      (first.extras ? `<p class="next-extra"><strong>On the way:</strong> ${extras(first.extras)}</p>` : "") +
+      `<button type="button" class="btn light" id="t-done">Done, what's next?</button>`
+    : `<h2>All done for today</h2><p>${esc(v.spare.length ? `Energy to spare: ${v.spare.join(", or ")}.` : "Rest up, and get to bed by midnight.")}</p>`;
+  if (first) $("#t-done").onclick = () => tick(first.id, true);
+  const homeward = v.passing.filter((x) => x.stop >= v.plan.length);
+  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
+  $("#t-plan").innerHTML = `<ul class="stops">${v.plan.filter((x) => !first || x.id !== first.id).map(line).join("")}</ul>` +
+    (homeward.length ? `<p class="muted"><strong>On the way home:</strong> ${extras(homeward)}</p>` : "") +
+    (v.home ? `<p class="muted">Home by about ${esc(v.home)}.${v.spare.length ? ` Then ${esc(v.spare.join(", or "))}.` : ""}</p>` : "") +
+    (v.fishing ? `<p class="muted"><strong>Fish at ${esc(v.fishing.place)}</strong> for ${v.fishing.fish.map(esc).join(", ")}.</p>` : "") +
+    (v.left.length ? `<details class="fold plain"><summary>Doesn't fit today (${v.left.length})</summary><ul class="list">${v.left.map((x) => `<li><span>${esc(x.title)}</span><span class="muted">${esc(x.why)}</span></li>`).join("")}</ul></details>` : "");
+  document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => tick(c.dataset.stop, c.checked)));
+}
+
+function drawPack(p) {
+  const s = p.slots;
+  $("#t-pack").innerHTML = `<div class="pack-head"><h2>Pack your bag</h2><strong>${s.used} of ${s.max} slots</strong></div>` +
+    (p.leave.length ? `<div class="alert amber small"><strong>Put in the Chest:</strong> ${p.leave.map(esc).join(", ")}.</div>` : "") +
+    (p.tools.length ? `<p class="muted">Keep with you: ${p.tools.map(esc).join(", ")}.</p>` : "") +
+    p.stops.map((x, i) => `<div class="pack-stop"><strong>${i + 1}. ${esc(x.stop)}</strong>${x.gold ? ` <span class="muted">about ${x.gold.toLocaleString()}g</span>` : ""}` +
+      (x.first ? `<div class="first">${esc(x.first)}</div>` : "") + (x.items.length ? `<div>${x.items.map(esc).join(", ")}</div>` : "") +
+      (x.there.length ? `<div class="muted">Already in the chest there: ${x.there.map(esc).join(", ")}</div>` : "") + "</div>").join("") +
+    (p.ship.length ? `<div class="pack-stop"><strong>Shipping bin</strong> <span class="muted">about ${p.ship_gold.toLocaleString()}g</span><div>${p.ship.map((x) => esc(x.name)).join(", ")}</div></div>` : "") +
+    (p.left_behind.length ? `<p class="muted small">Left behind today: ${p.left_behind.map((x) => `${x.items.map(esc).join(", ")} in the chest at ${esc(x.place)}`).join("; ")}.</p>` : "") +
+    (p.dropped.length ? `<p class="muted small">Bag full, so these go in the bin: ${p.dropped.map(esc).join(", ")}.</p>` : "") +
+    (s.free_on_purpose ? `<p class="muted small">Leaves ${s.free_on_purpose} slots free for what you pick up.</p>` : "");
+}
+
+// Goals that are off don't need a whole row each: one line lists them, and a press brings the rows back.
+let showOff = false;
+function tuckAwayOff() {
+  const off = [...document.querySelectorAll("#route-tree .tree-lane.off")];
+  off.forEach((r) => { r.hidden = !showOff; });
+  let more = $("#route-off");
+  if (!more) {
+    more = document.createElement("button");
+    more.id = "route-off"; more.type = "button"; more.className = "btn quiet";
+    more.addEventListener("click", () => { showOff = !showOff; tuckAwayOff(); });
+    $("#route-tree").after(more);
+  }
+  more.hidden = !off.length;
+  more.textContent = showOff ? "Hide goals that are off" : `Add a goal (${off.length} more to choose from)`;
+}
+
+function drawGoals(v) {
+  const chosen = v.objectives.filter((o) => o.tier !== "off");
+  const off = chosen.filter((o) => o.status !== "ok" && o.status !== "done");
+  $("#goals-head").textContent = !chosen.length ? "Choose your goals" : off.length
+    ? `${off.length} of ${chosen.length} goal${chosen.length === 1 ? "" : "s"} need${off.length === 1 ? "s" : ""} attention` : "All your goals are on track";
+  $("#goals-sub").textContent = chosen.length ? "In priority order. Drag to reorder them under Choose goals." : "Pick some below to get a route.";
+  const label = { ok: "On track", done: "Done", luck: "Needs luck", impossible: "Not this year", late: "Late" };
+  $("#goal-cards").innerHTML = chosen.map((o, i) => `<section class="card goal"><div class="goal-top"><span class="muted"><strong>${i + 1}</strong></span><h2>${esc(o.label)}</h2><span class="tag ${o.status === "ok" || o.status === "done" ? "green" : "amber"}">${esc(label[o.status] || o.status)}</span></div>` +
+    (o.finish ? `<div>Planned by ${esc(o.finish)}.</div>` : "") + (o.problems[0] ? `<div>${esc(o.problems[0])}</div>` : "") + "</section>").join("");
+}
+
 const views = {
   async route() {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
@@ -508,50 +608,38 @@ const views = {
 
   async dayPlan(ask = {}) {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
-    const q = new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "" });
-    const v = await get(`/api/today?${q}`);
+    dayAsk = ask;
+    if (!todayDone.date) { const m = await get("/api/meta"); loadDone(m.date); }
+    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "" })}`);
+    lastDay = v;
+    const h = v.head;
+    $("#m-date").textContent = `${h.weekday}, ${h.date.replace(/, Year \d+/, "")}`;
+    $("#m-glance").textContent = `${cap(h.weather)}, ${h.tomorrow} tomorrow · The spirits are ${h.mood}`;
+    $("#t-gold").textContent = `${h.money.toLocaleString()}g`;
     const where = $("#t-where");
     if (!where.childElementCount) where.innerHTML = v.places.map((p) => `<option>${esc(p)}</option>`).join("");
-    if (!$("#t-energy").value) $("#t-energy").value = v.energy.now;
-    const row = (x) => `<li class="t-stop"><label><input type="checkbox" data-stop="${esc(x.id)}"><b>${esc(x.time)}</b> ${esc(x.title)}</label>` +
-      `<span class="sub">${esc(x.why)}${x.near ? ` · ${esc(x.near)}` : ""} · ${x.energy_after} energy after</span>` +
-      (x.way.length ? `<ol class="t-way">${x.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") + "</li>";
-    $("#t-plan").innerHTML = `<p class="sub">Energy this morning: <b>${v.energy.now}/${v.energy.max}</b>. ${v.notes.map(esc).join(" ")}</p>` +
-      (v.plan.length ? `<ul class="list t-list">${v.plan.map(row).join("")}</ul>` : '<p class="sub">Nothing left to plan today.</p>') +
-      (v.passing.length ? `<p class="sub">On your way (optional, extra cash): ${v.passing.map((x) => `${esc(x.title)} ${x.gold}g${x.near ? `, ${esc(x.near)}` : ""}`).join("; ")}</p>` : "") +
-      (v.geodes.length ? `<p class="sub">Geodes, in cracking order: ${v.geodes.map((g) => `#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(" or ")}`).join("; ")}</p>` : "") +
-      (v.pace !== 1 ? `<p class="sub">Walking times use your pace: ${v.pace}x the first estimate.</p>` : "") +
-      (v.bring.length ? `<p class="sub">From the Chest: ${v.bring.map((x) => `${x.count > 1 ? `${x.count} ` : ""}${esc(x.name)} (${esc(x.why)})`).join("; ")}</p>` : "") +
-      (v.fishing ? `<p class="sub">Fish at ${esc(v.fishing.place)} for ${v.fishing.fish.map(esc).join(", ")}${v.fishing.bubbles.length ? `. Bubbles: ${v.fishing.bubbles.map(esc).join("; ")}` : ""}.</p>` : "") +
-      (v.spare.length ? `<p class="sub">Energy to spare: ${v.spare.map(esc).join(", or ")}.</p>` : "") +
-      (v.home ? `<p class="sub">Home by about ${esc(v.home)}.</p>` : "") +
-      (v.left.length ? `<p class="sub">Doesn't fit: ${v.left.map((x) => `${esc(x.title)} (${esc(x.why)})`).join("; ")}</p>` : "");
-    document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => {
-      if (c.checked) todayDone.add(c.dataset.stop); else todayDone.delete(c.dataset.stop);
-    }));
-    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="t-skill"><b>${esc(cap(k.name))} ${k.level}</b>` +
-      `<div class="t-bar"><span style="width:${Math.round(k.share * 100)}%"></span></div>` +
-      `<span class="sub">${k.next ? `${k.to_go} XP to level ${k.level + 1}: ${k.ways.map(esc).join(", or ")}` : "Maxed"}</span></div>`).join("");
+    const e = v.energy, now = ask.energy ?? e.now;
+    $("#t-energy").innerHTML = `<div class="meter-row"><strong>Energy</strong><strong>${now} / ${e.max}</strong></div><div class="bar-track"><span style="width:${Math.min(100, Math.round(now / e.max * 100))}%"></span></div>`;
+    $("#t-warning").hidden = !v.warning;
+    $("#t-warning").textContent = v.warning || "";
+    drawNext(v);
+    drawPack(v.pack);
+    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="skill"><div class="skill-name"><strong>${esc(cap(k.name))} ${k.level}</strong></div><div class="muted small">${k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div></div>`).join("");
   },
 
   async morning() {
-    await views.dayPlan();
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     const r = await fetch("/api/morning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(routeBody(routeState, "save")) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
     const v = await r.json();
-    $("#m-date").textContent = `${v.weekday}, ${v.date.replace(/, Year \d+/, "")}`;
-    const w = v.weather_words;
-    $("#m-glance").innerHTML = `<span><b>${esc(cap(w.today))}</b>, ${esc(w.tomorrow)} tomorrow${w.note ? ` · ${esc(w.note)}` : ""}</span>` +
-      `<span>The spirits: <b>${esc(v.mood)}</b>${v.mood_means ? ` · ${esc(v.mood_means)}` : ""}</span><span><b>${v.money.toLocaleString()}g</b></span>`;
+    morningView = v;
     drawPriorities(v.priorities);
     drawDay(v.day);
     const shown = new Set(v.day.blocks.flatMap((b) => b.lines));
-    const notes = v.today.filter((x) => x.kind !== "dish" || !v.day.blocks.some((b) => b.title === "The Saloon"))
-      .concat(v.do.filter((x) => !shown.has(x.title) && !shown.has(`Pick: ${x.title}`)));
+    const notes = v.today.filter((x) => x.kind !== "dish");  // the plan and pack list already carry the jobs
     $("#m-first").innerHTML = notes.length ? "<ul class=\"list\">" + notes.map((x) =>
-      `<li${x.errand ? ` class="clickable" data-errand="${esc(x.errand)}"` : ""}><span><b>${esc(x.title)}</b></span><span class="sub">${esc(x.text)}</span></li>`
-    ).join("") + "</ul>" : '<p class="sub">Nothing else today.</p>';
+      `<li class="note${x.errand ? " clickable" : ""}"${x.errand ? ` data-errand="${esc(x.errand)}"` : ""}><b>${esc(x.title)}</b><span class="muted">${esc(x.text)}</span></li>`
+    ).join("") + "</ul>" : '<p class="muted">Nothing special today.</p>';
     document.querySelectorAll("#m-first li[data-errand]").forEach((el) => el.addEventListener("click", () => showErrand(el.dataset.errand)));
     drawQuests(v.quests);
     const byDate = [];
@@ -736,65 +824,123 @@ async function busy(text, work) {
     if (--busyCount === 0) { clearTimeout(busyTimer); $("#loading").hidden = true; }
   }
 }
-const LOADING = { morning: "Reading your save…", route: "Planning the rest of the year…", plan: "Adding up what your goals take…",
-                  todo: "Reading your save…", sell: "Pricing what you hold…", cook: "Pricing your recipes…",
-                  romance: "Looking through your chests…" };
+const LOADING = { today: "Reading your save…", goals: "Planning the rest of the year…", farm: "Reading your farm…",
+                  people: "Looking through your chests…", ahead: "Looking ahead…" };
+// Old links and pointers still land in the right place.
+const OLD = { morning: ["today"], todo: ["today"], crops: ["farm", "crops"], sell: ["farm", "sell"], cook: ["farm", "cook"],
+              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["ahead"] };
+const SUBS = { crops: () => views.crops(), sell: () => views.sell(), cook: () => views.cook(), route: () => views.route(), plan: () => views.plan() };
+
+function showSub(name) {
+  document.querySelectorAll(".sub-view").forEach((s) => { const peers = s.parentElement.querySelectorAll(":scope > .sub-view"); if ([...peers].some((p) => p.dataset.for === name)) s.hidden = s.dataset.for !== name; });
+  document.querySelectorAll(".seg button").forEach((b) => { if (b.parentElement.parentElement.querySelector(`.sub-view[data-for="${name}"]`)) b.classList.toggle("on", b.dataset.sub === name); });
+  return SUBS[name]();
+}
+
+const places = {
+  async today() {
+    await views.dayPlan(dayAsk);  // the plan first: the rest fills in behind it, without holding the page up
+    views.morning().catch(() => {});
+    views.todo().catch(() => {});
+  },
+  async farm(sub) {
+    await showSub(sub || "crops");
+    const m = await get("/api/crops").then((v) => v.mine);
+    $("#farm-head").textContent = m.ready ? `${m.ready} crop${m.ready === 1 ? "" : "s"} ready to harvest` : `${m.total} crops growing`;
+    $("#farm-sub").textContent = `${m.total} planted, so a dry day costs about ${m.total * 2} energy to water${m.dies ? `. ${m.dies} won't ripen before the season ends.` : "."}`;
+  },
+  async people() {
+    const [q, day] = await Promise.all([get("/api/quests"), lastDay ? lastDay : views.dayPlan().then(() => lastDay)]);
+    if (routeState && routeState.settings.spouse) { try { if (!localStorage.getItem("romanceTarget")) localStorage.setItem("romanceTarget", routeState.settings.spouse); } catch { /* fine */ } }
+    await Promise.all([views.romance(), views.today()]);
+    drawQuests(q);
+    const talk = day.plan.find((x) => x.kind === "talk");
+    $("#people-head").textContent = talk ? `${talk.title.replace("Talk to ", "See ")}: ${talk.why.split(";")[0]}` : "Who's around today";
+    $("#people-sub").textContent = "Where people are, what to give them, and what to take where.";
+    const row = (id, label, text) => `<button type="button" class="row-btn" data-errand="${id}"><strong>${esc(label)}</strong><span class="muted">${esc(text)}</span></button>`;
+    $("#p-errands").innerHTML = row("cc", "Community Center", "what you hold for bundles") + row("gunther", "Gunther", "new finds for the Museum") + row("clint", "Clint", "geodes and tool upgrades") +
+      row("birthdays", "Birthdays", "the next 7 days") + row("trees", "Fruit trees", "what's growing and when") +
+      (seasonal.map((e) => row(e.id, e.label, "this season")).join(""));
+    document.querySelectorAll("#p-errands [data-errand]").forEach((b) => b.addEventListener("click", () => showErrand(b.dataset.errand)));
+  },
+  async goals(sub) {
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    if (!$("#route-settings").childElementCount) drawSettings();
+    await planRoute();
+    await showSub(sub || "route");
+  },
+  async ahead() {
+    const [m, day] = await Promise.all([get("/api/morning"), lastDay ? lastDay : views.dayPlan().then(() => lastDay)]);
+    await Promise.all([views.today(), views.cart()]);
+    const byDate = [];
+    m.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
+    $("#m-week").innerHTML = `<ul class="days">${byDate.map((d) => `<li><strong>${esc(d.date)}</strong><div>${d.items.map((e) => `<div>${esc(e.label)}${unsure(e.sure)}</div>`).join("")}</div></li>`).join("")}</ul>`;
+    const top = m.priorities[0];
+    $("#ahead-head").textContent = top ? top.title : "Nothing urgent coming up";
+    $("#ahead-sub").textContent = top ? top.text : "";
+    $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${esc(b.place)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
+    $("#a-geodes").innerHTML = day.geodes.length ? day.geodes.map((g) => `<div>#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(", or ")}</div>`).join("") : '<p class="muted">No geodes held.</p>';
+  },
+};
 
 async function show(name) {
+  const [place, sub] = OLD[name] || [name];
   if (location.hash.slice(1) !== name) history.replaceState(null, "", `#${name}`);
-  closeAsk();  // a tab button puts the search away, so the page you chose is what you see
+  closeAsk();  // choosing a place puts the search away, so the page you chose is what you see
   window.scrollTo(0, 0);
-  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-  document.querySelectorAll(".view").forEach((s) => (s.hidden = s.id !== `view-${name}`));
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.view === place));
+  document.querySelectorAll(".view").forEach((s) => (s.hidden = s.id !== `view-${place}`));
   try {
-    await busy(LOADING[name] || "Loading…", views[name]);
+    await busy(LOADING[place] || "Loading…", () => places[place](sub));
   } catch (e) {
-    $(`#view-${name}`).insertAdjacentHTML("afterbegin", `<p class="parch panel">Couldn't load this: ${esc(e.message)}</p>`);
+    $(`#view-${place}`).insertAdjacentHTML("afterbegin", `<p class="alert red">Couldn't load this: ${esc(e.message)}</p>`);
   }
 }
 
+let seasonal = [];
 async function start() {
   try {
     const m = await get("/api/meta");
-    $("#status").textContent = m.save ? `${m.player} · ${m.farm} Farm · ${m.date}` : "No save found";
-    const row = document.querySelector(".errands");
-    (m.seasonal_errands || []).forEach((e) => {
-      const b = document.createElement("button");
-      b.type = "button"; b.dataset.errand = e.id; b.textContent = e.label; b.className = "seasonal";
-      b.addEventListener("click", () => showErrand(e.id));
-      row.appendChild(b);
-    });
+    $("#status").textContent = m.save ? `${m.player}, ${m.farm} Farm, ${m.date}` : "No save found";
+    seasonal = m.seasonal_errands || [];
   } catch (e) {
     $("#status").textContent = e.message;
   }
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => busy("Loading…", () => showSub(b.dataset.sub))));
   $("#romance-target").addEventListener("change", (e) => {
     try { localStorage.setItem("romanceTarget", e.target.value); } catch { /* fine */ }
-    busy(LOADING.romance, views.romance);
+    busy("Looking through your chests…", views.romance);
   });
   let timer;
   $("#cart-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchCart, 250); });
   let askTimer;
   $("#ask-q").addEventListener("input", () => { clearTimeout(askTimer); askTimer = setTimeout(searchAsk, 200); });
   $("#ask-close").addEventListener("click", closeAsk);
-  document.querySelectorAll("[data-errand]").forEach((b) => b.addEventListener("click", () => showErrand(b.dataset.errand)));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAsk();
     if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("#ask-q").focus(); }
   });
   const first = location.hash.slice(1);
-  show(views[first] ? first : "morning");  // a link can open a tab: …/#route
+  show(places[first] || OLD[first] ? first : "today");  // a link can open a place: …/#goals
 }
 
 start();
 
-$("#t-form").addEventListener("submit", (e) => {
+$("#t-recalc").addEventListener("click", () => { $("#t-form").hidden = !$("#t-form").hidden; });
+$("#t-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const ask = {};
   const time = $("#t-time").value;
   if (time) ask.time = Number(time.replace(":", ""));
-  if ($("#t-energy").value !== "") ask.energy = Number($("#t-energy").value);
+  if ($("#t-energy-in").value !== "") ask.energy = Number($("#t-energy-in").value);
   ask.where = $("#t-where").value;
-  views.dayPlan(ask);
+  await busy("Replanning your day…", () => views.dayPlan(ask));
+  $("#t-form").hidden = true;
 });
-$("#t-reset").addEventListener("click", () => { todayDone.clear(); $("#t-time").value = ""; $("#t-energy").value = ""; views.dayPlan(); });
+$("#t-reset").addEventListener("click", async () => {
+  todayDone.clear(); saveDone();
+  $("#t-time").value = ""; $("#t-energy-in").value = "";
+  await busy("Reading your save…", () => views.dayPlan({}));
+  $("#t-form").hidden = true;
+});

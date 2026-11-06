@@ -97,8 +97,9 @@ def test_spares_near_the_route_are_offered_as_optional(data):
         v = today.view(Planner(None).farm())
     except Exception:
         pytest.skip("no save here")
-    assert all("gold" in p and "place" in p for p in v["passing"])
-    assert not {x["title"].removeprefix("Pick up ") for x in v["left"]} & {p["title"] for p in v["passing"]}
+    assert all("gold" in p and "place" in p and "stop" in p for p in v["passing"])
+    on_stops = [e for x in v["plan"] for e in x.get("extras", [])]
+    assert len(on_stops) == sum(1 for p in v["passing"] if p["stop"] < len(v["plan"]))
 
 
 def test_bubbles_rise_in_fishable_water_near_land(data):
@@ -153,3 +154,51 @@ def test_a_festival_day_is_only_the_farm_and_the_festival(data):
     farm.hours.festivals[(farm.save.season, farm.save.day)] = ("A Fair", 900, "Town")
     kinds = {x["kind"] for x in today.view(farm)["plan"]}
     assert "festival" in kinds and not kinds & {"mine", "shop", "forage", "talk", "bin"}
+
+
+def test_a_can_near_a_step_shows_both_items(data):
+    """Found in play: Blacksmith's bin said 3 Iron Ore, then gave a Newspaper once 20 cans had been opened."""
+    from valley_planner.facts.conditions import When
+    from valley_planner.facts.garbage import GarbageCans, _Roll
+    w = When("spring", 15, 1, 15, game_id=453557957)
+    s = SimpleNamespace(days_played=15, daily_luck=0.0, stats={"trashCansChecked": 18}, mail=set(), special_orders=[],
+                        dish_of_the_day=None, deepest_mine_level=5, crafting_recipes=set())
+    cans = GarbageCans(data)
+    before, after = _Roll(cans, "Blacksmith", w, s).at(0), _Roll(cans, "Blacksmith", w, s, 20).at(0)
+    assert before.label == "3 Iron Ore" and after.name == "Soggy Newspaper"
+    day = {c.can: c for c in cans.day(s, w)}
+    assert day["Blacksmith"].other.name == "Soggy Newspaper"
+    s.stats["trashCansChecked"] = 25
+    assert {c.can: c for c in cans.day(s, w)}["Blacksmith"].other is None
+
+
+def test_food_advice_covers_the_shortfall(data):
+    from valley_planner.views import today
+    farm = SimpleNamespace(data=data, held=lambda: {"(O)RiverJelly": 2}, name=lambda _q: "River Jelly")
+    assert "2 River Jelly" in today.food_advice(farm, 100)
+    assert "1 River Jelly" in today.food_advice(farm, 50)
+    assert "still be" in today.food_advice(farm, 500)
+
+
+def test_a_machine_you_cannot_build_yet_is_not_suggested():
+    from valley_planner.views.morning import _can_build
+    farm = SimpleNamespace(save=SimpleNamespace(skills={"farming": 3}))
+    assert not _can_build(farm, {"steps": [{"how": "Farming level 4"}]})
+    assert _can_build(farm, {"steps": [{"how": "Farming level 3"}, {"how": ""}]})
+
+
+def test_the_island_is_no_deadline():
+    from valley_planner.views.morning import _out_of_reach
+    assert _out_of_reach({"blocked": ["Willy's boat"]}) and _out_of_reach({"blocked": ["the bus (the Vault)"]})
+    assert not _out_of_reach({"blocked": ["a Coop"]}) and not _out_of_reach({})
+
+
+def test_books_and_catalogues_are_rare_gifts(data):
+    from valley_planner.app import Planner
+    from valley_planner.views import ask
+    try:
+        v = ask.villager(Planner(None).farm(), "Penny")
+    except Exception:
+        pytest.skip("no save here")
+    rare = {x["name"] for x in v["loves"] if x["rare"]}
+    assert {"Animal Catalogue", "Prismatic Shard"} <= rare and "Melon" not in rare and "Poppy" not in rare

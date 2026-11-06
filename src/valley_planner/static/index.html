@@ -6,229 +6,180 @@
   <title>Valley Planner</title>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/ui.css" />
 </head>
 <body>
-  <header class="top wood">
-    <div class="brand">
-      <svg width="30" height="30" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><rect x="7" y="6" width="2" height="9" fill="#3F7A2E"/><rect x="9" y="3" width="2" height="2" fill="#7CC04F"/><rect x="11" y="2" width="2" height="2" fill="#7CC04F"/><rect x="9" y="5" width="4" height="2" fill="#5E9C3F"/><rect x="3" y="5" width="2" height="2" fill="#7CC04F"/><rect x="5" y="7" width="2" height="2" fill="#5E9C3F"/><rect x="1" y="4" width="2" height="2" fill="#7CC04F"/></svg>
-      <h1>Valley Planner</h1>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand">Valley Planner</div>
+      <nav id="tabs" class="places" aria-label="Main">
+        <button type="button" data-view="today">Today</button>
+        <button type="button" data-view="farm">Farm</button>
+        <button type="button" data-view="people">People</button>
+        <button type="button" data-view="goals">Goals</button>
+        <button type="button" data-view="ahead">Ahead</button>
+      </nav>
+      <label class="find">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        <input id="ask-q" type="search" autocomplete="off" aria-label="Find an item, villager or fish" placeholder="Find an item, villager or fish" />
+      </label>
     </div>
-    <div id="status" class="pill">Reading your save…</div>
+    <div class="find-out">
+      <div id="ask-results" class="chip-row"></div>
+      <section class="ask-card" id="ask-card" hidden>
+        <button type="button" class="ghost ask-close" id="ask-close" aria-label="Close">×</button>
+        <div id="ask-card-body"></div>
+      </section>
+    </div>
   </header>
-
-  <nav id="tabs" class="tabs" aria-label="Views">
-    <button type="button" class="active" data-view="morning">Morning</button>
-    <button type="button" data-view="todo">To-do</button>
-    <button type="button" data-view="today">Today</button>
-    <button type="button" data-view="crops">Crops</button>
-    <button type="button" data-view="sell">Sell</button>
-    <button type="button" data-view="cook">Cook</button>
-    <button type="button" data-view="romance">Romance</button>
-    <button type="button" data-view="plan">Plan</button>
-    <button type="button" data-view="route">Route</button>
-    <button type="button" data-view="cart">Cart</button>
-  </nav>
-
-  <section class="askbar parch" aria-label="Ask about anything">
-    <div class="askbox-field">
-      <input id="ask-q" type="search" autocomplete="off" aria-label="Ask about an item, a villager or a fish"
-             placeholder="Ask about anything: an item, a villager or a fish (Hot Pepper, Maru, Sturgeon…)" />
-    </div>
-    <div class="chip-row errands" aria-label="Errands">
-      <button type="button" data-errand="gunther">Take to Gunther</button>
-      <button type="button" data-errand="clint">Take to Clint</button>
-      <button type="button" data-errand="cc">Take to the Community Center</button>
-      <button type="button" data-errand="birthdays">Birthday gifts</button>
-      <button type="button" data-errand="trees">Fruit trees</button>
-    </div>
-    <div id="ask-results" class="chip-row"></div>
-    <section class="ask-card" id="ask-card" hidden>
-      <button type="button" class="ghost ask-close" id="ask-close" aria-label="Close">×</button>
-      <div id="ask-card-body"></div>
-    </section>
-  </section>
 
   <div id="loading" class="loading" role="status" aria-live="polite" hidden><div class="loading-card"><span class="spinner" aria-hidden="true"></span><span id="loading-text">Reading your save…</span></div></div>
   <main>
-    <section id="view-morning" class="view">
-      <section class="parch panel">
-        <div class="m-top">
-          <h2 class="sign" id="m-date"></h2>
-          <div class="m-glance" id="m-glance"></div>
+    <section id="view-today" class="view">
+      <div class="glance">
+        <div class="glance-date">
+          <h1 id="m-date"></h1>
+          <div id="m-glance" class="muted"></div>
         </div>
-        <div id="m-priorities" class="priorities"></div>
-        <div class="dayline-wrap"><div id="m-day" class="dayline"></div></div>
-        <p class="sub">A suggested order: the farm first, then each errand while its shop is open. Shop hours are the game's.</p>
-      </section>
-      <section class="parch panel">
-        <h2 class="sign">Today's plan</h2>
-        <form id="t-form" class="t-form">
-          <label>Time <input id="t-time" type="time" step="600"></label>
-          <label>Energy <input id="t-energy" type="number" min="0" max="600"></label>
-          <label>Where <select id="t-where"></select></label>
-          <button type="submit">Recalculate</button>
-          <button type="button" id="t-reset">Back to this morning</button>
-        </form>
-        <div id="t-plan"></div>
-      </section>
-      <section class="parch panel">
-        <h2 class="sign">Skills</h2>
-        <div id="t-skills" class="t-skills"></div>
-      </section>
-      <div class="two">
-        <section class="parch panel">
-          <h2 class="sign">Worth knowing today</h2>
-          <div id="m-first"></div>
-        </section>
-        <section class="parch panel">
-          <h2 class="sign">This week</h2>
-          <div id="m-week"></div>
-        </section>
+        <div class="meter" id="t-energy"></div>
+        <div class="gold"><span class="muted">Gold</span><strong id="t-gold"></strong></div>
+        <button type="button" id="t-recalc" class="btn line">Recalculate</button>
       </div>
-      <section class="parch panel">
-        <h2 class="sign">Your quests</h2>
-        <div id="m-quests"></div>
-      </section>
-    </section>
-
-    <section id="view-todo" class="view" hidden>
-      <div class="two">
-        <section class="parch panel">
-          <h2 class="sign" id="todo-head">Today</h2>
-          <div id="todo-list"></div>
-        </section>
-        <section class="parch panel" id="todo-route-box">
-          <h2 class="sign">Your route this week</h2>
-          <p class="sub" id="todo-route-note">From the goals on the <a href="#route">Route</a> tab.</p>
-          <div id="todo-route"></div>
-        </section>
-        <section class="parch panel" id="todo-review-box" hidden>
-          <h2 class="sign" id="todo-review-head">Yesterday</h2>
-          <div id="todo-review"></div>
-        </section>
+      <form id="t-form" class="recalc" hidden>
+        <div class="recalc-title">Off plan? Tell it where you've got to.</div>
+        <label>Time <input id="t-time" type="time" step="600"></label>
+        <label>Energy <input id="t-energy-in" type="number" min="0" max="600"></label>
+        <label>Where <select id="t-where"></select></label>
+        <button type="submit" class="btn">Replan my day</button>
+        <button type="button" id="t-reset" class="btn quiet">Back to this morning</button>
+      </form>
+      <div id="t-warning" class="alert amber" role="status" hidden></div>
+      <div class="cols">
+        <div class="col-main">
+          <section id="t-next" class="next" aria-live="polite"></section>
+          <div id="m-priorities" class="priorities"></div>
+          <section class="card"><h2>The rest of today</h2><div id="t-plan"></div></section>
+          <details class="fold"><summary>This week's route</summary><p class="sub" id="todo-route-note"></p><div id="todo-route"></div></details>
+          <details class="fold"><summary>Checklist</summary><h3 id="todo-head" hidden></h3><div id="todo-list"></div></details>
+          <details class="fold" id="todo-review-box" hidden><summary id="todo-review-head">Yesterday</summary><div id="todo-review"></div></details>
+          <details class="fold"><summary>Shop-hours timeline</summary><div class="dayline-wrap"><div id="m-day" class="dayline"></div></div></details>
+        </div>
+        <aside class="col-side">
+          <section class="card" id="t-pack"></section>
+          <section class="card"><h2>Only today</h2><div id="m-first"></div></section>
+          <section class="card"><h2>Skills</h2><div id="t-skills" class="skills"></div></section>
+        </aside>
       </div>
     </section>
 
-    <section id="view-today" class="view" hidden>
-      <div class="two">
-        <section class="parch panel">
-          <h2 class="sign">Shops today</h2>
-          <div id="hours"></div>
-        </section>
-        <section class="parch panel">
-          <h2 class="sign">Coming up</h2>
-          <div id="days"></div>
-        </section>
+    <section id="view-farm" class="view" hidden>
+      <div><h1 id="farm-head">Farm</h1><div class="muted" id="farm-sub"></div></div>
+      <div class="seg" role="group" aria-label="Farm">
+        <button type="button" data-sub="crops">Crops</button><button type="button" data-sub="sell">Sell</button><button type="button" data-sub="cook">Cook</button>
       </div>
-    </section>
-
-    <section id="view-crops" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">What you can still plant</h2>
+      <div class="sub-view" data-for="crops">
+      <section class="card">
+        <h2>What you can still plant</h2>
         <p class="sub" id="countdown-head"></p>
         <div class="table-wrap"><table class="sell-table" id="countdown"></table></div>
       </section>
-      <section class="parch panel">
-        <h2 class="sign">In the ground</h2>
+      <section class="card">
+        <h2>In the ground</h2>
         <p class="sub" id="mine-head"></p>
         <div class="table-wrap"><table class="sell-table" id="mine"></table></div>
         <h3>Fruit trees</h3>
         <div id="mine-trees"></div>
-      </section>
-    </section>
-
-    <section id="view-cook" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">What to cook</h2>
-        <p class="sub" id="cook-head"></p>
-        <h3>Worth cooking now</h3>
-        <div class="table-wrap"><table class="sell-table" id="cook-now"></table></div>
-      </section>
-      <section class="parch panel">
-        <h2 class="sign">Which quality to cook with</h2>
-        <p class="sub">The gain from each dish if its ingredients are all of one quality. A dish has no quality of its own, so better ingredients only raise what you give up: where it's red, sell that quality and cook with the plain ones. Cooking takes from the end of your backpack first, then the fridge, not the cheapest, so carry only the quality you mean to use.</p>
-        <div class="table-wrap"><table class="sell-table" id="cook-quality"></table></div>
-      </section>
-      <div class="two">
-        <section class="parch panel">
-          <h2 class="sign">Your other recipes</h2>
-          <p class="sub">Ingredients are costed at their best other use (sold, or through one of your machines), or today's shop price if you don't have them.</p>
-          <div class="table-wrap"><table class="sell-table" id="cook-known"></table></div>
-        </section>
-        <section class="parch panel">
-          <h2 class="sign">Worth learning</h2>
-          <div class="table-wrap"><table class="sell-table" id="cook-learn"></table></div>
-        </section>
-      </div>
-    </section>
-
-    <section id="view-sell" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">Ship these</h2>
+      </section></div>
+      <div class="sub-view" data-for="sell" hidden>
+      <section class="card">
+        <h2>Ship these</h2>
         <p class="sub" id="sell-head"></p>
         <div class="table-wrap"><table class="sell-table" id="sell-rows"></table></div>
       </section>
       <div class="two">
-        <section class="parch panel">
-          <h2 class="sign">Put through a machine first</h2>
+        <section class="card">
+          <h2>Put through a machine first</h2>
           <div id="sell-process"></div>
         </section>
-        <section class="parch panel">
-          <h2 class="sign">Hold on to</h2>
+        <section class="card">
+          <h2>Hold on to</h2>
           <div id="sell-filters" class="filter-list"></div>
           <div id="sell-keep"></div>
         </section>
       </div>
-      <section class="parch panel" id="sell-hints-panel">
-        <h2 class="sign">Worth getting</h2>
+      <section class="card" id="sell-hints-panel">
+        <h2>Worth getting</h2>
         <p class="sub">A machine you don't have at all, that would pay better than what you're doing with
           what's left raw — with its recipe and what it takes to craft.</p>
         <div id="sell-hints"></div>
+      </section></div>
+      <div class="sub-view" data-for="cook" hidden>
+      <section class="card">
+        <h2>What to cook</h2>
+        <p class="sub" id="cook-head"></p>
+        <h3>Worth cooking now</h3>
+        <div class="table-wrap"><table class="sell-table" id="cook-now"></table></div>
       </section>
+      <section class="card">
+        <h2>Which quality to cook with</h2>
+        <p class="sub">The gain from each dish if its ingredients are all of one quality. A dish has no quality of its own, so better ingredients only raise what you give up: where it's red, sell that quality and cook with the plain ones. Cooking takes from the end of your backpack first, then the fridge, not the cheapest, so carry only the quality you mean to use.</p>
+        <div class="table-wrap"><table class="sell-table" id="cook-quality"></table></div>
+      </section>
+      <div class="two">
+        <section class="card">
+          <h2>Your other recipes</h2>
+          <p class="sub">Ingredients are costed at their best other use (sold, or through one of your machines), or today's shop price if you don't have them.</p>
+          <div class="table-wrap"><table class="sell-table" id="cook-known"></table></div>
+        </section>
+        <section class="card">
+          <h2>Worth learning</h2>
+          <div class="table-wrap"><table class="sell-table" id="cook-learn"></table></div>
+        </section>
+      </div></div>
     </section>
 
-    <section id="view-romance" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">Who are you courting?</h2>
+    <section id="view-people" class="view" hidden>
+      <div><h1 id="people-head">People</h1><div class="muted" id="people-sub"></div></div>
+      <div class="cols">
+        <div class="col-main">
+      <section class="card">
+        <h2>Who are you courting?</h2>
         <select id="romance-target" class="romance-pick"><option value="">Choose someone…</option></select>
       </section>
       <div id="romance-body" hidden>
-        <section class="parch panel">
-          <h2 class="sign" id="romance-head"></h2>
+        <section class="card">
+          <h2 id="romance-head"></h2>
           <p class="sub" id="romance-status"></p>
           <div id="romance-cap"></div>
         </section>
-        <section class="parch panel">
-          <h2 class="sign">Where to find them today</h2>
+        <section class="card">
+          <h2>Where to find them today</h2>
           <div id="romance-where"></div>
         </section>
-        <section class="parch panel">
-          <h2 class="sign">What you hold that would help</h2>
+        <section class="card">
+          <h2>What you hold that would help</h2>
           <p class="sub">Loved gifts give 80 points, liked 45 (×8 on their birthday); a heart is 250. Two gifts
             count against the week, from Sunday.</p>
           <div class="table-wrap"><table class="sell-table" id="romance-gifts"></table></div>
         </section>
+      </div></div>
+        <aside class="col-side">
+          <section class="card"><h2>You could take something to</h2><div id="p-errands" class="stack"></div></section>
+          <section class="card"><h2>Quests</h2><div id="m-quests"></div></section>
+          <section class="card"><h2>Open today</h2><div id="hours"></div></section>
+        </aside>
       </div>
     </section>
 
-    <section id="view-plan" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">What it all takes</h2>
-        <p class="sub" id="needs-head"></p>
-        <div class="need-tiles" id="needs-tiles"></div>
-        <p class="needs-single" id="needs-single"></p>
-        <div class="nwhere" id="needs-where"></div>
-      </section>
-      <section class="parch panel" id="needs-choices-box" hidden>
-        <h2 class="sign">Choose how: things you can get more than one way</h2>
-        <p class="sub">The ticked way is the one the route plans. Press another way to plan with it instead: the route, the To-do and these totals all follow.</p>
-        <div class="choices" id="needs-choices"></div>
-      </section>
-    </section>
-
-    <section id="view-route" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">Your route</h2>
+    <section id="view-goals" class="view" hidden>
+      <div class="head-row"><div><h1 id="goals-head">Goals</h1><div class="muted" id="goals-sub"></div></div></div>
+      <div id="goal-cards" class="stack"></div>
+      <div class="seg" role="group" aria-label="Goals">
+        <button type="button" data-sub="route">Choose goals and see the route</button><button type="button" data-sub="plan">Everything they need</button>
+      </div>
+      <div class="sub-view" data-for="route">
+      <section class="card">
+        <h2>Your route</h2>
         <p class="sub">Each row is a goal. Read it left to right: do this, to unlock this, to get this. Set each goal to Target, Nice or Off, and drag a goal's name to change its priority.</p>
         <div id="route-chips" class="route-chips"></div>
         <div class="route-key" aria-label="How much time each step has">
@@ -240,21 +191,16 @@
         </div>
         <p class="sub" id="route-cave-note"></p>
       </section>
-      <section class="parch panel">
+      <section class="card">
         <div class="tree-wrap"><div id="route-tree" class="tree"></div></div>
       </section>
-      <section class="parch panel" id="route-synergy-box" hidden>
-        <h2 class="sign">Where your goals help each other</h2>
+      <details class="fold" id="route-synergy-box" hidden><summary>Where your goals help each other</summary>
+        
         <p class="sub">One step, more than one goal: these move several goals forward together.</p>
         <div id="route-synergy" class="route-synergy"></div>
-      </section>
-      <div class="two">
-        <section class="parch panel">
-          <h2 class="sign">Cash through the year</h2>
-          <div id="route-cash" class="route-cash"></div>
-        </section>
-        <section class="parch panel">
-          <h2 class="sign">Planning choices</h2>
+      </details>
+      <details class="fold"><summary>Cash through the year</summary><div id="route-cash" class="route-cash"></div></details>
+      <details class="fold"><summary>Planning assumptions</summary>
           <div class="route-settings">
             <label for="route-start">Start from</label>
             <select id="route-start">
@@ -270,26 +216,47 @@
           </div>
           <div id="route-settings" class="route-settings"></div>
           <p class="sub">Prices and rules are the game's; these numbers are estimates you can change.</p>
-        </section>
-      </div>
+        </details></div>
+      <div class="sub-view" data-for="plan" hidden>
+      <section class="card">
+        <h2>What it all takes</h2>
+        <p class="sub" id="needs-head"></p>
+        <div class="need-tiles" id="needs-tiles"></div>
+        <p class="needs-single" id="needs-single"></p>
+        <div class="nwhere" id="needs-where"></div>
+      </section>
+      <section class="card" id="needs-choices-box" hidden>
+        <h2>Choose how: things you can get more than one way</h2>
+        <p class="sub">The ticked way is the one the route plans. Press another way to plan with it instead: the route, the To-do and these totals all follow.</p>
+        <div class="choices" id="needs-choices"></div>
+      </section></div>
     </section>
 
-    <section id="view-cart" class="view" hidden>
-      <section class="parch panel">
-        <h2 class="sign">When is it at the cart?</h2>
+    <section id="view-ahead" class="view" hidden>
+      <div><h1 id="ahead-head">Ahead</h1><div class="muted" id="ahead-sub"></div></div>
+      <div class="cols">
+        <div class="col-main">
+          <section class="card"><h2>Next 7 days</h2><div id="m-week"></div>
+            <p class="muted small">Percentages depend on that morning's luck. Bins with no percentage are certain.</p></section>
+          <details class="fold"><summary>Festivals and events, 2 weeks</summary><div id="days"></div></details>
+        </div>
+        <aside class="col-side">
+      <section class="card">
+        <h2>When is it at the cart?</h2>
         <div class="askbox-field">
           <input id="cart-q" type="search" autocomplete="off" placeholder="Red Cabbage, Rare Seed, Truffle…" />
         </div>
         <div id="cart-hits"></div>
       </section>
-      <section class="parch panel">
-        <h2 class="sign">The next visits</h2>
-        <div id="cart-days"></div>
-      </section>
+      <details class="fold"><summary>Full stock, next visits</summary><div id="cart-days"></div></details>
+          <section class="card"><h2>Today's bubbles</h2><div id="a-bubbles"></div></section>
+          <section class="card"><h2>Your next geodes</h2><div id="a-geodes"></div></section>
+        </aside>
+      </div>
     </section>
   </main>
 
-  <footer class="sub foot">Reads your own save and your own copy of the game. Not affiliated with ConcernedApe.</footer>
+  <footer class="foot"><span id="status">Reading your save…</span> · Reads your own save and your own copy of the game. Not affiliated with ConcernedApe.</footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

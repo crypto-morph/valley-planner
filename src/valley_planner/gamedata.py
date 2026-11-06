@@ -59,6 +59,7 @@ class GameData:
         self.version = game_version(install)
         self.cache = (cache or cache_root()) / self.version
         self._memory: dict[str, object] = {}
+        self._present: dict[str, bool] = {}
         self._lock = threading.Lock()
 
     @cached_property
@@ -83,7 +84,10 @@ class GameData:
             return value
 
     def has(self, name: str) -> bool:
-        return (self.install.content / f"{name}.xnb").is_file()
+        """Remembered: the game's files don't change while it runs, and looking is slow on a Windows drive from WSL."""
+        if name not in self._present:
+            self._present[name] = (self.install.content / f"{name}.xnb").is_file()
+        return self._present[name]
 
     def assets_in(self, folder: str) -> list[str]:
         """Asset names in a content folder, e.g. 'Characters/schedules'."""

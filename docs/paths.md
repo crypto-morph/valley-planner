@@ -23,6 +23,17 @@ Planning runs to the end of Year 3. After that the player doesn't need the hand-
 - **Travel is part of the plan**: minecarts and warp totems (`facts/travel.py`), with the horse, bus and boat to
   come. Totems are spent, so using one costs something and has to earn it.
 
+## The interface
+
+Five places, each answering one question, with Find on every screen: Today (what do I do now?), Farm (what do I grow,
+sell and cook?), People (who do I see, and what do I give?), Goals (am I on track?), Ahead (what's coming up?). Each
+opens with its answer in a sentence and has one main action. Green means fine, amber needs care, red will be missed,
+blue is a forecast. Fonts stay local: the planner sends nothing off the computer. `static/ui.css` holds the look;
+`styles.css` and `app.css` still style the route tree and tables.
+
+`views/pack.py` turns the day's stops into a pack list, starting from the morning's backpack and its size: what to
+leave, what to take for each stop, and what goes in the bin.
+
 ## Layout
 
 | Where | What |

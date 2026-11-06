@@ -173,6 +173,7 @@ class Save:
     items: list[Item] = field(default_factory=list)
     crops: list[Crop] = field(default_factory=list)
     forage: list[Forage] = field(default_factory=list)  # spawned forage lying around this morning
+    bushes: list[Forage] = field(default_factory=list)  # berry bushes with fruit on this morning
     stamina: int = 270  # energy this morning
     farmer_id: int = 0  # seeds geodes
     mail: set[str] = field(default_factory=set)  # received
@@ -325,6 +326,20 @@ def night_override(days_played: int, day: int, season: str, raw: str) -> str:
     if season == "summer" and next_month_day % 13 == 0:
         return "storm"
     return raw
+
+
+def _bushes(root: ET.Element) -> list[Forage]:
+    """Berry bushes with fruit on this morning: medium bushes whose sprite is set to the fruiting one."""
+    out = []
+    for loc in _or(_child(root, "locations"), []):
+        name = _text(loc, "name")
+        for b in _or(_child(loc, "largeTerrainFeatures"), []):
+            tile = _child(b, "tilePosition")
+            fruiting = _text(b, "size") == "1" and _text(b, "tileSheetOffset") == "1"
+            if _type(b) == "Bush" and fruiting and tile is not None:
+                out.append(Forage("Berry bush", "", name, (int(float(_text(tile, "X", "0"))),
+                                                           int(float(_text(tile, "Y", "0"))))))
+    return out
 
 
 def _forage(root: ET.Element) -> list[Forage]:
@@ -634,7 +649,7 @@ def read_save(path: Path, data=None) -> Save:
         weather_tomorrow=night_override(days_played, _int(root, "dayOfMonth", 1),
                                         (_text(root, "currentSeason", "spring") or "spring").lower(), tomorrow),
         farmer_id=int(_text(player, "UniqueMultiplayerID", "0") or 0),
-        forage=_forage(root), stamina=int(float(_text(player, "stamina", "270") or 270)),
+        forage=_forage(root), bushes=_bushes(root), stamina=int(float(_text(player, "stamina", "270") or 270)),
         daily_luck=max(-0.2, min(0.2, luck + (0.025 if "HasSpecialCharm" in mail else 0))),
         items=items, crops=crops, mail=mail, mailbox=set(_strings(_child(player, "mailbox"))),
         mail_tomorrow=set(_strings(_child(player, "mailForTomorrow"))),

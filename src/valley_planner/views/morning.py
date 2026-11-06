@@ -20,6 +20,8 @@ Each points at its tab (or opens the errand card) for the full picture.
 
 from __future__ import annotations
 
+import re
+
 from ..engine import cc
 from ..facts import romance
 from . import crops, errands, sell
@@ -132,8 +134,8 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
         b = slot["best"]
         if not b or slot["status"] in ("have", "stuck") or not b.get("last_start") or slot["name"] in growing:
             continue
-        if any("bus" in str(x) for x in b.get("blocked") or []):
-            continue  # a place you can't reach yet is no deadline
+        if _out_of_reach(b):
+            continue
         last = _day_number(b["last_start"])
         if last is not None and last - w.days_played <= SOON:
             do.append({"kind": "cc", "title": f"{slot['name']} for the {slot['bundle']} bundle",
@@ -228,8 +230,8 @@ def _priorities(farm: Farm, mine: dict, plan: dict, cc_info: dict, orders: list[
         b = slot["best"]
         if not b or slot["status"] in ("have", "stuck") or not b.get("last_start") or slot["name"] in growing:
             continue
-        if any("bus" in str(x) for x in slot.get("blocked") or b.get("blocked") or []):
-            continue  # a place you can't reach yet is no deadline
+        if _out_of_reach(b):
+            continue
         last = _day_number(b["last_start"])
         days = None if last is None else last - w.days_played
         if days is not None and 0 <= days <= DEADLINE_WINDOW:
@@ -261,7 +263,7 @@ def _priorities(farm: Farm, mine: dict, plan: dict, cc_info: dict, orders: list[
         add("romance", "plenty", f"{p['name']} is capped at {p['hearts']}♥", f"give them {item} to raise it further",
             "CAPPED", tab="romance", target=p["name"])
 
-    hints = sell.view(farm)["hints"]
+    hints = [h for h in sell.view(farm)["hints"] if _can_build(farm, h)]
     if hints and hints[0]["gain_total"] >= WORTH_GETTING:
         h = hints[0]
         add("sell", "plenty", f"Worth getting: a {h['machine']}",
@@ -410,6 +412,24 @@ def _growing(farm: Farm) -> set[str]:
     return {farm.name(f"(O){c.harvest_id}") for c in farm.save.crops if not c.dead and not c.forage}
 
 
+def _can_build(farm: Farm, hint: dict) -> bool:
+    """False while a step needs a skill level you haven't reached."""
+    for st in hint["steps"]:
+        m = re.match(r"(\w+) level (\d+)", st.get("how") or "", re.I)
+        if m and farm.save.skills.get(m.group(1).lower(), 0) < int(m.group(2)):
+            return False
+    return True
+
+
+def _out_of_reach(way: dict) -> bool:
+    """A way through the Desert or the Island: not somewhere you can go yet, so no deadline to worry about."""
+    return any(word in str(x) for x in way.get("blocked") or [] for word in ("bus", "boat"))
+
+
+def _can_item(can) -> str:
+    return f"{can.loot.label} or {can.other.label}" if can.other else can.loot.label
+
+
 def _bins(farm: Farm) -> dict:
     """The garbage cans with something in them today: exact, since today's luck is in the save."""
     full = [c for c in farm.bins.day(farm.save, farm.when) if c.loot]
@@ -417,13 +437,13 @@ def _bins(farm: Farm) -> dict:
         return {"kind": "bins", "title": "Every garbage can is empty today", "text": ""}
     n = len(full)
     return {"kind": "bins", "title": f"{n} garbage can{'s have' if n != 1 else ' has'} something today",
-            "text": " · ".join(f"{c.place}: {c.loot.label}" for c in full)}
+            "text": " · ".join(f"{c.place}: {_can_item(c)}" for c in full)}
 
 
 def _bins_ahead(farm: Farm, days_played: int) -> str:
     """Another day's cans: certain ones first, then those that hang on the day's luck, likeliest first."""
     cans = sorted((c for c in farm.bins.day(farm.save, farm.when.on(days_played)) if c.loot), key=lambda c: -c.odds)
-    parts = [f"{c.place}: {c.loot.label}" + ("" if c.odds == 1 else f" ({round(c.odds * 100)}%)") for c in cans]
+    parts = [f"{c.place}: {_can_item(c)}" + ("" if c.odds == 1 else f" ({round(c.odds * 100)}%)") for c in cans]
     return f"Bins: {', '.join(parts)}" if parts else ""
 
 

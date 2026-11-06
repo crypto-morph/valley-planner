@@ -12034,7 +12034,7 @@
   {
    "id": "forage.salmonberry-days",
    "area": "Food",
-   "summary": "Medium bushes are in bloom Spring 15-18 (by the bush location's season); each such bush rolls about 20-26% per day to fruit, and shaking a fruiting non-town bush drops Salmonberry (296), 1 + ForagingLevel/4 of them.",
+   "summary": "Medium bushes are in bloom Spring 15-18 (by the bush location's season); each such bush rolls about 20-26% per day to fruit, and shaking a fruiting non-town bush drops Salmonberry (296), 1 + ForagingLevel/4 of them. The save marks which bushes have fruit each morning (tileSheetOffset 1 on a size 1 bush), so they can be read, not guessed.",
    "checked_against": [
     "StardewValley.TerrainFeatures.Bush.GetShakeOffItem",
     "StardewValley.TerrainFeatures.Bush.inBloom",
@@ -12766,7 +12766,7 @@
   {
    "id": "bins.walk",
    "area": "Garbage cans",
-   "summary": "BeforeAll, the can's Items, then AfterAll are walked in order and the first entry that passes wins. An entry needs a passed roll unless IgnoreBaseChance is set. Conditions run left to right and stop at the first failure, so a RANDOM after a failed query draws nothing; RANDOM draws on the can's generator, SYNCED_RANDOM on its own day generator, and @addDailyLuck adds the luck. RandomItemId and random stack amounts then draw on the can's generator.",
+   "summary": "BeforeAll, the can's Items, then AfterAll are walked in order and the first entry that passes wins. An entry needs a passed roll unless IgnoreBaseChance is set. Conditions run left to right and stop at the first failure, so a RANDOM after a failed query draws nothing; RANDOM draws on the can's generator, SYNCED_RANDOM on its own day generator, and @addDailyLuck adds the luck. RandomItemId and random stack amounts then draw on the can's generator. Reaching 20 or 50 cans opened adds a rare entry's draw to the walk, so an item can change partway through a day, though whether the can has anything can't: found in play.",
    "checked_against": [
     "StardewValley.GameLocation.TryGetGarbageItem",
     "StardewValley.GameStateQuery.CheckConditions/2",
@@ -13027,6 +13027,20 @@
    "refs": [],
    "tests": [
     "tests/test_today.py::test_pace_learns_from_the_day_and_counts_a_day_once"
+   ]
+  },
+  {
+   "id": "sell.shop-tags",
+   "area": "Selling",
+   "summary": "A shop buys an item when its SalableItemTags match the item's category tag: Pierre takes crops, forage, flowers, seeds, milk, eggs, artisan goods and cooking; Willy fish, bait and tackle; Clint minerals, gems and metal; Marnie milk, eggs and meat; Robin building resources; Marlon monster loot. The shipping bin takes the rest, paid overnight.",
+   "checked_against": [],
+   "data": [
+    "Data/Shops (SalableItemTags)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_pack.py::test_shops_buy_what_the_game_says"
    ]
   }
  ]

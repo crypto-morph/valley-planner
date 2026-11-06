@@ -16,10 +16,12 @@ from __future__ import annotations
 import json
 
 from ..facts import bubbles, geodes, help_wanted, skills
+from ..facts.buyers import Buyers
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS
+from . import errands, pack, quests, sell
 from .farm import Farm
 
 TILE_ENERGY = 2
@@ -41,6 +43,9 @@ PIERRE_SEEDS = ("472", "473", "474", "475", "427", "477", "429", "476", "273", "
 PACE_DAYS = 7
 PACE_MIN_MINUTES = 60  # a shorter stretch says too little about pace
 MIN_REPLANT = 8
+BERRIES = {"spring": "(O)296", "fall": "(O)410"}  # Salmonberry, Blackberry
+SHOP_TRIP = 100  # gold of spares that makes Pierre's worth a stop on its own
+FISH_TRIP = 150  # gold of fish that makes Willy's worth the walk
 CART_AHEAD = 10  # days of cart visits to hold gold back for
 KEEP_GOLD = 100  # never spend the last of it on seeds
 MINE_DOOR = ("Mountain", 54, 5)
@@ -251,12 +256,109 @@ def _fishing(farm: Farm) -> dict | None:
     return {"place": farm.place(best), "fish": spots[best], "bubbles": _bubble_words(farm, best)}
 
 
+def _head(farm: Farm) -> dict:
+    """The day at a glance, cheap enough to show before anything else has loaded."""
+    from .morning import WEATHER, WEEKDAYS, luck_words
+    s = farm.save
+    return {"date": farm.label(s.days_played), "weekday": WEEKDAYS[(s.days_played - 1) % 7],
+            "weather": WEATHER.get(s.weather, s.weather),
+            "tomorrow": WEATHER.get(s.weather_tomorrow, s.weather_tomorrow),
+            "mood": luck_words(s.daily_luck)[0], "money": s.money}
+
+
+def _berries(farm: Farm) -> list[dict]:
+    """Fruiting bushes you can shake in passing: each gives 1 + Foraging level / 4 berries."""
+    s = farm.save
+    item = BERRIES.get(s.season)
+    if not item or not s.bushes:
+        return []
+    name, price = farm.name(item), _price(farm, item)
+    count = 1 + s.skills.get("foraging", 0) // 4
+    return [{"id": f"bush:{b.location}:{b.tile[0]}:{b.tile[1]}", "title": f"{name} bush ({count})",
+             "gold": price * count, "at": (b.location, *b.tile)} for b in s.bushes if b.location in OUTDOORS]
+
+
+def _all_bubbles(farm: Farm) -> list[dict]:
+    return [{"place": farm.place(loc), "spells": _bubble_words(farm, loc)} for loc in bubbles.MAPS]
+
+
 def _bubble_words(farm: Farm, location: str) -> list[str]:
     s = farm.save
     spells = bubbles.forecast(farm.data, location, s.days_played, int(s.unique_id), legacy=s.legacy_random)
     return [f"{clock(_minutes(x.start))} to {clock(_minutes(min(x.end, 2400)))}"
             + (f", {farm.walker.near(location, x.tile, farm.place)}" if farm.walker.near(location, x.tile, farm.place)
                else "") for x in spells if 700 <= x.start < 2000]
+
+
+def _door(farm: Farm, location: str, name: str) -> tuple | None:
+    """The tile you stand on to use a door."""
+    door = next((m for m in farm.walker.landmarks[location] if m.name == name), None)
+    return (location, door.x, door.y + 1) if door else None
+
+
+def _community_center(farm: Farm) -> list[dict]:
+    if "canReadJunimoText" not in farm.save.mail:
+        return []
+    items = [i for r in errands.community_center(farm)["rooms"] for i in r["items"] if i["open"]]
+    door = _door(farm, "Town", "CommunityCenter")
+    if not items or not door:
+        return []
+    return [{"id": "cc", "kind": "shop", "title": "Community Center", "minutes": 5, "at": door,
+             "why": f"{len(items)} bundle item{'s' if len(items) != 1 else ''} to hand in",
+             "value": QUEST_VALUE}]
+
+
+def _museum(farm: Farm) -> list[dict]:
+    take = errands.gunther(farm)["take"]
+    door = _door(farm, "Town", "ArchaeologyHouse")
+    if not take or not door:
+        return []
+    return [{"id": "museum", "kind": "shop", "title": "The Museum", "minutes": 5, "at": door,
+             "why": f"{len(take)} new find{'s' if len(take) != 1 else ''} to donate", "value": BUNDLE_VALUE,
+             "from": 8 * 60, "until": 18 * 60}]
+
+
+def _willy(farm: Farm, quest: dict | None) -> list[dict]:
+    """His shop is worth the walk for a request, or a good bag of fish."""
+    door = _door(farm, "Beach", "FishShop")
+    for_him = quest and quest.get("who") == "Willy" and farm.held().get(f"(O){quest['item']}")
+    active = any(q["deliver_to"] == "Willy" for q in quests.view(farm)["quests"])
+    fish = sum(r["each"] * r["count"] for r in sell.default(farm)["sell"] if r.get("category") == -4)
+    if not door or not (for_him or active or fish >= FISH_TRIP):
+        return []
+    return [{"id": "willy", "kind": "shop", "title": "Willy's shop", "minutes": 5, "at": door,
+             "why": "hand in the request and sell your fish" if for_him or active else "sell your fish",
+             "value": QUEST_VALUE if for_him or active else fish, "from": 9 * 60, "until": 17 * 60}]
+
+
+def energy_warning(farm: Farm, cost: int, power: int) -> str:
+    """Say so when the day's must-dos cost more than you've got, and what to eat."""
+    if cost <= power - RESERVE:
+        return ""
+    return f"Watering costs {cost} energy and you have {power}. {food_advice(farm, cost - (power - RESERVE))}"
+
+
+def food_advice(farm: Farm, short: int) -> str:
+    """Enough food from what you hold to cover the shortfall, biggest first, or how far it gets you."""
+    objects = farm.data.asset("Data/Objects")
+    foods = []
+    for q, n in farm.held().items():
+        o = objects.get(q.removeprefix("(O)"))
+        if q.startswith("(O)") and o and int(o.get("Edibility") or 0) > 0:
+            foods += [(int(int(o["Edibility"]) * 2.5), farm.name(q))] * n
+    eat, gained = [], 0
+    for energy, name in sorted(foods, reverse=True):
+        if gained >= short:
+            break
+        eat.append((name, energy))
+        gained += energy
+    if not eat:
+        return "You've no food, so do the crops that matter most first."
+    counts = {name: sum(1 for n, _e in eat if n == name) for name, _e in eat}
+    words = " and ".join(f"{k} {name}" for name, k in counts.items())
+    if gained < short:
+        return f"Eat {words} (+{gained}), and you'll still be {short - gained} short: do the crops that matter first."
+    return f"Eat {words} (+{gained}) partway through."
 
 
 def _wizard(farm: Farm) -> list[dict]:
@@ -272,7 +374,9 @@ def _wizard(farm: Farm) -> list[dict]:
 def _pierre(farm: Farm, ripe: int) -> list[dict]:
     """A harvest is only money, and replanted, once it's been to Pierre's: he pays on the spot."""
     shop = next((x for x in farm.hours_today() if x["id"] == "SeedShop"), {})
-    if not ripe or shop.get("closed"):
+    selling = sum(r["each"] * r["count"] for r in sell.default(farm)["sell"]
+                  if "SeedShop" in Buyers(farm.data).of(r.get("category")))
+    if not (ripe or selling >= SHOP_TRIP) or shop.get("closed"):
         return []
     return [{"id": "pierre", "kind": "shop", "title": "Pierre's: sell the harvest, buy seeds",
              "why": "he pays on the spot, so you can replant today", "at": ("Town", 43, 57), "minutes": 5,
@@ -302,7 +406,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     pos = (where, *_anchor(walker, where)) if where and where != "Farm" else ("Farm", *FARMHOUSE_DOOR)
     plan: list[dict] = []
     left: list[dict] = []
-    walked: list[tuple] = []  # every tile the plan's walks cross
+    legs: list[tuple[int, list]] = []  # (the stop it leads to, the tiles walked)
 
     def farm_job(job_id: str, title: str, tiles: int, cost: int, minutes: float, why: str) -> None:
         nonlocal now, power
@@ -312,8 +416,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         fits = min(afford, max(0, (FINISH - now)) // max(1, int(minutes)))
         if fits:
             power -= fits * cost
-            plan.append({"id": job_id, "time": clock(now), "kind": "farm", "title": f"{title} {fits}", "why": why,
-                         "way": [], "energy_after": power})
+            plan.append({"id": job_id, "time": clock(now), "at": now, "kind": "farm", "title": f"{title} {fits}",
+                         "why": why, "way": [], "energy_after": power})
             now += round(fits * minutes)
         if fits < tiles:
             left.append({"title": f"{title} {tiles - fits}", "why": "not enough energy or time left today"})
@@ -331,14 +435,18 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                          "energy_after": power})
             pos = ("Farm", *FARMHOUSE_DOOR)
     ripe = sum(1 for c in s.crops if c.location == "Farm" and c.ready and not c.forage and c.harvest_id)
+    warning = energy_warning(farm, thirsty * TILE_ENERGY, power) if "water" not in done else ""
     farm_job("harvest", "Harvest", ripe, 0, 1, "keep what the bundles need, sell the rest")
     farm_job("water", "Water", thirsty, TILE_ENERGY, TILE_MINUTES, "they won't grow tonight otherwise")
     farm_job("plant", "Hoe and plant", seeds, TILE_ENERGY if wet else 2 * TILE_ENERGY,
              TILE_MINUTES * (1 if wet else 2), "the rain waters them" if wet else "hoe, plant, water")
 
     place = lambda n: farm.place(n)  # noqa: E731
-    stops = [x for x in _stops(farm, held) + _wizard(farm) + _pierre(farm, ripe) + _clint(farm, held)
-             + _mines(farm, power) + (_sweetheart(farm, spouse) if spouse else []) if x["id"] not in done]
+    fest_today = (s.season, s.day) in farm.hours.festivals
+    board = help_wanted.quest_today(s, farm.data, festival=fest_today)
+    stops = [x for x in _stops(farm, held) + _wizard(farm) + _community_center(farm) + _pierre(farm, ripe)
+             + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power)
+             + (_sweetheart(farm, spouse) if spouse else []) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
     if fest:  # the map is the festival's and the day ends with it: only the farm jobs and the festival itself
         stops = []
@@ -366,11 +474,11 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         if best is None:
             seen = {x["id"]: x for x in stops}  # one line for a stop with several time windows
             left += [{"title": x["title"], "why": "can't be there in time" if "until" in x else
-                      "too far for what it's worth today", "at": x["at"], "value": x["value"],
+                      "too far for what it's worth today", "at": x["at"], "value": x["value"], "id": x["id"],
                       "spare": x["kind"] == "forage"} for x in seen.values()]
             break
         path = walker.path(prev, best["at"])
-        walked += path
+        legs.append((len(plan), path))
         now = max(now + walker.minutes(path), best.get("from", 0))
         arrived = now
         tile = (best["at"][1], best["at"][2])
@@ -406,16 +514,25 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         pos = path[-1]
         prev = walker.reach(pos)
     home = walker.path(prev, ("Farm", *FARMHOUSE_DOOR))
-    walked += home or []
+    if home:
+        legs.append((len(plan), home))
+    candidates = [{"id": x["id"], "title": x["title"].removeprefix("Pick up "), "gold": x["value"], "at": x["at"]}
+                  for x in left if x.get("spare")] + _berries(farm)
     passing = []
-    for x in [y for y in left if y.get("spare")]:
-        loc, tx, ty = x["at"]
-        gap = min((abs(a[1] - tx) + abs(a[2] - ty) for a in walked if a[0] == loc), default=PASSING + 1)
-        if gap <= PASSING:
-            passing.append({"title": x["title"].removeprefix("Pick up "), "gold": x["value"],
-                            "near": walker.near(loc, (tx, ty), farm.place), "place": farm.place(loc)})
-    left = [{k: x[k] for k in ("title", "why")} for x in left if x["title"].removeprefix("Pick up ") not in
-            {p["title"] for p in passing}]
+    placed = set()
+    for c in candidates:
+        loc, tx, ty = c["at"]
+        gaps = [(min(abs(a[1] - tx) + abs(a[2] - ty) for a in path if a[0] == loc), i, path) for i, path in legs
+                if any(a[0] == loc for a in path)]
+        best = min(gaps, key=lambda g: g[0], default=None)
+        if best and best[0] <= PASSING:
+            row = {"title": c["title"], "gold": c["gold"], "near": walker.near(loc, (tx, ty), farm.place),
+                   "place": farm.place(loc), "stop": best[1]}
+            passing.append(row)
+            placed.add(c["id"])
+            if best[1] < len(plan):
+                plan[best[1]].setdefault("extras", []).append(row)
+    left = [{k: x[k] for k in ("title", "why")} for x in left if x.get("id") not in placed]
     spare = max(0, power - RESERVE)
     hours = max(0, FINISH - now)
     casts = min(spare // CAST_ENERGY, hours // CAST_MINUTES)
@@ -425,10 +542,13 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         extra.append(f"fish about {casts} times")
     if trees:
         extra.append(f"chop about {trees} trees for {trees * TREE_WOOD} Wood")
-    return {"plan": plan, "left": left, "notes": [_board_note(farm)], "spare": extra, "passing": passing,
+    return {"head": _head(farm), "plan": plan, "left": left, "notes": [_board_note(farm)], "spare": extra,
+            "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
-            "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power},
+            "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
+            "pack": pack.build(farm, plan, spouse),
+            "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",
             "skills": [{"name": k.name, "level": k.level, "xp": k.xp, "next": k.next_xp, "to_go": k.to_go,
                         "share": round(k.share, 3), "ways": list(k.ways)} for k in skills.progress(s.experience)],

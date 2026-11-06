@@ -11,8 +11,16 @@ from ..facts.sources import FESTIVAL_DAYS, _shop_label
 from .farm import Farm, date_label
 
 MAX_RESULTS = 8
+BOOKS = -102  # the books' category, catalogues included
+RARE_PRICE = 1000  # gold: a loved gift this dear is a luxury, not a plan
 QUALITIES = ((0, ""), (1, "silver"), (2, "gold"), (4, "iridium"))
 CART_DAYS = 112
+
+
+def _rare_gift(farm: Farm, oid: str) -> bool:
+    """Books, catalogues and the like: technically loved, but not something to plan a gift around."""
+    info = farm.items.get(oid)
+    return not info or info.category == BOOKS or info.type in ("asdf", "Quest") or not 0 < info.price < RARE_PRICE
 
 
 def search(farm: Farm, q: str) -> dict:
@@ -142,8 +150,8 @@ def villager(farm: Farm, name: str) -> dict:
                   "talked_today": bool(f and f.talked_today), "status": f.status if f else "", "met": f is not None}
     held = farm.held()
     loves = farm.gifts.lists(name)
-    card["loves"] = [{"name": farm.name(f"(O){i}"), "held": held.get(f"(O){i}", 0)} for i in loves["love"]
-                     if farm.gifts.giftable(f"(O){i}")]
+    card["loves"] = [{"name": farm.name(f"(O){i}"), "held": held.get(f"(O){i}", 0), "rare": _rare_gift(farm, i)}
+                     for i in loves["love"] if farm.gifts.giftable(f"(O){i}")]
     card["loves"].sort(key=lambda x: (-bool(x["held"]), x["name"]))
     card["likes_held"] = sorted(farm.name(f"(O){i}") for i in loves["like"] if held.get(f"(O){i}"))[:12]
     days = farm.schedules.today(name, Situation(w, hearts=card["hearts"], raining=s.wet,

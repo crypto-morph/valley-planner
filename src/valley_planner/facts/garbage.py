@@ -18,8 +18,10 @@ What can be known ahead:
   every luck the game can roll (-0.100 to 0.100 evenly, plus the Special Charm) and report the share that fill the
   can: `odds` 1 means it has something however the day turns out, 0 that it's empty, and in between it hangs on luck.
 - Other days use today's state of the farm (stats, mail, active special orders). The dish of the day isn't known
-  ahead. Opening cans raises trashCansChecked, which unlocks the rare entries at 20 and 50; those draw after the
-  can's roll, so that can't change whether the roll passed, only the rare drop itself.
+  ahead.
+- Opening cans raises trashCansChecked, and reaching 20 or 50 adds a rare entry's draw to the walk. Those draws come
+  after the can's roll, so whether a can has anything stays exact, but what comes out shifts: found in play, when one
+  can gave its forecast item at 19 and the next a different one at 20. Near a threshold both results are given.
 
 The Desert Festival's can isn't here: it's only there for three days, in the desert, and always has Calico Eggs.
 """
@@ -45,6 +47,8 @@ CANS = {  # the "Action Garbage" tiles on the Town map
     "Saloon": "the Saloon",
     "JojaMart": "JojaMart",
 }
+CAN_STEPS = (20, 50)  # trashCansChecked values where a new rare draw joins the walk
+CAN_MARGIN = 10  # how near a step counts: a day's opening could cross it
 LUCKS = tuple(k / 1000 for k in range(-100, 101))  # Next(-100, 101) / 1000: every value equally likely
 CHARM = 0.025
 SEASON_POOL = ("68", "66", "78", "80", "86", "152", "167", "153", "420")
@@ -90,13 +94,15 @@ class CanDay:
     place: str
     odds: float  # share of the possible lucks that fill it (0 or 1 when the luck is known)
     loot: Loot | None  # the most likely thing in it
+    other: Loot | None = None  # what it holds instead once you've opened enough cans to cross a step
 
 
 class _Roll:
     """One can on one day, for trying different lucks. Everything luck doesn't touch is worked out once."""
 
-    def __init__(self, cans: GarbageCans, can: str, when: When, save):
+    def __init__(self, cans: GarbageCans, can: str, when: When, save, opened: int | None = None):
         self.cans, self.can, self.when, self.save = cans, can, when, save
+        self.opened = save.stats.get("trashCansChecked", 0) if opened is None else opened
         rng = day_save_random(when.days_played, when.game_id, 777 + hash_text(can), legacy=when.legacy_random)
         for _ in range(2):
             for _ in range(rng.next(0, 100)):
@@ -123,7 +129,8 @@ class _Roll:
                 chance = _f32(float(args[2]) + _f32(luck)) if lucky else _f32(float(args[2]))
                 result = self._synced(args[1]) < chance
             elif key == "PLAYER_STAT":
-                result = self.save.stats.get(args[1], 0) >= int(args[2])
+                have = self.opened if args[1] == "trashCansChecked" else self.save.stats.get(args[1], 0)
+                result = have >= int(args[2])
             elif key == "PLAYER_SPECIAL_ORDER_RULE_ACTIVE":
                 result = any(r in self.cans.active_rules(self.save) for r in args[1:])
             else:
@@ -229,5 +236,14 @@ class GarbageCans:
                 results = [roll.at(luck + charm) for luck in LUCKS]
             found = [r for r in results if r]
             loot = Counter(found).most_common(1)[0][0] if found else None
-            out.append(CanDay(can, place, len(found) / len(results), loot))
+            out.append(CanDay(can, place, len(found) / len(results), loot, self._after_step(can, when, save, loot)))
         return out
+
+    def _after_step(self, can: str, when: When, save, loot: Loot | None) -> Loot | None:
+        """What the can holds if a step is crossed first, when that's near and changes the item."""
+        opened = save.stats.get("trashCansChecked", 0)
+        step = next((n for n in CAN_STEPS if opened < n <= opened + CAN_MARGIN), None)
+        if step is None or loot is None:
+            return None
+        other = _Roll(self, can, when, save, step).at(save.daily_luck)
+        return other if other and other != loot else None
