@@ -2,9 +2,22 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from valley_planner.engine.route.pace import Pace
 from valley_planner.facts.conditions import When
 from valley_planner.facts.travel import Travel
+
+
+def fresh_farm():
+    """A new farm from the installed game; skipped where there isn't one, like CI."""
+    from valley_planner.discover import find_game
+    from valley_planner.engine.route.start import new_farm
+    from valley_planner.gamedata import GameData
+    game = find_game()
+    if game is None:
+        pytest.skip("no game here")
+    return new_farm(GameData(game))
 
 
 def at(floor, day):
@@ -28,10 +41,8 @@ def test_pace_moves_halfway_towards_what_the_save_shows():
 
 
 def test_a_faster_pace_needs_fewer_trips_and_they_stay_a_week_apart():
-    from valley_planner.app import Planner
     from valley_planner.engine.route.plan import Router, Settings
-    from valley_planner.engine.route.start import new_farm
-    farm = new_farm(Planner(None).data)
+    farm = fresh_farm()
     days = Router(farm).mining_days(120, 112)
     assert len(days) == 12 and all(b - a >= 2 for a, b in zip(days, days[1:], strict=False))
     assert len({(d - 1) // 7 for d in days}) == 12
@@ -84,10 +95,8 @@ def test_a_goal_brings_in_what_it_depends_on():
 
 
 def test_a_goal_waits_for_the_goals_it_depends_on():
-    from valley_planner.app import Planner
     from valley_planner.engine.route.plan import Settings, route
-    from valley_planner.engine.route.start import new_farm
-    farm = new_farm(Planner(None).data)
+    farm = fresh_farm()
     objs = {o["id"]: o for o in route(farm, ["skull_cavern"], [], cave="bats")["objectives"]}
     assert all(o["status"] == "ok" for o in objs.values()) and len(objs) == 3
     assert objs["skull_cavern"]["steps"][0]["ready"] == objs["mines_bottom"]["finish"]  # the key is the last to come
