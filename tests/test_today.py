@@ -202,3 +202,33 @@ def test_books_and_catalogues_are_rare_gifts(data):
         pytest.skip("no save here")
     rare = {x["name"] for x in v["loves"] if x["rare"]}
     assert {"Animal Catalogue", "Prismatic Shard"} <= rare and "Melon" not in rare and "Poppy" not in rare
+
+
+def tv_farm(label, sure=True, known=()):
+    event = SimpleNamespace(kind="tv", label=label, sure=sure)
+    return SimpleNamespace(save=SimpleNamespace(days_played=21, cooking_recipes=set(known)), when=None,
+                           calendar=SimpleNamespace(day=lambda _w, today_days_played: [event]))
+
+
+def test_the_queen_of_sauce_is_a_stop_when_the_recipe_is_new():
+    from valley_planner.views import today
+    show = today._show_today(tv_farm("Queen of Sauce: Radish Salad"))
+    assert show["title"] == "Watch the Queen of Sauce: Radish Salad" and "new recipe" in show["why"]
+    assert today._show_today(tv_farm("Queen of Sauce: Omelet", known=["Omelet"])) is None
+    rerun = today._show_today(tv_farm("Queen of Sauce rerun: Coleslaw", sure=False))
+    assert "probably" in rerun["why"]
+
+
+def test_the_show_comes_first_at_home_and_is_only_a_note_when_away(data):
+    from valley_planner.app import Planner
+    from valley_planner.views import today
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    if not today._show_today(farm):
+        pytest.skip("nothing new on TV today")
+    assert today.view(farm)["plan"][0]["id"] == "tv"
+    assert today.view(farm, done={"tv"})["plan"][0]["id"] != "tv"
+    away = today.view(farm, time=1100, where="Town", done={"water", "plant", "harvest"})
+    assert not [x for x in away["plan"] if x["id"] == "tv"] and any("Queen of Sauce" in n for n in away["notes"])

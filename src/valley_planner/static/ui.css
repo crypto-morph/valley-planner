@@ -164,3 +164,6 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .card-pane[hidden] { display: none; }
 .stop-extra { display: block; color: #1F4F2E; font-size: 15px; }
 .next-extra { color: #EAF3EC; }
+
+.day-notes { margin: 0; font-weight: 700; }
+.day-notes[hidden] { display: none; }

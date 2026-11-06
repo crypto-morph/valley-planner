@@ -622,6 +622,8 @@ const views = {
     $("#t-energy").innerHTML = `<div class="meter-row"><strong>Energy</strong><strong>${now} / ${e.max}</strong></div><div class="bar-track"><span style="width:${Math.min(100, Math.round(now / e.max * 100))}%"></span></div>`;
     $("#t-warning").hidden = !v.warning;
     $("#t-warning").textContent = v.warning || "";
+    $("#t-notes").hidden = !v.notes.length;
+    $("#t-notes").textContent = v.notes.join(" ");
     drawNext(v);
     drawPack(v.pack);
     $("#t-skills").innerHTML = v.skills.map((k) => `<div class="skill"><div class="skill-name"><strong>${esc(cap(k.name))} ${k.level}</strong></div><div class="muted small">${k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div></div>`).join("");

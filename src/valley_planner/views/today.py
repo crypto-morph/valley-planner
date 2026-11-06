@@ -43,6 +43,7 @@ PIERRE_SEEDS = ("472", "473", "474", "475", "427", "477", "429", "476", "273", "
 PACE_DAYS = 7
 PACE_MIN_MINUTES = 60  # a shorter stretch says too little about pace
 MIN_REPLANT = 8
+TV_MINUTES = 10
 BERRIES = {"spring": "(O)296", "fall": "(O)410"}  # Salmonberry, Blackberry
 SHOP_TRIP = 100  # gold of spares that makes Pierre's worth a stop on its own
 FISH_TRIP = 150  # gold of fish that makes Willy's worth the walk
@@ -266,6 +267,20 @@ def _head(farm: Farm) -> dict:
             "mood": luck_words(s.daily_luck)[0], "money": s.money}
 
 
+def _show_today(farm: Farm) -> dict | None:
+    """The Queen of Sauce, when she's teaching something you don't know: it's on the TV at home, so it comes first."""
+    s = farm.save
+    for e in farm.calendar.day(farm.when, today_days_played=s.days_played):
+        if e.kind != "tv":
+            continue
+        recipe = e.label.split(": ", 1)[-1]
+        if recipe not in s.cooking_recipes:
+            sure = "" if e.sure else "probably "
+            return {"title": f"Watch the Queen of Sauce: {recipe}",
+                    "why": f"{sure}a new recipe, on the TV in your house"}
+    return None
+
+
 def _berries(farm: Farm) -> list[dict]:
     """Fruiting bushes you can shake in passing: each gives 1 + Foraging level / 4 berries."""
     s = farm.save
@@ -436,6 +451,15 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             pos = ("Farm", *FARMHOUSE_DOOR)
     ripe = sum(1 for c in s.crops if c.location == "Farm" and c.ready and not c.forage and c.harvest_id)
     warning = energy_warning(farm, thirsty * TILE_ENERGY, power) if "water" not in done else ""
+    show = _show_today(farm)
+    tv_note = ""
+    if show and "tv" not in done:
+        if pos[0] == "Farm":  # before you leave the house
+            plan.append({"id": "tv", "time": clock(now), "at": now, "kind": "farm", **show, "way": [],
+                         "energy_after": power})
+            now += TV_MINUTES
+        else:
+            tv_note = f"{show['title']} is on: {show['why']}."
     farm_job("harvest", "Harvest", ripe, 0, 1, "keep what the bundles need, sell the rest")
     farm_job("water", "Water", thirsty, TILE_ENERGY, TILE_MINUTES, "they won't grow tonight otherwise")
     farm_job("plant", "Hoe and plant", seeds, TILE_ENERGY if wet else 2 * TILE_ENERGY,
@@ -542,7 +566,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         extra.append(f"fish about {casts} times")
     if trees:
         extra.append(f"chop about {trees} trees for {trees * TREE_WOOD} Wood")
-    return {"head": _head(farm), "plan": plan, "left": left, "notes": [_board_note(farm)], "spare": extra,
+    return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
+            "notes": [x for x in (_board_note(farm), tv_note) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
