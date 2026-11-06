@@ -450,11 +450,13 @@ def _bins_ahead(farm: Farm, days_played: int) -> str:
 def _cart(farm: Farm) -> dict:
     """The cart today, and anything on it a bundle still needs."""
     days = list(farm.cart.days(farm.when, count_days=1, guarantee=farm.save.cart_guarantee))
-    want = {s["item"] for s in cc.plan(farm)["slots"] if s["status"] != "have"}
-    hits = [f"{i.name} ({i.price:,}g)" for d in days for i in d.items if i.item in want]
+    want = {s["item"]: s for s in cc.plan(farm)["slots"] if s["status"] != "have"}
+    hits = [f"{i.name} ({i.price:,}g)" for d in days for i in d.items
+            if i.item in want and cc.cart_only(want[i.item], i.stock)]
     place = " & ".join(farm.place(p) for p in days[0].place.split(" & ")) if days else "the Forest"
     return {"kind": "cart", "title": f"The Traveling Cart is at {place}, 6 AM to 8 PM",
-            "text": f"It has what a bundle needs: {', '.join(hits)}" if hits else "nothing your bundles need today"}
+            "text": f"Only the cart has this in time: {', '.join(hits)}" if hits
+            else "nothing you can't get elsewhere"}
 
 
 def _time(t: int) -> str:

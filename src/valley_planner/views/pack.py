@@ -107,6 +107,15 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
             taken.add(row["name"])
             row["count"] -= 1
 
+    for b in errands.birthdays(farm, days=0)["birthdays"]:
+        if known(f"talk:{b['who']}") and b["who"] != spouse:
+            pick = _gift(farm, b["who"], spare)
+            if pick:
+                row, _taste = pick
+                stop(f"talk:{b['who']}", b["who"])["items"].append(f"{row['name']}, a birthday gift")
+                taken.add(row["name"])
+                row["count"] -= 1
+
     buyers = Buyers(farm.data)
     ship: list[dict] = []
     sales: list[tuple[int, str, str]] = []  # gold, stop, item

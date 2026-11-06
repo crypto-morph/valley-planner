@@ -33,6 +33,7 @@ from functools import cached_property
 
 from .access import place_open
 from .conditions import SEASONS, When, split
+from .items import FIXED_SALE_PRICE
 from .places import Places
 
 FESTIVAL_DAYS = {  # festival shop id part -> (season, first day, last day): the festivals' own dates
@@ -114,7 +115,8 @@ class Sources:
                 if qid.startswith("(O)") and " " not in qid and not e.get("IsRecipe"):  # a recipe isn't the item
                     sold.setdefault(qid[3:], []).append((sid, e))
         for oid, entries in sold.items():
-            for sid, e in entries:
+            for_gold = [x for x in entries if not x[1].get("TradeItemId")]
+            for sid, e in for_gold or entries:  # a swap for a book or an egg isn't a way to get what gold can buy
                 seasons, rest = _cond_seasons(e.get("Condition"))
                 days = None
                 desert = sid in ("Sandy", "DesertTrade", "Casino") or sid.startswith("DesertFestival")
@@ -126,7 +128,8 @@ class Sources:
                     seasons, days = frozenset({fest[0]}), (fest[1], fest[2])
                 add(oid, Source("shop", _shop_label(sid), seasons, days, condition=rest, needs=needs,
                                 cost=max(0, int(e.get("Price") or -1)) if (e.get("Price") or -1) >= 0 else 0,
-                                notes=("festival stall",) if fest else ()))
+                                notes=("festival stall",) if fest else GATHER_FIRST.get(oid, ()) if sid == "Carpenter"
+                                else ()))
 
         for seed, c in self.data.asset("Data/Crops").items():
             harvest = _unq(c.get("HarvestItemId"))
@@ -284,6 +287,8 @@ class Sources:
         return not missing, missing
 
 
+GATHER_FIRST = {oid: (f"If you have the energy, gather it. If not, Robin's is the cheap way: {year1}g each in Year 1, "
+                      f"{later}g after",) for oid, (year1, later) in FIXED_SALE_PRICE.items() if oid in ("388", "390")}
 SHOP_NAMES = {"SeedShop": "Pierre's", "Joja": "JojaMart", "FishShop": "Willy's Fish Shop", "AnimalShop": "Marnie's",
               "Blacksmith": "Clint's", "Saloon": "the Saloon", "Sandy": "the Oasis", "Carpenter": "Robin's",
               "Hospital": "Harvey's Clinic", "AdventureShop": "the Adventurer's Guild", "Traveler": "the cart",

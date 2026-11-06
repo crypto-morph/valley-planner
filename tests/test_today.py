@@ -232,3 +232,40 @@ def test_the_show_comes_first_at_home_and_is_only_a_note_when_away(data):
     assert today.view(farm, done={"tv"})["plan"][0]["id"] != "tv"
     away = today.view(farm, time=1100, where="Town", done={"water", "plant", "harvest"})
     assert not [x for x in away["plan"] if x["id"] == "tv"] and any("Queen of Sauce" in n for n in away["notes"])
+
+
+def test_a_person_indoors_is_a_stop_at_the_door(data, monkeypatch):
+    from valley_planner.app import Planner
+    from valley_planner.facts.schedules import DaySchedule, Stop
+    from valley_planner.views import today
+    try:
+        farm = Planner(None).farm()
+    except Exception:
+        pytest.skip("no save here")
+    day = DaySchedule("Tue", (Stop(900, False, "ArchaeologyHouse", 17, 9, 2), Stop(1400, False, "Town", 88, 100, 2)))
+    monkeypatch.setattr(farm.schedules, "today", lambda _n, _s: [day])
+    monkeypatch.setattr(farm.save.friends["Penny"], "talked_today", False)
+    first, second = today._sweetheart(farm, "Penny")
+    assert first["at"][0] == "Town" and "inside" in first["why"] and first["until"] == 14 * 60
+    assert second["at"] == ("Town", 88, 100) and "inside" not in second["why"]
+
+
+def test_a_birthday_with_a_gift_in_hand_is_a_stop(monkeypatch):
+    from valley_planner.views import errands, today
+    monkeypatch.setattr(errands, "birthdays", lambda _f, days=7: {"birthdays": [
+        {"who": "Pierre", "loved": [], "liked": ["Carrot"]}, {"who": "Emily", "loved": [], "liked": []}]})
+    monkeypatch.setattr(today, "_person", lambda _f, who, why, value: [{"id": f"talk:{who}", "why": why}])
+    stops = today._birthdays(SimpleNamespace())
+    assert [s["id"] for s in stops] == ["talk:Pierre"] and "Carrot counts 8 times" in stops[0]["why"]
+
+
+def test_sprinklers_say_what_is_missing():
+    from valley_planner.views import today
+
+    def farm(held, recipes=("Sprinkler",)):
+        return SimpleNamespace(save=SimpleNamespace(crafting_recipes=set(recipes)), held=lambda: held)
+
+    assert "Iron Bars" in today.sprinkler_note(farm({"(O)334": 14}), 80)
+    assert "craft 3" in today.sprinkler_note(farm({"(O)334": 14, "(O)335": 3}), 80)
+    assert today.sprinkler_note(farm({"(O)334": 14}), 10) == ""
+    assert today.sprinkler_note(farm({}, recipes=()), 80) == ""

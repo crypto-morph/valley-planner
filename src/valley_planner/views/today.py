@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 
+from ..engine import cc
 from ..facts import bubbles, geodes, help_wanted, skills
 from ..facts.buyers import Buyers
 from ..facts.fish import Fish
@@ -43,6 +44,8 @@ PIERRE_SEEDS = ("472", "473", "474", "475", "427", "477", "429", "476", "273", "
 PACE_DAYS = 7
 PACE_MIN_MINUTES = 60  # a shorter stretch says too little about pace
 MIN_REPLANT = 8
+BIRTHDAY_VALUE = 300
+HEAVY_WATERING = 40  # crops: the point where sprinklers start to matter most
 TV_MINUTES = 10
 BERRIES = {"spring": "(O)296", "fall": "(O)410"}  # Salmonberry, Blackberry
 SHOP_TRIP = 100  # gold of spares that makes Pierre's worth a stop on its own
@@ -106,13 +109,20 @@ def _stops(farm: Farm, held: dict[str, int]) -> list[dict]:
     return out
 
 
-def _sweetheart(farm: Farm, name: str) -> list[dict]:
-    """Where they stand between walks: a stop for each stretch of today, so the plan catches whichever fits."""
+def _building_door(farm: Farm, location: str) -> tuple | None:
+    """The outdoor tile outside a building, so someone indoors can still be a stop."""
+    for place in OUTDOORS:
+        door = _door(farm, place, location)
+        if door:
+            return door
+    return None
+
+
+def _person(farm: Farm, name: str, why: str, value: int) -> list[dict]:
+    """A stop for each stretch of their day, indoors or out, so the plan catches whichever fits."""
     s = farm.save
     f = s.friends.get(name)
-    if f is None and name not in farm.data.asset("Data/Characters"):
-        return []
-    if f is not None and f.talked_today:
+    if name not in farm.data.asset("Data/Characters") or (f is not None and f.talked_today):
         return []
     days = farm.schedules.today(name, Situation(farm.when, hearts=f.hearts if f else 0, raining=s.wet))
     if len(days) != 1:  # a coin-flip day: nowhere certain to send you
@@ -120,13 +130,42 @@ def _sweetheart(farm: Farm, name: str) -> list[dict]:
     stops = days[0].stops
     out = []
     for a, b in zip(stops, [*stops[1:], None], strict=False):
-        if a.location not in OUTDOORS:
+        at = (a.location, a.x, a.y) if a.location in OUTDOORS else _building_door(farm, a.location)
+        if not at:
             continue
+        indoors = "" if a.location in OUTDOORS else f"inside {farm.place(a.location)}, "
         begin, end = _minutes(a.time), _minutes(b.time) if b else FINISH
         out.append({"id": f"talk:{name}", "kind": "talk", "title": f"Talk to {name}",
-                    "why": f"there until {clock(end)}; a daily talk keeps the hearts moving", "minutes": 2,
-                    "at": (a.location, a.x, a.y), "value": SWEETHEART_VALUE, "from": begin, "until": end})
+                    "why": f"{indoors}there until {clock(end)}; {why}", "minutes": 2, "at": at, "value": value,
+                    "from": begin, "until": end})
     return out
+
+
+def _sweetheart(farm: Farm, name: str) -> list[dict]:
+    return _person(farm, name, "a daily talk keeps the hearts moving", SWEETHEART_VALUE)
+
+
+def _birthdays(farm: Farm, spouse: str = "") -> list[dict]:
+    """Anyone with a birthday today, if you hold something they'd like: a gift counts 8 times."""
+    out = []
+    for b in errands.birthdays(farm, days=0)["birthdays"]:
+        gift = (b["loved"] or b["liked"] or [""])[0]
+        if b["who"] != spouse and gift:
+            out += _person(farm, b["who"], f"it's their birthday, and {gift} counts 8 times", BIRTHDAY_VALUE)
+    return out
+
+
+def sprinkler_note(farm: Farm, watering: int) -> str:
+    """Watering is the biggest daily cost, so say what stands between you and sprinklers."""
+    s, held = farm.save, farm.held()
+    if watering < HEAVY_WATERING or "Sprinkler" not in s.crafting_recipes:
+        return ""
+    copper, iron = held.get("(O)334", 0), held.get("(O)335", 0)
+    can = min(copper, iron)
+    if can:
+        return f"You can craft {can} Sprinklers now: each saves about 8 energy a day."
+    missing = "Iron Bars" if not iron else "Copper Bars"
+    return f"{missing} are all that's stopping Sprinklers. Each saves about 8 energy a day."
 
 
 def geode_forecast(farm: Farm, held: dict[str, int]) -> list[dict]:
@@ -149,11 +188,12 @@ def geode_forecast(farm: Farm, held: dict[str, int]) -> list[dict]:
 def cart_budget(farm: Farm) -> int:
     """Gold to hold back for the coming cart visits' bundle items, each counted once."""
     s, wanted = farm.save, {}
+    slots = {x["item"]: x for x in cc.plan(farm)["slots"] if x["status"] != "have"}
     for d in farm.cart.days(farm.when, count_days=CART_AHEAD, guarantee=s.cart_guarantee):
         for i in d.items:
-            if i.sure and i.item not in wanted and farm.bundles.fits(i.item, None, 0, shown_only=False):
-                if not farm.held().get(i.item):
-                    wanted[i.item] = i.price
+            if i.sure and i.item in slots and i.item not in wanted and not farm.held().get(i.item) \
+                    and cc.cart_only(slots[i.item], i.stock):
+                wanted[i.item] = i.price
     return sum(wanted.values())
 
 
@@ -470,7 +510,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     board = help_wanted.quest_today(s, farm.data, festival=fest_today)
     stops = [x for x in _stops(farm, held) + _wizard(farm) + _community_center(farm) + _pierre(farm, ripe)
              + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power)
-             + (_sweetheart(farm, spouse) if spouse else []) if x["id"] not in done]
+             + (_sweetheart(farm, spouse) if spouse else []) + _birthdays(farm, spouse) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
     if fest:  # the map is the festival's and the day ends with it: only the farm jobs and the festival itself
         stops = []
@@ -567,7 +607,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     if trees:
         extra.append(f"chop about {trees} trees for {trees * TREE_WOOD} Wood")
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
-            "notes": [x for x in (_board_note(farm), tv_note) if x],
+            "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),

@@ -304,6 +304,13 @@ class Planner:
 LIKELY = 0.8  # a random way this likely by the deadline counts as the plan
 
 
+def cart_only(slot: dict, stock: int) -> bool:
+    """Whether a cart visit is worth a bundle's gold. You'd never buy from the cart what can be grown, caught,
+    made or bought elsewhere, so only a slot the plan can fill no other way counts, and only if it fills it in one go.
+    `slot`: a row of plan()."""
+    return stock >= slot["count"] and (slot["best"] or {}).get("kind") == "cart_day"
+
+
 def _best(ways: list[Way]) -> Way | None:
     """The soonest certain way you can use now; else a likely random one; else the certain way with the
     least to unlock first (random ways stay listed as the backup)."""

@@ -640,13 +640,10 @@ const views = {
     const shown = new Set(v.day.blocks.flatMap((b) => b.lines));
     const notes = v.today.filter((x) => x.kind !== "dish");  // the plan and pack list already carry the jobs
     $("#m-first").innerHTML = notes.length ? "<ul class=\"list\">" + notes.map((x) =>
-      `<li class="note${x.errand ? " clickable" : ""}"${x.errand ? ` data-errand="${esc(x.errand)}"` : ""}><b>${esc(x.title)}</b><span class="muted">${esc(x.text)}</span></li>`
+      `<li class="day-note${x.errand ? " clickable" : ""}"${x.errand ? ` data-errand="${esc(x.errand)}"` : ""}><b>${esc(x.title)}</b><span class="muted">${esc(x.text)}</span></li>`
     ).join("") + "</ul>" : '<p class="muted">Nothing special today.</p>';
     document.querySelectorAll("#m-first li[data-errand]").forEach((el) => el.addEventListener("click", () => showErrand(el.dataset.errand)));
     drawQuests(v.quests);
-    const byDate = [];
-    v.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
-    $("#m-week").innerHTML = list(byDate.map((d) => li(`<b>${esc(d.date)}</b>`, d.items.map((e) => `<span class="ev-${esc(e.kind)}">${esc(e.label)}</span>${unsure(e.sure)}`).join(" · "))));
   },
 
   async todo() {
@@ -682,16 +679,10 @@ const views = {
   },
 
   async today() {
-    const [hours, cal] = await Promise.all([get("/api/hours"), get("/api/calendar?days=14")]);
+    const hours = await get("/api/hours");
     $("#hours").innerHTML = `<p class="sub">${esc(hours.date)}</p><ul class="list">` + hours.shops.map((s) =>
       `<li><span>${esc(s.shop)}</span><span>${s.open.length ? esc(s.open.join(", ")) : `<span class="unsure">${esc(s.closed)}</span>`}${unsure(s.sure)}</span></li>`
     ).join("") + "</ul>";
-    $("#days").innerHTML = cal.days.filter((d) => d.events.length || d.today).map((d) =>
-      `<div class="day${d.today ? " today" : ""}"><h3>${esc(d.weekday)} ${esc(d.date)}</h3><ul class="list">` +
-      (d.events.length ? d.events.map((e) =>
-        `<li><span class="ev-${esc(e.kind)}">${esc(e.label)}${unsure(e.sure)}</span><span class="sub">${esc([e.detail, e.start && e.end ? `${e.start}–${e.end}` : e.start].filter(Boolean).join(" · "))}</span></li>`
-      ).join("") : '<li class="sub">Nothing special</li>') + "</ul></div>"
-    ).join("");
   },
 
   async crops() {
@@ -827,10 +818,10 @@ async function busy(text, work) {
   }
 }
 const LOADING = { today: "Reading your save…", goals: "Planning the rest of the year…", farm: "Reading your farm…",
-                  people: "Looking through your chests…", ahead: "Looking ahead…" };
+                  people: "Looking through your chests…", calendar: "Filling in the month…" };
 // Old links and pointers still land in the right place.
 const OLD = { morning: ["today"], todo: ["today"], crops: ["farm", "crops"], sell: ["farm", "sell"], cook: ["farm", "cook"],
-              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["ahead"] };
+              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["calendar"], ahead: ["calendar"] };
 const SUBS = { crops: () => views.crops(), sell: () => views.sell(), cook: () => views.cook(), route: () => views.route(), plan: () => views.plan() };
 
 function showSub(name) {
@@ -871,19 +862,80 @@ const places = {
     await planRoute();
     await showSub(sub || "route");
   },
-  async ahead() {
-    const [m, day] = await Promise.all([get("/api/morning"), lastDay ? lastDay : views.dayPlan().then(() => lastDay)]);
-    await Promise.all([views.today(), views.cart()]);
-    const byDate = [];
-    m.week.forEach((e) => { const d = byDate.find((x) => x.date === e.date); if (d) d.items.push(e); else byDate.push({ date: e.date, items: [e] }); });
-    $("#m-week").innerHTML = `<ul class="days">${byDate.map((d) => `<li><strong>${esc(d.date)}</strong><div>${d.items.map((e) => `<div>${esc(e.label)}${unsure(e.sure)}</div>`).join("")}</div></li>`).join("")}</ul>`;
-    const top = m.priorities[0];
-    $("#ahead-head").textContent = top ? top.title : "Nothing urgent coming up";
-    $("#ahead-sub").textContent = top ? top.text : "";
+  async calendar() {
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    const [day] = await Promise.all([lastDay ? lastDay : views.dayPlan().then(() => lastDay), drawMonth(calMonth.offset), views.cart()]);
     $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${esc(b.place)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
     $("#a-geodes").innerHTML = day.geodes.length ? day.geodes.map((g) => `<div>#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(", or ")}</div>`).join("") : '<p class="muted">No geodes held.</p>';
   },
 };
+
+const CAL_ICONS = {
+  festival: ["M3 20 12 4l9 16zM12 4v16M8 20l4-7 4 7", "Festival"],
+  passive: ["M9 3h6M8 6h8l2 5-2 7H8l-2-7zM12 18v3", "Market or fair"],
+  derby: ["M3 12c4-6 10-6 14 0-4 6-10 6-14 0zM17 12l4-4v8zM8 11h.01", "Fishing event"],
+  birthday: ["M4 20h16v-8H4zM8 12V8M12 12V8M16 12V8M4 16c2 2 4 2 6 0s4-2 6 0 3 1 4 0", "Birthday"],
+  cart: ["M3 5h3l2 10h10l2-7H7M9 19h.01M17 19h.01", "Traveling Cart"],
+  bookseller: ["M12 7c-2-2-5-2-8-2v14c3 0 6 0 8 2 2-2 5-2 8-2V5c-3 0-6 0-8 2zM12 7v14", "Bookseller"],
+  green_rain: ["M5 19C5 9 11 5 20 4c0 10-4 15-13 15M5 21l8-9", "Green rain"],
+  tv: ["M3 7h18v12H3zM8 3l4 4 4-4", "New recipe on TV"],
+  rain: ["M7 15a4 4 0 1 1 1-8 5 5 0 0 1 9.6 1A3.5 3.5 0 0 1 17 15zM9 18l-1 3M13 18l-1 3M17 18l-1 3", "Rain"],
+  storm: ["M7 14a4 4 0 1 1 1-8 5 5 0 0 1 9.6 1A3.5 3.5 0 0 1 17 14zM13 14l-3 4h4l-3 4", "Storm"],
+  crops: ["M12 21V8M12 8C10 7 9 5 9 3c2 1 3 3 3 5zM12 8c2-1 3-3 3-5-2 1-3 3-3 5zM12 14c-2-1-4-1-5-3 2-.5 4 1 5 3zM12 14c2-1 4-1 5-3-2-.5-4 1-5 3z", "Crops ripe"],
+  season: ["M7 3h10M7 21h10M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9", "Season ends"],
+  quest: ["M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M9 9h6M9 13h6", "Quest deadline"],
+  bins: ["M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13", "Bins"],
+};
+const calMonth = { offset: 0, view: null, day: null };
+const calIcon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${(CAL_ICONS[k] || CAL_ICONS.quest)[0]}"/></svg>`;
+const CAL_SHOWN = 5;  // a phone's day cell holds no more than this; the day panel lists the rest
+
+function drawDay(n, focus) {
+  const d = calMonth.view.days[n - 1];
+  calMonth.day = n;
+  document.querySelectorAll(".cal-cell").forEach((c) => c.setAttribute("aria-pressed", String(Number(c.dataset.day) === n)));
+  $("#cal-day").innerHTML = `<h2>${esc(d.date)}</h2>` + (d.items.length ? `<ul class="cal-items">${d.items.map((x, i) => `
+    <li class="${x.important ? "vital" : ""} ${i === focus ? "focus" : ""}">
+      <span class="cal-ic" aria-hidden="true">${calIcon(x.kind)}</span>
+      <div><strong>${esc(x.title)}</strong>${x.important ? ' <span class="cal-flag">Important</span>' : ""}${unsure(x.sure)}
+      ${x.text ? `<div class="muted">${esc(x.text)}</div>` : ""}</div></li>`).join("")}</ul>` : `<p class="muted">${d.past ? "Already gone." : "Nothing known for this day."}</p>`);
+}
+
+async function drawMonth(offset) {
+  const v = await get(`/api/month?${new URLSearchParams({ offset, spouse: routeState.settings.spouse || "" })}`);
+  calMonth.view = v; calMonth.offset = v.offset;
+  const n = v.important.length;
+  const days = new Set(v.important.map((x) => x.day)).size;
+  $("#cal-head").textContent = n ? `${days} important day${days === 1 ? "" : "s"} in ${v.label.split(",")[0]}` : `Nothing vital in ${v.label.split(",")[0]}`;
+  $("#cal-sub").textContent = "Pick any day to see what's on it.";
+  $("#cal-month").textContent = v.label;
+  $("#cal-prev").disabled = v.offset <= 0;
+  $("#cal-next").disabled = v.offset >= v.max_offset;
+  $("#cal-watch").innerHTML = v.watch && !v.watch.banner ? `<div class="alert ${v.watch.level === "green" ? "good" : ""}"><strong>${esc(v.watch.title)}.</strong> ${esc(v.watch.text)}</div>` : "";
+  $("#cal-grid").innerHTML = v.weekdays.map((d) => `<div class="cal-wd">${d}</div>`).join("") + v.days.map((d) => {
+    const vital = d.items.some((x) => x.important);
+    const shown = d.items.slice(0, CAL_SHOWN);
+    return `<button type="button" class="cal-cell ${d.past ? "past" : ""} ${d.today ? "today" : ""} ${vital ? "vital" : ""}" data-day="${d.day}"
+      aria-label="${esc(d.date)}${d.today ? ", today" : ""}${vital ? ", important" : ""}: ${d.items.length ? esc(d.items.map((x) => x.title).join(", ")) : "nothing"}">
+      <span class="cal-num">${d.day}${vital ? ' <span class="cal-bang" aria-hidden="true">!</span>' : ""}</span>
+      <span class="cal-icons">${shown.map((x, i) => `<span class="cal-ic" data-i="${i}" title="${esc(x.title)}">${calIcon(x.kind)}</span>`).join("")}${d.items.length > CAL_SHOWN ? `<span class="cal-more">+${d.items.length - CAL_SHOWN}</span>` : ""}</span>
+    </button>`;
+  }).join("");
+  $("#cal-important").innerHTML = n ? v.important.map((x) => `<button type="button" class="cal-jump" data-day="${x.day}"><span class="cal-ic">${calIcon(x.kind)}</span> <strong>${esc(x.date)}</strong> ${esc(x.title)}</button>`).join("") : '<p class="muted">Nothing that would be missed.</p>';
+  $("#cal-key").innerHTML = Object.keys(CAL_ICONS).map((k) => `<span class="cal-keyline"><span class="cal-ic">${calIcon(k)}</span> ${CAL_ICONS[k][1]}</span>`).join("");
+  const today = v.days.find((d) => d.today);
+  drawDay((today || v.days.find((d) => d.items.some((x) => x.important)) || v.days[0]).day);
+}
+
+async function drawWatch() {
+  const w = (await get("/api/watch")).cabbage;
+  const b = $("#watch");
+  b.hidden = !(w && w.banner);
+  if (!b.hidden) {
+    b.className = `watch ${w.level}`;
+    b.innerHTML = `<div class="watch-in"><strong>${esc(w.title)}.</strong> ${esc(w.text)}</div>`;
+  }
+}
 
 async function show(name) {
   const [place, sub] = OLD[name] || [name];
@@ -909,6 +961,15 @@ async function start() {
     $("#status").textContent = e.message;
   }
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+  drawWatch().catch(() => {});
+  $("#cal-prev").addEventListener("click", () => busy("Filling in the month…", () => drawMonth(calMonth.offset - 1)));
+  $("#cal-next").addEventListener("click", () => busy("Filling in the month…", () => drawMonth(calMonth.offset + 1)));
+  $("#cal-grid").addEventListener("click", (e) => {
+    const cell = e.target.closest(".cal-cell");
+    const ic = e.target.closest(".cal-ic");
+    if (cell) drawDay(Number(cell.dataset.day), ic ? Number(ic.dataset.i) : undefined);
+  });
+  $("#cal-important").addEventListener("click", (e) => { const j = e.target.closest(".cal-jump"); if (j) drawDay(Number(j.dataset.day)); });
   document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => busy("Loading…", () => showSub(b.dataset.sub))));
   $("#romance-target").addEventListener("change", (e) => {
     try { localStorage.setItem("romanceTarget", e.target.value); } catch { /* fine */ }
