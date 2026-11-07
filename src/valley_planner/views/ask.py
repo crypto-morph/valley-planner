@@ -157,7 +157,8 @@ def villager(farm: Farm, name: str) -> dict:
     days = farm.schedules.today(name, Situation(w, hearts=card["hearts"], raining=s.wet,
                                                 married=bool(f and f.status == "Married")))
     card["today"] = [{"key": d.key, "chance": d.chance,
-                      "stops": [{"time": time_label(st.time), "place": farm.place(st.location)} for st in d.stops]}
+                      "stops": [{"time": time_label(st.time), "place": farm.place(st.location),
+                                 "spot": [st.location, st.x, st.y]} for st in d.stops]}
                      for d in days]
     return card
 

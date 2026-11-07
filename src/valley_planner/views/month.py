@@ -261,6 +261,11 @@ def _nights(farm: Farm, first: int) -> dict[int, dict]:
             text = f"Only if its landing spot is clear: right now it's {n.what or 'blocked'}." + " Clear it to get one."
         out[n.days_played] = _item("night", title, text, important=n.kind in ("meteorite", "fairy"),
                                    sure=n.sure)
+        if n.tile:  # where on the farm: the meteorite's 2x2, or the tile the statue, capsule or fairy lands on
+            x, y = n.tile
+            out[n.days_played]["spot"] = {"loc": "Farm", "x": x, "y": y, "radius": 6, "marks": [
+                {"x": x, "y": y, "kind": "rect", "w": 2, "h": 2, "color": "#8A2318"} if n.kind == "meteorite"
+                else {"x": x, "y": y, "kind": "cross"}]}
     return out
 
 

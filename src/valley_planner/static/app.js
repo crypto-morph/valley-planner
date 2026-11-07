@@ -40,7 +40,7 @@ function itemCard(c) {
 // Where a villager is today, from /api/ask/villager's "today" (one entry, or two on a rain-coinflip day)
 function whereToday(today) {
   return today.map((d) => (today.length > 1 ? `<p class="sub">${Math.round(d.chance * 100)}% chance:</p>` : "") +
-    (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place)))) : '<p class="sub">Stays home</p>')).join("");
+    (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place) + (st.spot ? `<details class="pic-fold"><summary>Show me where</summary>${spotPic(st.spot)}</details>` : "")))) : '<p class="sub">Stays home</p>')).join("");
 }
 
 // A card's sections as tabs, so a long card opens on one short list instead of everything at once.
@@ -560,7 +560,6 @@ function drawNext(v) {
       (v.fishing.spots.length ? `<details class="pic-fold"><summary>Show me today's bubbles</summary>${spotPic([v.fishing.location, ...v.fishing.spots[0]], "", v.fishing.spots.map(([x, y], i) => ({ x, y, kind: "dot", color: "#1C4C74", label: i ? "" : "Bubbles" })))}</details>` : "") : "") +
     (v.left.length ? `<details class="fold plain"><summary>Doesn't fit today (${v.left.length})</summary><ul class="list">${v.left.map((x) => `<li><span>${esc(x.title)}</span><span class="muted">${esc(x.why)}</span></li>`).join("")}</ul></details>` : "");
   document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => tick(c.dataset.stop, c.checked)));
-  document.querySelectorAll("#t-plan details.pic-fold").forEach((d) => d.addEventListener("toggle", () => { if (d.open) drawMaps(d); }, { once: true }));
 }
 
 function drawPack(p) {
@@ -975,7 +974,8 @@ function drawDay(n, focus) {
     <li class="${x.important ? "vital" : ""} ${i === focus ? "focus" : ""}">
       <span class="cal-ic" aria-hidden="true">${calIcon(x.kind)}</span>
       <div><strong>${esc(x.title)}</strong>${x.important ? ' <span class="cal-flag">Important</span>' : ""}${unsure(x.sure)}
-      ${x.text ? `<div class="muted">${esc(x.text)}</div>` : ""}</div></li>`).join("")}</ul>` : `<p class="muted">${d.past ? "Already gone." : "Nothing known for this day."}</p>`);
+      ${x.text ? `<div class="muted">${esc(x.text)}</div>` : ""}${x.spot ? `<canvas class="map-pic" data-map="${esc(JSON.stringify(x.spot))}"></canvas>` : ""}</div></li>`).join("")}</ul>` : `<p class="muted">${d.past ? "Already gone." : "Nothing known for this day."}</p>`);
+  drawMaps($("#cal-day"));
 }
 
 async function drawMonth(offset) {
@@ -1086,3 +1086,6 @@ $("#t-reset").addEventListener("click", async () => {
   await busy("Reading your save…", () => views.dayPlan({}));
   $("#t-form").hidden = true;
 });
+
+// A folded picture is drawn the first time it's opened, wherever it is on the page.
+document.addEventListener("toggle", (e) => { if (e.target.matches?.("details.pic-fold") && e.target.open) drawMaps(e.target); }, true);
