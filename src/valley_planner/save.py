@@ -190,6 +190,7 @@ class Save:
     house_upgrade: int = 0
     house_upgrade_days: int = 0  # days until Robin finishes a house upgrade under way
     deepest_mine_level: int = 0
+    mine_carts: dict[int, int] = field(default_factory=dict)  # floor -> coal carts left, for floors you've been on
     mine_lowest: int = 0  # lowest Mines level anyone reached (shop conditions use this)
     cave_choice: int = 0  # 0 not chosen yet, 1 fruit bats, 2 mushrooms
     experience: dict[str, int] = field(default_factory=dict)  # skill -> XP points
@@ -658,7 +659,8 @@ def read_save(path: Path, data=None) -> Save:
                        "completed": _bool(q, "completed"), "daily": _bool(q, "dailyQuest"),
                        "days_left": _int(q, "daysLeft"), "target": _text(q, "target"),
                        "item_id": (_text(q, "ItemId") or _text(q, "item")).removeprefix("(O)"),
-                       "count": _int(q, "number", 1), "reward": max(_int(q, "moneyReward"), _int(q, "reward"))})
+                       "count": _int(q, "number", 1), "reward": max(_int(q, "moneyReward"), _int(q, "reward")),
+                       "greet": _strings(_child(q, "whoToGreet"))})
 
     board = [_order(o) for o in _or(_child(root, "availableSpecialOrders"), []) if _tag(o) == "SpecialOrder"]
 
@@ -689,6 +691,8 @@ def read_save(path: Path, data=None) -> Save:
         max_stamina=_int(player, "maxStamina", 270), max_items=_int(player, "maxItems", 12),
         house_upgrade=house_upgrade, house_upgrade_days=max(0, _int(player, "daysUntilHouseUpgrade")),
         deepest_mine_level=_int(player, "deepestMineLevel"),
+        mine_carts={int(_flat(k) or 0): _int(_or(_child(v, "MineInfo"), v), "coalCartsLeft", 1)
+                    for k, v in _dict(_child(root, "mine_permanentMineChanges"))},
         cave_choice=_int(player, "caveChoice"),
         experience=dict(zip(("farming", "fishing", "foraging", "mining", "combat", "luck"),
                             (int(c.text or 0) for c in _or(_child(player, "experiencePoints"), [])), strict=False)),

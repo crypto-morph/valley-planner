@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from valley_planner.facts import help_wanted, skills
+from valley_planner.facts.items import Items
 from valley_planner.facts.walk import Walker, _legs
 from valley_planner.save import night_override
 
@@ -174,10 +175,23 @@ def test_a_can_near_a_step_shows_both_items(data):
 
 def test_food_advice_covers_the_shortfall(data):
     from valley_planner.views import today
-    farm = SimpleNamespace(data=data, held=lambda: {"(O)RiverJelly": 2}, name=lambda _q: "River Jelly")
+    jelly = SimpleNamespace(qualified_id="(O)RiverJelly", category=-7, quality=0, stack=2)
+    farm = SimpleNamespace(data=data, items=Items(data), save=SimpleNamespace(items=[jelly]),
+                           bundles=SimpleNamespace(fits=lambda *a, **k: []), name=lambda _q: "River Jelly")
     assert "2 River Jelly" in today.food_advice(farm, 100)
     assert "1 River Jelly" in today.food_advice(farm, 50)
     assert "still be" in today.food_advice(farm, 500)
+
+
+def test_food_eats_the_cheapest_energy_first(data):
+    """A Salmonberry gives 25 energy for 5g; a Parsnip 25 for 35g."""
+    from valley_planner.views import today
+    berry = SimpleNamespace(qualified_id="(O)296", category=-79, quality=0, stack=1)
+    parsnip = SimpleNamespace(qualified_id="(O)24", category=-75, quality=0, stack=1)
+    farm = SimpleNamespace(data=data, items=Items(data), save=SimpleNamespace(items=[parsnip, berry]),
+                           bundles=SimpleNamespace(fits=lambda *a, **k: []),
+                           name=lambda q: {"(O)296": "Salmonberry", "(O)24": "Parsnip"}[q])
+    assert today.food_advice(farm, 20).startswith("Eat 1 Salmonberry")
 
 
 def test_a_machine_you_cannot_build_yet_is_not_suggested():

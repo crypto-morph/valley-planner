@@ -4,8 +4,9 @@ It's limited by the three things that run out: the clock, your energy and what's
 (watering, then planting), then the stops worth the walk, best value for the minutes first. What doesn't fit is
 listed with the reason. Recalculate with the time, energy and place you're at, and ticked stops left out.
 
-Energy at the start of a game (planning choices, from the first days of a real game): hoeing or watering a tile
-costs 2; a tile takes a person about 1.6 minutes. FINISH: no planned stop starts after this.
+Energy comes from the game's own sums (facts/tools.py): the can and hoe are charged as far as the job fills them, and
+picking a crop stops the clock, so only the steps between crops count. FINISH: no planned stop starts after this,
+which leaves an hour to get home and into bed by midnight, the last time that costs nothing tomorrow.
 
 The person you're courting is a stop with a time window, from their schedule. Spare energy at the end goes on
 whichever of fishing or chopping you ask for, suggested rather than timed to the minute.
@@ -17,7 +18,7 @@ import json
 
 from ..engine import cc
 from ..engine.unlocks import BRIDGE_WOOD, KITCHEN
-from ..facts import bubbles, geodes, help_wanted, skills
+from ..facts import bubbles, geodes, help_wanted, mine_day, skills, tools
 from ..facts.buyers import Buyers
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
@@ -27,15 +28,17 @@ from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS
 from . import errands, levels, pack, quests, sell
 from .farm import Farm
 
-TILE_ENERGY = 2
+TILE_ENERGY = 2  # a tile hand-watered at Farming 0, for the odd job
 TILE_MINUTES = 1.6
-RESERVE = 10  # energy never spent, so you don't pass out
+HARVEST_MINUTES = 0.3  # a crop: the clock stops while you pick, so it's the step to the next one
+RESERVE = 10  # energy never spent: touching 0 halves tomorrow
 START = 6 * 60 + 10
-FINISH = 20 * 60
+FINISH = 23 * 60
 QUEST_VALUE = 500
 SWEETHEART_VALUE = 400
-CAST_ENERGY, CAST_MINUTES = 9, 20  # fishing: an average cast and catch, from a real game's first days
-TREE_ENERGY, TREE_MINUTES, TREE_WOOD = 30, 15, 17  # a tree and its stump
+CAST_MINUTES = 20  # fishing: an average cast and catch, from a real game's first days
+TREE_MINUTES, TREE_WOOD = 15, 17  # a tree and its stump
+INTRODUCTIONS_VALUE = 300  # each hello on the way to +100 with everyone you've met
 BUNDLE_VALUE = 200
 GOOD_BIN = 50  # gold a bin's item has to be worth to be a stop
 SPARE_DETOUR = 15  # minutes: the longest walk for something no bundle needs
@@ -258,17 +261,38 @@ def _clint(farm: Farm, held: dict[str, int]) -> list[dict]:
 
 
 def _mines(farm: Farm, power: int) -> list[dict]:
-    """A trip down the Mines, if the day has the energy for one."""
-    s = farm.save
+    """A trip down the Mines, if the day has the energy for one, with what today's luck and floors hold."""
+    s, w = farm.save, farm.when
     if "landslideDone" not in s.mail and s.days_played < 5:
         return []
     if power < MINES_MIN_ENERGY or s.deepest_mine_level >= 120:
         return []
     floor = s.deepest_mine_level
     goal = (floor // 5 + 1) * 5
-    return [{"id": "mines", "kind": "mine", "title": f"The Mines: reach floor {goal} (you're on {floor})",
-             "why": f"leave at about {MINES_LEAVE} energy", "at": MINE_DOOR, "minutes": MINES_MINUTES,
-             "value": BUNDLE_VALUE, "energy_to": MINES_LEAVE}]
+    iron = floor >= mine_day.IRON_FROM - 1 and farm.held().get("(O)335", 0) < 20
+    lines = [mine_day.luck_words(s.daily_luck)]
+    dark = mine_day.dark_floors(w.days_played, w.game_id, range(floor // 5 * 5 + 1, goal + 10),
+                                legacy=w.legacy_random)
+    if dark:
+        lines.append(f"today's dark floors carry extra ore: {', '.join(map(str, dark[:6]))}")
+    carts = mine_day.full_carts(s.mine_carts, floor)
+    if carts:
+        lines.append(f"{len(carts) * mine_day.CART_COAL} free Coal in the minecarts on floor "
+                     f"{' and '.join(map(str, carts))}")
+    lines.append(f"leave at about {MINES_LEAVE} energy")
+    title = f"The Mines: floors {floor + 1} to {goal}" + (", for Iron Ore" if iron else f" (you're on {floor})")
+    return [{"id": "mines", "kind": "mine", "title": title, "why": "; ".join(lines), "at": MINE_DOOR,
+             "minutes": MINES_MINUTES, "value": BUNDLE_VALUE, "energy_to": MINES_LEAVE}]
+
+
+def _introductions(farm: Farm) -> list[dict]:
+    """The Introductions quest: the last hello adds 100 with everyone you've met."""
+    for q in farm.save.quests:
+        if q["type"] == "SocializeQuest" and not q["completed"] and q.get("greet"):
+            left = q["greet"]
+            why = (f"{len(left)} to go for Introductions, which ends with +100 friendship with everyone you've met")
+            return [x for name in left for x in _person(farm, name, why, INTRODUCTIONS_VALUE)]
+    return []
 
 
 def bring_list(farm: Farm, spouse: str = "") -> list[dict]:
@@ -416,16 +440,35 @@ def energy_warning(farm: Farm, cost: int, power: int) -> str:
     return f"Watering costs {cost} energy and you have {power}. {food_advice(farm, cost - (power - RESERVE))}"
 
 
+def night_note(farm: Farm, power: int) -> str:
+    """What tonight does to tomorrow: a level-up fills you up, and 0 energy halves you."""
+    s = farm.save
+    up = [r for r in levels.forecast(farm) if r["day"] == s.days_played and r["sure"]]
+    if up:
+        r = up[0]
+        return (f"You reach {r['skill'].title()} {r['level']} today, so you wake on full energy tomorrow"
+                " whatever you spend or however late you sleep.")
+    if power <= 0:
+        return (f"At 0 energy tomorrow starts on {s.max_stamina // 2 + 1}. A Muscle Remedy (Harvey's) clears that,"
+                " and so does a level-up tonight.")
+    late = tools.wake(s.max_stamina, 2500, 0)
+    return f"Be in bed by 12:50am: at 1:00am tomorrow starts on {late}, not {s.max_stamina}." if late else ""
+
+
 def food_advice(farm: Farm, short: int) -> str:
-    """Enough food from what you hold to cover the shortfall, biggest first, or how far it gets you."""
+    """Enough food from what you hold to cover the shortfall, the least gold lost per energy first."""
     objects = farm.data.asset("Data/Objects")
     foods = []
-    for q, n in farm.held().items():
-        o = objects.get(q.removeprefix("(O)"))
-        if q.startswith("(O)") and o and int(o.get("Edibility") or 0) > 0:
-            foods += [(int(int(o["Edibility"]) * 2.5), farm.name(q))] * n
+    for it in farm.save.items:
+        q = it.qualified_id
+        o = objects.get(q.removeprefix("(O)")) if q.startswith("(O)") else None
+        if not o or int(o.get("Edibility") or 0) <= 0 or farm.bundles.fits(q, it.category, it.quality,
+                                                                            shown_only=False):
+            continue
+        energy = tools.food(int(o["Edibility"]), it.quality)
+        foods += [((_price(farm, q) or 0) / energy, energy, farm.name(q))] * it.stack
     eat, gained = [], 0
-    for energy, name in sorted(foods, reverse=True):
+    for _cost, energy, name in sorted(foods):
         if gained >= short:
             break
         eat.append((name, energy))
@@ -490,10 +533,10 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         nonlocal now, power
         if job_id in done or not tiles:
             return
-        afford = min(tiles, max(0, power - RESERVE) // cost) if cost else tiles
-        fits = min(afford, max(0, (FINISH - now)) // max(1, int(minutes)))
+        afford = min(tiles, int(max(0, power - RESERVE) // cost)) if cost else tiles
+        fits = min(afford, int(max(0, (FINISH - now)) // max(0.1, minutes)))
         if fits:
-            power -= fits * cost
+            power -= round(fits * cost)
             plan.append({"id": job_id, "time": clock(now), "at": now, "kind": "farm", "title": f"{title} {fits}",
                          "why": why, "way": [], "energy_after": power})
             now += round(fits * minutes)
@@ -513,7 +556,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                          "energy_after": power})
             pos = ("Farm", *FARMHOUSE_DOOR)
     ripe = sum(1 for c in s.crops if c.location == "Farm" and c.ready and not c.forage and c.harvest_id)
-    warning = energy_warning(farm, thirsty * TILE_ENERGY, power) if "water" not in done else ""
+    warning = energy_warning(farm, round(thirsty * tools.water(s.tool_levels.get("WateringCan", 0),
+                                                               s.skills.get("farming", 0), thirsty)[0]),
+                             power) if "water" not in done else ""
     show = _show_today(farm)
     tv_note = ""
     if show and "tv" not in done:
@@ -523,16 +568,22 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             now += TV_MINUTES
         else:
             tv_note = f"{show['title']} is on: {show['why']}."
-    farm_job("harvest", "Harvest", ripe, 0, 1, "keep what the bundles need, sell the rest")
-    farm_job("water", "Water", thirsty, TILE_ENERGY, TILE_MINUTES, "they won't grow tonight otherwise")
-    farm_job("plant", "Hoe and plant", seeds, TILE_ENERGY if wet else 2 * TILE_ENERGY,
-             TILE_MINUTES * (1 if wet else 2), "the rain waters them" if wet else "hoe, plant, water")
+    can, farming = s.tool_levels.get("WateringCan", 0), s.skills.get("farming", 0)
+    water_e, water_m = tools.water(can, farming, thirsty)
+    hoe_e, hoe_m = tools.hoe(s.tool_levels.get("Hoe", 0), farming, seeds)
+    plant_e, plant_m = tools.water(can, farming, seeds)
+    farm_job("harvest", "Harvest", ripe, 0, HARVEST_MINUTES, "keep what the bundles need, sell the rest")
+    farm_job("water", "Water", thirsty, water_e, water_m, "they won't grow tonight otherwise"
+             + ("; hold the can to charge it, it's cheaper a tile" if can and thirsty >= tools.TILES[1] else ""))
+    farm_job("plant", "Hoe and plant", seeds, hoe_e + (0 if wet else plant_e), hoe_m + (0 if wet else plant_m),
+             "the rain waters them" if wet else "hoe, plant, water"
+             + ("; a charged hoe costs one swing however many tiles it digs" if s.tool_levels.get("Hoe") else ""))
 
     place = lambda n: farm.place(n)  # noqa: E731
     fest_today = (s.season, s.day) in farm.hours.festivals
     board = help_wanted.quest_today(s, farm.data, festival=fest_today)
     stops = [x for x in _stops(farm, held) + _wizard(farm) + _community_center(farm) + _pierre(farm, ripe)
-             + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power)
+             + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power) + _introductions(farm)
              + (_sweetheart(farm, spouse) if spouse else []) + _birthdays(farm, spouse) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
     if fest:  # the map is the festival's and the day ends with it: only the farm jobs and the festival itself
@@ -622,8 +673,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     left = [{k: x[k] for k in ("title", "why")} for x in left if x.get("id") not in placed]
     spare = max(0, power - RESERVE)
     hours = max(0, FINISH - now)
-    casts = min(spare // CAST_ENERGY, hours // CAST_MINUTES)
-    trees = min(spare // TREE_ENERGY, hours // TREE_MINUTES)
+    casts = min(int(spare // tools.cast(s.skills.get("fishing", 0))), hours // CAST_MINUTES)
+    trees = min(int(spare // tools.tree(s.tool_levels.get("Axe", 0), s.skills.get("foraging", 0))),
+                hours // TREE_MINUTES)
     extra = []
     if casts >= 3:
         extra.append(f"fish about {casts} times")
@@ -634,7 +686,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         coming.setdefault(row["skill"], row)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty),
-                                  wood_note(farm, trees)) if x],
+                                  wood_note(farm, trees), night_note(farm, power)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
