@@ -99,6 +99,12 @@ def unguarded(crops: set, guards: list) -> set:
 
 
 def next_scarecrow(crops: set, guards: list) -> tuple[int, int] | None:
-    """The crop tile where one more Scarecrow protects the most."""
+    """The crop tile where one more Scarecrow protects the most; of equals, the one nearest the middle of the
+    crops it's for, so it isn't squeezed against the Scarecrow you have."""
     open_crops = unguarded(crops, guards)
-    return max(crops, key=lambda t: (sum(_near(t, c) for c in open_crops), t), default=None) if open_crops else None
+    if not open_crops:
+        return None
+    mx = sum(x for x, _ in open_crops) / len(open_crops)
+    my = sum(y for _, y in open_crops) / len(open_crops)
+    return max(crops, key=lambda t: (sum(_near(t, c) for c in open_crops), -((t[0] - mx) ** 2 + (t[1] - my) ** 2),
+                                     t))

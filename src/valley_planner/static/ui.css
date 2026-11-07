@@ -181,6 +181,7 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .sp-gc { background: #E8EBE2; }
 .sp-go { background: #F3EDE0; }
 .giant + .giant { margin-top: 12px; }
+.pic-fold summary { cursor: pointer; color: var(--muted, #55605A); font-size: 14px; min-height: 32px; display: flex; align-items: center; }
 .map-pic { display: block; max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; image-rendering: pixelated; }
 .sp-gone { background: #2B6A3E; color: #FFFFFF; }
 .sp-ghouse { background: #D9CBB0; color: #3E2E14; }

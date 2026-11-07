@@ -446,7 +446,9 @@ def _fishing(farm: Farm) -> dict | None:
     if not spots:
         return None
     best = max(spots, key=lambda k: len(spots[k]))
-    return {"place": farm.place(best), "fish": spots[best], "bubbles": _bubble_words(farm, best)}
+    spells = bubbles.forecast(farm.data, best, s.days_played, int(s.unique_id), legacy=s.legacy_random)
+    return {"place": farm.place(best), "fish": spots[best], "bubbles": _bubble_words(farm, best),
+            "location": best, "spots": [list(x.tile) for x in spells if 700 <= x.start < 2000]}
 
 
 def _head(farm: Farm) -> dict:
@@ -747,7 +749,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                      "title": best["title"],
                      "why": best["why"], "way": walker.directions(path, place),
                      "near": walker.near(best["at"][0], tile, place), "place": place(best["at"][0]),
-                     "energy_after": power})
+                     "spot": None if best["kind"] == "farm" else list(best["at"]), "energy_after": power})
         now += best["minutes"]
         if best["id"] == "pierre":  # then home to get the seeds in
             way = walker.path(walker.reach(best["at"]), ("Farm", *FARMHOUSE_DOOR))
@@ -788,7 +790,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         best = min(gaps, key=lambda g: g[0], default=None)
         if best and best[0] <= PASSING:
             row = {"title": c["title"], "gold": c["gold"], "near": walker.near(loc, (tx, ty), farm.place),
-                   "place": farm.place(loc), "stop": best[1]}
+                   "place": farm.place(loc), "stop": best[1], "spot": [loc, tx, ty]}
             passing.append(row)
             placed.add(c["id"])
             if best[1] < len(plan):

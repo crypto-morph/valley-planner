@@ -33,7 +33,8 @@ def _grid(plan, hoed: set, objects: dict, extra: tuple | None, *, quality: bool)
             return "c" if t in hoed else "n"
         return "x" if t in objects else "o" if t in hoed else "."
 
-    return {"rows": ["".join(letter((x, y)) for x in range(x0, x1 + 1)) for y in range(y0, y1 + 1)]}
+    return {"rows": ["".join(letter((x, y)) for x in range(x0, x1 + 1)) for y in range(y0, y1 + 1)],
+            "origin": [x0, y0]}
 
 
 def view(farm: Farm, crops: int | None = None) -> dict:

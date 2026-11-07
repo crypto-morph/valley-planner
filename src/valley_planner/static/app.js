@@ -546,17 +546,21 @@ function drawNext(v) {
     ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
       (first.way.length ? `<ol>${first.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") +
       (first.extras ? `<p class="next-extra"><strong>On the way:</strong> ${extras(first.extras)}</p>` : "") +
+      (first.spot ? spotPic(first.spot, first.title) : "") +
       `<button type="button" class="btn light" id="t-done">Done, what's next?</button>`
     : `<h2>All done for today</h2><p>${esc(v.spare.length ? `Energy to spare: ${v.spare.join(", or ")}.` : "Rest up, and get to bed by midnight.")}</p>`;
   if (first) $("#t-done").onclick = () => tick(first.id, true);
+  drawMaps($("#t-next"));
   const homeward = v.passing.filter((x) => x.stop >= v.plan.length);
-  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
+  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label>${x.spot ? `<details class="pic-fold"><summary>Show me where</summary>${spotPic(x.spot, x.title)}</details>` : ""}</li>`;
   $("#t-plan").innerHTML = `<ul class="stops">${v.plan.filter((x) => !first || x.id !== first.id).map(line).join("")}</ul>` +
     (homeward.length ? `<p class="muted"><strong>On the way home:</strong> ${extras(homeward)}</p>` : "") +
     (v.home ? `<p class="muted">Home by about ${esc(v.home)}.${v.spare.length ? ` Then ${esc(v.spare.join(", or "))}.` : ""}</p>` : "") +
-    (v.fishing ? `<p class="muted"><strong>Fish at ${esc(v.fishing.place)}</strong> for ${v.fishing.fish.map(esc).join(", ")}.</p>` : "") +
+    (v.fishing ? `<p class="muted"><strong>Fish at ${esc(v.fishing.place)}</strong> for ${v.fishing.fish.map(esc).join(", ")}.</p>` +
+      (v.fishing.spots.length ? `<details class="pic-fold"><summary>Show me today's bubbles</summary>${spotPic([v.fishing.location, ...v.fishing.spots[0]], "", v.fishing.spots.map(([x, y], i) => ({ x, y, kind: "dot", color: "#1C4C74", label: i ? "" : "Bubbles" })))}</details>` : "") : "") +
     (v.left.length ? `<details class="fold plain"><summary>Doesn't fit today (${v.left.length})</summary><ul class="list">${v.left.map((x) => `<li><span>${esc(x.title)}</span><span class="muted">${esc(x.why)}</span></li>`).join("")}</ul></details>` : "");
   document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => tick(c.dataset.stop, c.checked)));
+  document.querySelectorAll("#t-plan details.pic-fold").forEach((d) => d.addEventListener("toggle", () => { if (d.open) drawMaps(d); }, { once: true }));
 }
 
 function drawPack(p) {
@@ -611,10 +615,17 @@ function giantCard(g) {
         { x: g.tile[0], y: g.tile[1], kind: "cross", label: "1" }] }))}"></canvas></div>`;
 }
 
+// A picture of a place, with a cross on the tile (or the marks given), drawn by drawMaps once it's in the page.
+function spotPic([loc, x, y], label = "", marks = null) {
+  return `<canvas class="map-pic" data-map="${esc(JSON.stringify({ loc, x, y, radius: 6, marks: marks || [{ x, y, kind: "cross", label: label.length < 28 ? label : "" }] }))}"></canvas>`;
+}
+
 // Draw every <canvas data-map> inside `root` with the game's own tiles (static/map.js).
 function drawMaps(root) {
   if (!window.ValleyMap) return;
   root.querySelectorAll("canvas[data-map]").forEach((c) => {
+    if (c.dataset.drawn || c.closest("details:not([open])")) return;
+    c.dataset.drawn = "1";
     const o = JSON.parse(c.dataset.map);
     window.ValleyMap.drawArea(c, o.loc, o).catch(() => { c.replaceWith(Object.assign(document.createElement("p"), { className: "muted small", textContent: "The picture couldn't be drawn." })); });
   });
@@ -874,6 +885,15 @@ function drawSprinklers() {
   $("#sp-grid").style.gridTemplateColumns = `repeat(${rows[0].length}, 1fr)`;
   $("#sp-grid").innerHTML = rows.map((r) => [...r].map((t) => `<span class="sp-t sp-${t === "." ? "none" : t}" title="${TILE_WORDS[t]}">${"SQXA".includes(t) ? t : ""}</span>`).join("")).join("");
   $("#sp-key").innerHTML = [...new Set(rows.join(""))].filter((t) => t !== ".").map((t) => `<span class="sp-keyline"><span class="sp-t sp-${t}">${"SQXA".includes(t) ? t : ""}</span> ${TILE_WORDS[t]}</span>`).join("");
+  const [x0, y0] = (later ? v.later : v.now).origin, w = rows[0].length, h = rows.length;
+  const marks = [];
+  rows.forEach((r, j) => [...r].forEach((t, i) => {
+    if ("SQ".includes(t)) marks.push({ x: x0 + i, y: y0 + j, kind: "rect", color: t === "Q" ? "#1C4C74" : "#2B6A3E", label: t, inside: true });
+    if (t === "A") marks.push({ x: x0 + i, y: y0 + j, kind: "cross", label: "Scarecrow" });
+    if (t === "n") marks.push({ x: x0 + i, y: y0 + j, kind: "dot", color: "#C77700" });
+  }));
+  $("#sp-pic").innerHTML = `<canvas class="map-pic" data-map="${esc(JSON.stringify({ loc: "Farm", x: x0 + Math.floor(w / 2), y: y0 + Math.floor(h / 2), radius: Math.ceil(Math.max(w, h) / 2) + 1, scale: Math.max(w, h) > 24 ? 1 : 2, marks }))}"></canvas>`;
+  drawMaps($("#sp-pic"));
   $("#sp-later-note").textContent = later ? `Swap the ${v.quality} marked Q for Quality Sprinklers, on the same tiles. ${v.quality_keep} old ones stay at the edges and ${v.freed} come free. No crop moves.` : "";
 }
 
