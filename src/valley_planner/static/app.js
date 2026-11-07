@@ -699,10 +699,11 @@ const views = {
   },
 
   async crops() {
-    const [v, pick] = await Promise.all([get("/api/crops"), get("/api/picking")]);
+    const [v, pick, extras] = await Promise.all([get("/api/crops"), get("/api/picking"), get("/api/extras")]);
+    $("#extras").innerHTML = `<ul class="list-plain">${extras.map((x) => `<li><strong>${esc(x.title)}.</strong> ${esc(x.text)}</li>`).join("")}</ul>`;
     $("#giants").innerHTML = pick.giants.length ? pick.giants.map((g) => `<div class="giant"><p><strong>${esc(g.crop)}, ${esc(g.day)}${g.sure ? "" : " (one of two overlapping squares)"}.</strong> ${esc(g.text)}</p>
       <div class="sp-grid" style="grid-template-columns: repeat(${g.rows[0].length}, 1fr); max-width: ${g.rows[0].length * 26}px">${g.rows.map((r) => [...r].map((t) => `<span class="sp-t sp-g${t === "." ? "none" : t}">${"SGXHP".includes(t) ? t : ""}</span>`).join("")).join("")}</div></div>`).join("") +
-      '<p class="muted small">Worked out from the game\'s code; no giant crop has been checked in a save yet. G: the square, S: sow the same crop, H: hoe and sow, P: pull up what's there and sow, X: your Scarecrow.</p>'
+      '<p class="muted small">Worked out from the game\'s code; no giant crop has been checked in a save yet. G: the square, S: sow the same crop, H: hoe and sow, P: pull up what\'s there and sow, X: your Scarecrow.</p>'
       : '<p class="muted">No giant crop is due in the next week.</p>';
     $("#waiting").innerHTML = pick.waiting.length ? `<ul class="list-plain">${pick.waiting.map((w) => `<li>${w.count} ${esc(w.crop)}: ${esc(w.now)} today, ${esc(w.best)} on ${esc(w.day)}${w.note ? `; ${esc(w.note)}` : ""}.</li>`).join("")}</ul>` : '<p class="muted">Everything ripe is at its best today.</p>';
     const c = v.countdown;

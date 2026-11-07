@@ -5,11 +5,19 @@ them gives the shortest walk between any two outdoor tiles. Debris on the farm a
 
 Speed: 5 pixels a tick is about 33 tiles in 10 game minutes. NEW_PLAYER_PACE stretches that, because a person stops,
 looks and takes corners (a planning choice, from watching the first days of a real game).
+
+Diagonals (Farmer.getMovementSpeed): holding two directions moves both axes at once, each at 0.707 of the speed, so
+a diagonal step crosses one tile across and one down in sqrt(2) times a straight step's time: slower per step,
+faster than the L of two straight steps it replaces. The walk takes a diagonal only when both straight tiles beside
+it are open too (no squeezing past a corner), and costs it DIAGONAL tiles.
+Unsure: the farmer's box is narrower than a tile and slides along walls one axis at a time, so in play some corners
+can be shaved a little more than this allows.
 """
 
 from __future__ import annotations
 
-from collections import deque
+import heapq
+import math
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -21,7 +29,10 @@ MINUTES_PER_TILE = 10 / 33
 NEW_PLAYER_PACE = 1.5
 TIDE_POOLS_X = 58  # the Beach east of its broken bridge
 EDGE = {(0, -1): "north", (0, 1): "south", (-1, 0): "west", (1, 0): "east"}
+DIAGONALS = ((-1, -1), (1, -1), (-1, 1), (1, 1))
+DIAGONAL = math.sqrt(2)  # a diagonal step, in straight steps' time (0.707 a tick on each axis)
 CHUNK = 8  # tiles: small wiggles in a route aren't worth saying
+SLANT = 2.414  # tan(67.5°): a stretch this close to 45° is said as a diagonal
 Node = tuple[str, int, int]
 
 
@@ -73,20 +84,38 @@ class Walker:
             return False
         return not (loc == "Beach" and x >= TIDE_POOLS_X and not self.bridge_fixed)
 
+    @cached_property
+    def _free(self) -> set[Node]:
+        """Every open tile, for the search to look up quickly."""
+        return {(loc, x, y) for loc, (w, h, _) in self.grids.items() for x in range(w) for y in range(h)
+                if self.open((loc, x, y))}
+
     def reach(self, start: Node) -> dict[Node, Node | None]:
-        """Every tile you can walk to from `start`, each pointing back along the shortest way."""
+        """Every tile you can walk to from `start`, each pointing back along the quickest way (diagonals allowed)."""
+        free, exits = self._free, self.exits
         prev: dict[Node, Node | None] = {start: None}
-        q = deque([start])
-        while q:
-            c = q.popleft()
+        best: dict[Node, float] = {start: 0.0}
+        done: set[Node] = set()
+        heap: list[tuple[float, int, Node]] = [(0.0, 0, start)]
+        tick = 0  # first come, first kept among equal costs
+        while heap:
+            d, _, c = heapq.heappop(heap)
+            if c in done:
+                continue
+            done.add(c)
             loc, x, y = c
-            onward = [(loc, x + dx, y + dy) for dx, dy in EDGE]
-            if c in self.exits:
-                onward.append(self.exits[c])
-            for n in onward:
-                if n not in prev and n[0] in self.grids and self.open(n):
+            onward = [((loc, x + dx, y + dy), 1.0) for dx, dy in EDGE]
+            onward += [((loc, x + dx, y + dy), DIAGONAL) for dx, dy in DIAGONALS
+                       if (loc, x + dx, y) in free and (loc, x, y + dy) in free]
+            if c in exits:
+                onward.append((exits[c], 1.0))
+            for n, step in onward:
+                nd = d + step
+                if n in free and n not in done and nd < best.get(n, math.inf) - 1e-9:
+                    best[n] = nd
                     prev[n] = c
-                    q.append(n)
+                    tick += 1
+                    heapq.heappush(heap, (nd, tick, n))
         return prev
 
     @staticmethod
@@ -102,8 +131,14 @@ class Walker:
             out.append(prev[out[-1]])
         return out[::-1]
 
+    @staticmethod
+    def tiles(path: list[Node]) -> float:
+        """How long the walk is, in straight steps: a diagonal step counts DIAGONAL."""
+        return sum(DIAGONAL if a[0] == b[0] and abs(a[1] - b[1]) == 1 and abs(a[2] - b[2]) == 1 else 1.0
+                   for a, b in zip(path, path[1:], strict=False))
+
     def minutes(self, path: list[Node]) -> int:
-        return round((len(path) - 1) * MINUTES_PER_TILE * self.pace)
+        return round(self.tiles(path) * MINUTES_PER_TILE * self.pace)
 
     @cached_property
     def landmarks(self) -> dict[str, list[Landmark]]:
@@ -158,15 +193,22 @@ class Walker:
 
 
 def _legs(tiles: list[tuple[int, int]]) -> list[tuple[str, int]]:
-    """A tile route as compass legs, ignoring wiggles."""
+    """A tile route as compass legs (diagonals too), ignoring wiggles."""
     legs: list[tuple[str, int]] = []
     for a, b in zip(tiles[::CHUNK], [*tiles[CHUNK::CHUNK], tiles[-1]], strict=False):
         dx, dy = b[0] - a[0], b[1] - a[1]
-        for d, n in ((("east" if dx > 0 else "west"), abs(dx)), (("south" if dy > 0 else "north"), abs(dy))):
-            if n and legs and legs[-1][0] == d:
-                legs[-1] = (d, legs[-1][1] + n)
-            elif n:
-                legs.append((d, n))
+        ns, ew = ("south" if dy > 0 else "north"), ("east" if dx > 0 else "west")
+        if not dx and not dy:
+            continue
+        if min(abs(dx), abs(dy)) * SLANT >= max(abs(dx), abs(dy)):  # about as far across as down: a diagonal leg
+            d = ns + ew
+        else:
+            d = ew if abs(dx) > abs(dy) else ns
+        n = max(abs(dx), abs(dy))
+        if legs and legs[-1][0] == d:
+            legs[-1] = (d, legs[-1][1] + n)
+        else:
+            legs.append((d, n))
     kept: list[tuple[str, int]] = []
     for d, n in legs:  # dropping a wiggle can leave two legs the same way
         if n < 3:

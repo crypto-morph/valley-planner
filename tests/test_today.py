@@ -283,3 +283,31 @@ def test_sprinklers_say_what_is_missing():
     assert "craft 3" in today.sprinkler_note(farm({"(O)334": 14, "(O)335": 3}), 80)
     assert today.sprinkler_note(farm({"(O)334": 14}), 10) == ""
     assert today.sprinkler_note(farm({}, recipes=()), 80) == ""
+
+
+def _plain_walker(blocked=()):
+    w = Walker(None)
+    w.__dict__["grids"] = {"Farm": (10, 10, set(blocked))}
+    w.__dict__["exits"] = {}
+    return w
+
+
+def test_walks_go_diagonally_at_root_two_a_step():
+    w = _plain_walker()
+    path = w.path(w.reach(("Farm", 0, 0)), ("Farm", 5, 5))
+    assert len(path) == 6 and w.tiles(path) == pytest.approx(5 * 2 ** 0.5)  # five diagonal steps, not ten straight
+    assert w.minutes(path) == round(5 * 2 ** 0.5 * 10 / 33 * 1.5)
+
+
+def test_walks_dont_squeeze_past_corners():
+    w = _plain_walker(blocked={(1, 0)})
+    prev = w.reach(("Farm", 0, 0))
+    assert prev[("Farm", 1, 1)] == ("Farm", 0, 1)  # a wall beside the diagonal: round the corner instead
+    assert _plain_walker().reach(("Farm", 0, 0))[("Farm", 1, 1)] == ("Farm", 0, 0)
+    w = _plain_walker(blocked={(1, 0), (0, 1)})
+    assert ("Farm", 1, 1) not in w.reach(("Farm", 0, 0))  # walled in: no slipping out between the corners
+
+
+def test_legs_say_diagonals():
+    assert _legs([(i, i) for i in range(30)]) == [("southeast", 29)]
+    assert _legs([(0, y) for y in range(10)] + [(x, 9) for x in range(1, 20)]) == [("south", 8), ("east", 19)]

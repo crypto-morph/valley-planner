@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..engine import cc
-from ..facts import night_events, special_orders, weather
+from ..facts import bookseller, night_events, special_orders, weather
 from ..facts.conditions import date_of
 from . import crops, levels, picking
 from .farm import Farm
@@ -126,6 +126,18 @@ def _weather(farm: Farm, dp: int) -> tuple[str, bool]:
                             legacy=farm.when.legacy_random)
 
 
+def bookseller_text(farm: Farm, dp: int) -> tuple[str, bool]:
+    """The Bookseller's stall on a visit day: where, and what he sells, cheapest first."""
+    try:
+        day = bookseller.stock(dp, farm.save, farm.data)
+    except Exception:  # noqa: BLE001 - a stock we can't read shouldn't hide the visit
+        return f"All day by {bookseller.LANDMARK}.", False
+    books = sorted(day.items, key=lambda b: b.price)
+    words = ", ".join(f"{b.name} {b.price:,}g" + ("" if b.sure else " (maybe)") for b in books)
+    text = f"All day by {bookseller.LANDMARK}." + (f" {words}." if words else "")
+    return text, True  # the visit and stock are seeded; "(maybe)" marks books gated on what you read
+
+
 def _item(kind: str, title: str, text: str = "", *, important: bool = False, sure: bool = True) -> dict:
     return {"kind": kind, "title": title, "text": text, "important": important, "sure": sure}
 
@@ -150,6 +162,9 @@ def _events(farm: Farm, dp: int, spouse: str) -> list[dict]:
                 out.append(_item("birthday", e.label, "A gift today counts 8 times."))
         elif e.kind == "cart":
             continue  # the cart row below says what's on it
+        elif e.kind == "bookseller":
+            text, sure = bookseller_text(farm, dp)
+            out.append(_item("bookseller", e.label, text, sure=sure and e.sure))
         else:
             out.append(_item(e.kind, e.label, farm.place(e.detail) if e.kind == "festival" and e.detail else e.detail,
                              sure=e.sure))

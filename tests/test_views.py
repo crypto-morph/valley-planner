@@ -194,3 +194,19 @@ def test_cook_quality_columns_only_fall():
     for r in cook.view(farm)["known"]:
         q = [r["by_quality"][k] for k in (0, 1, 2, 4) if r["by_quality"][k] is not None]
         assert q == sorted(q, reverse=True)
+
+
+def test_app_js_parses():
+    """A syntax error in app.js blanks every page, and no Python test would notice."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node isn't installed")
+    js = Path(__file__).parent.parent / "src" / "valley_planner" / "static" / "app.js"
+    run = subprocess.run([node, "--check", str(js)], capture_output=True, text=True, check=False)
+    assert run.returncode == 0, run.stderr

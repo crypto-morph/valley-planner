@@ -15,10 +15,22 @@ whichever of fishing or chopping you ask for, suggested rather than timed to the
 from __future__ import annotations
 
 import json
+import math
 
 from ..engine import cc
 from ..engine.unlocks import BRIDGE_WOOD, KITCHEN
-from ..facts import bubbles, geodes, help_wanted, mine_day, romance, skills, tools
+from ..facts import (
+    artifact_spots,
+    bubbles,
+    comforts,
+    geodes,
+    help_wanted,
+    mine_day,
+    mine_floors,
+    romance,
+    skills,
+    tools,
+)
 from ..facts.buyers import Buyers
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
@@ -87,6 +99,39 @@ def _forage_why(farm: Farm, qid: str, held: dict[str, int]) -> tuple[str, int]:
     return "a spare: sell or gift it", _price(farm, qid)
 
 
+LOST_BOOK_VALUE = 50  # a library book: no gold, but the museum's reward track and lore
+
+
+def _dig_spots(farm: Farm, held: dict[str, int]) -> list[dict]:
+    """Worm tiles and seed spots you can reach today, with what digging each one gives (seeded by tile and day)."""
+    try:
+        spots = artifact_spots.spots(farm.save, farm.data)
+    except Exception:  # noqa: BLE001 - a forecast we can't make shouldn't stop the day plan
+        return []
+    out = []
+    for sp in spots:
+        if sp.reachable is False or sp.location not in OUTDOORS:
+            continue
+        sure = [d for d in sp.drops if d.sure and d.id]
+        if not sure:
+            continue
+        value, whys = 0, []
+        for d in sure:
+            if d.id == "(O)102":
+                value += LOST_BOOK_VALUE
+                whys.append("a Lost Book for the library")
+                continue
+            why, v = _forage_why(farm, d.id, held)
+            value += v * (1 if v == BUNDLE_VALUE else d.count)
+            whys.append(why if v == BUNDLE_VALUE else f"{d.count} {d.name}, about {v * d.count}g")
+        names = " and ".join(f"{d.count} {d.name}" if d.count > 1 else d.name for d in sp.drops)
+        kind = "worm tile" if sp.kind == "artifact" else "seed spot"
+        out.append({"id": f"dig:{sp.location}:{sp.tile[0]}:{sp.tile[1]}", "kind": "forage",
+                    "title": f"Hoe the {kind}: {names}" + ("" if sp.sure else " (probably)"),
+                    "why": "; ".join(whys), "at": (sp.location, *sp.tile), "minutes": 1, "value": value})
+    return out
+
+
 def _stops(farm: Farm, held: dict[str, int], spouse: str = "") -> list[dict]:
     s = farm.save
     out = []
@@ -95,6 +140,7 @@ def _stops(farm: Farm, held: dict[str, int], spouse: str = "") -> list[dict]:
         out.append({"id": f"forage:{f.location}:{f.tile[0]}:{f.tile[1]}", "kind": "forage",
                     "title": f"Pick up {f.name}", "why": why, "at": (f.location, *f.tile), "minutes": 1,
                     "value": value})
+    out += _dig_spots(farm, held)
     fest = farm.hours.festivals
     today = (farm.when.season, farm.when.day) in fest or (farm.when.season, farm.when.day + 1) in fest
     quest = help_wanted.quest_today(s, farm.data, festival=today)
@@ -313,6 +359,14 @@ def _mines(farm: Farm, power: int) -> list[dict]:
                                 legacy=w.legacy_random)
     if dark:
         lines.append(f"today's dark floors carry extra ore: {', '.join(map(str, dark[:6]))}")
+    kw = dict(reached_bottom=s.deepest_mine_level >= 120,
+              quarry_open="ccCraftsRoom" in s.mail and "VisitedQuarryMine" in s.mail, legacy=w.legacy_random)
+    busy = mine_floors.infested_ahead(w.days_played, w.game_id, floor, goal - floor, **kw)
+    if busy:
+        words = {"monsters": "monsters", "slimes": "slimes", "dinos": "dinosaurs"}
+        lines.append("full of monsters today, with no ladder until every one is dead: " + ", ".join(
+            f"floor {k.floor} ({words.get(k.infested, k.infested)})" for k in busy)
+            + ". Bring food, or stop above it")
     carts = mine_day.full_carts(s.mine_carts, floor)
     if carts:
         lines.append(f"{len(carts) * mine_day.CART_COAL} free Coal in the minecarts on floor "
@@ -494,7 +548,16 @@ def night_note(farm: Farm, power: int) -> str:
 
 
 def food_advice(farm: Farm, short: int) -> str:
-    """Enough food from what you hold to cover the shortfall, the least gold lost per energy first."""
+    """Enough food from what you hold to cover the shortfall, the least gold lost per energy first,
+    and the spa when it's open: free, it only costs time."""
+    text = _food_advice(farm, short)
+    if short > 0 and comforts.spa_open(getattr(farm.save, "days_played", 0)):
+        text += (f" Or sit still in the spa pool, up the mountain past the Railroad: about "
+                 f"{math.ceil(short / comforts.SPA_ENERGY_PER_MINUTE)} game minutes for {short} energy, free.")
+    return text
+
+
+def _food_advice(farm: Farm, short: int) -> str:
     objects = farm.data.asset("Data/Objects")
     foods = []
     for it in farm.save.items:

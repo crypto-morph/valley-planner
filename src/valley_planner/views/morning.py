@@ -83,7 +83,10 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
                           "text": "you already know it" if known else "watch it to learn the recipe"})
         elif e.kind == "cart":
             today.append(_cart(farm))
-        elif e.kind in ("bookseller", "green_rain"):
+        elif e.kind == "bookseller":
+            from .month import bookseller_text  # month imports morning
+            today.append({"kind": e.kind, "title": e.label, "text": bookseller_text(farm, s.days_played)[0]})
+        elif e.kind == "green_rain":
             today.append({"kind": e.kind, "title": e.label, "text": farm.place(e.detail) if e.detail else ""})
     if s.dish_of_the_day:
         qid, n = s.dish_of_the_day
