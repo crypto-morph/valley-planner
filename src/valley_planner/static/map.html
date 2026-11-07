@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Map view</title>
+  <style>
+    :root { --bg: #FFF8E6; --ink: #2B1A0E; --muted: #5A3A1C; }
+    body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink);
+           font: 15px "Atkinson Hyperlegible", Verdana, system-ui, sans-serif; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .wrap { overflow: auto; max-width: 100%; }
+    canvas { display: block; image-rendering: pixelated; }
+    #tile { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Map</h1>
+  <p>Drawn from your own game files. <span id="tile"></span></p>
+  <div class="wrap"><canvas id="map" data-ready="0"></canvas></div>
+  <script src="/static/map.js"></script>
+  <script>
+    (async function () {
+      // /map.html?loc=Farm&x=61&y=21&r=8&mark=cross&label=Here&overlay=1&season=spring&scale=2 (no x, y: whole map)
+      const q = new URLSearchParams(location.search);
+      const loc = q.get("loc") || "Farm";
+      const canvas = document.getElementById("map");
+      const num = (k) => (q.has(k) && q.get(k) !== "" ? Number(q.get(k)) : null);
+      const x = num("x"), y = num("y");
+      const opts = { overlay: q.get("overlay") !== "0", season: q.get("season") || "" };
+      if (num("scale")) opts.scale = num("scale");
+      if (x !== null && y !== null) {
+        opts.x = x; opts.y = y;
+        if (num("r") !== null) opts.radius = num("r");
+        const kind = q.get("mark") || "cross";
+        opts.marks = kind === "none" ? [] : [{ x, y, kind, label: q.get("label") || "", w: num("w"), h: num("h") }];
+      }
+      document.getElementById("title").textContent = x === null ? loc : `${loc} around ${x}, ${y}`;
+      let view;
+      try {
+        view = await (x !== null && y !== null ? ValleyMap.drawArea(canvas, loc, opts) : ValleyMap.drawWhole(canvas, loc, opts));
+      } catch (e) {
+        document.getElementById("tile").textContent = `Couldn't draw it: ${e.message}`;
+        canvas.dataset.ready = "error";
+        return;
+      }
+      canvas.dataset.ready = "1";
+      const out = document.getElementById("tile");
+      canvas.addEventListener("mousemove", (ev) => {
+        const rect = canvas.getBoundingClientRect();
+        const t = 16 * view.scale;
+        out.textContent = `Tile ${view.x0 + Math.floor((ev.clientX - rect.left) / t)}, ${view.y0 + Math.floor((ev.clientY - rect.top) / t)}`;
+      });
+    })();
+  </script>
+</body>
+</html>

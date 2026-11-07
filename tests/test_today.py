@@ -311,3 +311,22 @@ def test_walks_dont_squeeze_past_corners():
 def test_legs_say_diagonals():
     assert _legs([(i, i) for i in range(30)]) == [("southeast", 29)]
     assert _legs([(0, y) for y in range(10)] + [(x, 9) for x in range(1, 20)]) == [("south", 8), ("east", 19)]
+
+
+def test_crops_that_cannot_ripen_are_not_watered():
+    from types import SimpleNamespace
+
+    from valley_planner.views import crops as crops_view
+    from valley_planner.views import today as today_view
+
+    info = SimpleNamespace(seasons=("spring",))
+    farm = SimpleNamespace(when=SimpleNamespace(season="spring", day=25),
+                           crops=SimpleNamespace(get=lambda seed: info, by_harvest={}),
+                           name=lambda qid: {"(O)190": "Cauliflower"}.get(qid, qid))
+    late = SimpleNamespace(dead=False, ready=False, in_pot=False, seed_id="474", harvest_id="190", location="Farm",
+                           days_left=6)
+    soon = SimpleNamespace(**{**vars(late), "days_left": 3})
+    assert crops_view.doomed(farm, late) and not crops_view.doomed(farm, soon)
+    note = today_view.doomed_note(farm, [late, late])
+    assert note.startswith("Don't water 2 Cauliflower: they can't ripen")
+    assert today_view.doomed_note(farm, []) == ""

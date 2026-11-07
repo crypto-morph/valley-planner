@@ -31,3 +31,23 @@ def test_reads_tile_properties_through_every_tile_kind():
     assert m.id == "Town" and m.properties == {"Outdoors": "T", "Light": 3}
     tiles = m.layers["Buildings"].tile_properties
     assert tiles == {(0, 0): {"Action": "LockedDoorWarp 6 29 SeedShop 900 2100"}, (1, 1): {"Action": "Message x"}}
+
+
+def test_keeps_tile_sheets_and_every_tile_when_asked():
+    def sheet(sid, image, cols, rows):
+        return s(sid) + s("") + s(image) + struct.pack("<8i", cols, rows, 16, 16, 0, 0, 0, 0) + props()
+
+    row0 = b"T" + s("a") + b"S" + struct.pack("<iB", 7, 0) + props() + b"T" + s("b") + b"S" + struct.pack("<iB", 3, 0) \
+        + props()
+    anim = b"A" + struct.pack("<ii", 250, 2) + b"T" + s("a") + b"S" + struct.pack("<iB", 9, 0) + props() \
+        + b"S" + struct.pack("<iB", 10, 0) + props() + props()
+    row1 = b"N" + struct.pack("<i", 1) + anim
+    layer = s("Back") + b"\x01" + s("") + struct.pack("<4i", 2, 2, 16, 16) + props() + row0 + row1
+    data = b"tBIN10" + s("Tiny") + s("") + props() + struct.pack("<i", 2) + sheet("a", "spring_town", 32, 72) \
+        + sheet("b", "../TileSheets/x", 4, 4) + struct.pack("<i", 1) + layer
+    m = read_tbin(data, tiles=True)
+    assert [(sh.id, sh.image, sh.columns, sh.rows, sh.tile_width) for sh in m.sheets] == \
+        [("a", "spring_town", 32, 72, 16), ("b", "../TileSheets/x", 4, 4, 16)]
+    # row by row: sheet a tile 7, sheet b tile 3; nothing, then the animation's first frame (sheet a, tile 9)
+    assert m.layers["Back"].tiles == [7, (1 << 16) | 3, -1, 9]
+    assert read_tbin(data).layers["Back"].tiles is None  # not kept unless asked

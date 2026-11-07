@@ -37,7 +37,7 @@ from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS
-from . import errands, levels, pack, quests, sell
+from . import crops, errands, levels, pack, picking, quests, sell
 from .farm import Farm
 
 TILE_ENERGY = 2  # a tile hand-watered at Farming 0, for the odd job
@@ -263,6 +263,19 @@ def wood_note(farm: Farm, trees: int) -> str:
     rest = short - trees * TREE_WOOD
     return (f"{short} Wood short: chop your {trees} spare trees, and plant a seed where each one stood."
             + (f" Robin has the other {rest} at {price}g each, if you need it soon." if rest > 0 else ""))
+
+
+def doomed_note(farm: Farm, lost: list) -> str:
+    """Crops that die at the season's end before they ripen: watering them is wasted energy."""
+    if not lost:
+        return ""
+    names: dict[str, int] = {}
+    for c in lost:
+        name = farm.name(f"(O){c.harvest_id}")
+        names[name] = names.get(name, 0) + 1
+    words = " and ".join(f"{n} {name}" for name, n in names.items())
+    return (f"Don't water {words}: {'it' if len(lost) == 1 else 'they'} can't ripen before the season ends, so "
+            "the can's energy is wasted. Pull them up and sow something quicker, or leave them.")
 
 
 def sprinkler_note(farm: Farm, watering: int) -> str:
@@ -547,6 +560,13 @@ def night_note(farm: Farm, power: int) -> str:
     return f"Be in bed by 12:50am: at 1:00am tomorrow starts on {late}, not {s.max_stamina}." if late else ""
 
 
+def _giant_watch(farm: Farm) -> dict | None:
+    try:
+        return picking.watch(farm)
+    except Exception:  # noqa: BLE001 - a forecast we can't make shouldn't stop the day plan
+        return None
+
+
 def food_advice(farm: Farm, short: int) -> str:
     """Enough food from what you hold to cover the shortfall, the least gold lost per energy first,
     and the spa when it's open: free, it only costs time."""
@@ -645,7 +665,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             left.append({"title": f"{title} {tiles - fits}", "why": "not enough energy or time left today"})
 
     wet = s.wet
-    thirsty = 0 if wet else sum(1 for c in s.crops if c.location == "Farm" and not c.watered and not c.ready)
+    lost = [c for c in s.crops if c.location == "Farm" and not c.watered and crops.doomed(farm, c)]
+    thirsty = 0 if wet else sum(1 for c in s.crops if c.location == "Farm" and not c.watered and not c.ready
+                                and not c.dead and c not in lost)
     seeds = sum(i.stack for i in s.items if i.type == "Seeds" and i.category == -74)
     home_first = pos[0] != "Farm" and ((thirsty and "water" not in done) or (seeds and "plant" not in done))
     if home_first:  # the farm jobs still come first: walk back for them
@@ -786,12 +808,13 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     for row in levels.forecast(farm):  # soonest first, so each skill keeps its next level
         coming.setdefault(row["skill"], row)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
-            "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty),
+            "notes": [x for x in (_board_note(farm), tv_note, doomed_note(farm, lost), sprinkler_note(farm, thirsty),
                                   wood_note(farm, trees), night_note(farm, power), luau_note(farm)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
             "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
+            "giant": _giant_watch(farm),
             "pack": pack.build(farm, plan, spouse),
             "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",

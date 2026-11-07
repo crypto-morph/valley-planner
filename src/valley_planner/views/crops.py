@@ -31,6 +31,17 @@ SEASONLESS = {"Greenhouse"}  # crops here ignore seasons
 ALWAYS_SUMMER_PREFIX = "Island"  # the island's own season
 
 
+def doomed(farm: Farm, c) -> bool:
+    """A growing crop that can't ripen before its season ends, even watered every day: it dies first."""
+    if c.dead or c.ready or c.in_pot:
+        return False
+    w = farm.when
+    info = farm.crops.get(c.seed_id) if c.seed_id else farm.crops.by_harvest.get(c.harvest_id)
+    nxt = SEASONS[(SEASONS.index(w.season) + 1) % 4]
+    return bool(_location_season(c.location, w.season) == w.season and info and nxt not in info.seasons
+                and w.day + c.days_left > 28)
+
+
 def _location_season(location: str, season: str) -> str | None:
     """The season a location follows; None if crops there ignore seasons."""
     if location in SEASONLESS:

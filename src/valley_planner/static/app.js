@@ -600,6 +600,26 @@ function drawGoals(v) {
     (o.finish ? `<div>Planned by ${esc(o.finish)}.</div>` : "") + (o.problems[0] ? `<div>${esc(o.problems[0])}</div>` : "") + "</section>").join("");
 }
 
+function giantCard(g) {
+  const head = g.sow_by ? `${g.crop}: sow by ${g.sow_by}, giant on ${g.day}` : `${g.crop} turns giant on ${g.day}${g.sure === false ? " (one of two overlapping squares)" : ""}`;
+  const checks = (g.checks || []).map((c) => `<li class="${c.ok ? "ok" : "todo"}"><span aria-hidden="true">${c.ok ? "✓" : "!"}</span> ${esc(c.text)}</li>`).join("");
+  return `<div class="giant"><p><strong>${esc(head)}.</strong> ${g.where ? `The top-left (1) is ${esc(g.where)}. ` : ""}${esc(g.text)}</p>
+    ${checks ? `<ul class="giant-checks">${checks}</ul>` : ""}
+    <canvas class="map-pic" data-map="${esc(JSON.stringify({ loc: "Farm", x: g.tile[0] + 1, y: g.tile[1] + 1, radius: 7,
+      marks: [{ x: g.tile[0], y: g.tile[1], kind: "square3", color: "#2B6A3E" },
+        ...(g.missing || []).filter(([x, y]) => x !== g.tile[0] || y !== g.tile[1]).map(([x, y, l]) => ({ x, y, kind: "rect", color: "#C77700", label: l, inside: true })),
+        { x: g.tile[0], y: g.tile[1], kind: "cross", label: "1" }] }))}"></canvas></div>`;
+}
+
+// Draw every <canvas data-map> inside `root` with the game's own tiles (static/map.js).
+function drawMaps(root) {
+  if (!window.ValleyMap) return;
+  root.querySelectorAll("canvas[data-map]").forEach((c) => {
+    const o = JSON.parse(c.dataset.map);
+    window.ValleyMap.drawArea(c, o.loc, o).catch(() => { c.replaceWith(Object.assign(document.createElement("p"), { className: "muted small", textContent: "The picture couldn't be drawn." })); });
+  });
+}
+
 const views = {
   async route() {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
@@ -623,6 +643,9 @@ const views = {
     $("#t-energy").innerHTML = `<div class="meter-row"><strong>Energy</strong><strong>${now} / ${e.max}</strong></div><div class="bar-track"><span style="width:${Math.min(100, Math.round(now / e.max * 100))}%"></span></div>`;
     $("#t-warning").hidden = !v.warning;
     $("#t-warning").textContent = v.warning || "";
+    $("#t-giant").hidden = !v.giant;
+    $("#t-giant").innerHTML = v.giant ? `<h2>Giant crop</h2>${giantCard(v.giant)}<p class="muted small">Green outline: the square. Cross: the top-left (1). Orange: tiles to sow (S), hoe and sow (H), or pull up and sow (P).</p>` : "";
+    drawMaps($("#t-giant"));
     $("#t-notes").hidden = !v.notes.length;
     $("#t-notes").textContent = v.notes.join(" ");
     drawNext(v);
@@ -701,10 +724,10 @@ const views = {
   async crops() {
     const [v, pick, extras] = await Promise.all([get("/api/crops"), get("/api/picking"), get("/api/extras")]);
     $("#extras").innerHTML = `<ul class="list-plain">${extras.map((x) => `<li><strong>${esc(x.title)}.</strong> ${esc(x.text)}</li>`).join("")}</ul>`;
-    $("#giants").innerHTML = pick.giants.length ? pick.giants.map((g) => `<div class="giant"><p><strong>${esc(g.crop)}, ${esc(g.day)}${g.sure ? "" : " (one of two overlapping squares)"}.</strong> ${esc(g.text)}</p>
-      <div class="sp-grid" style="grid-template-columns: repeat(${g.rows[0].length}, 1fr); max-width: ${g.rows[0].length * 26}px">${g.rows.map((r) => [...r].map((t) => `<span class="sp-t sp-g${t === "." ? "none" : t}">${"SGXHP".includes(t) ? t : ""}</span>`).join("")).join("")}</div></div>`).join("") +
-      '<p class="muted small">Worked out from the game\'s code; no giant crop has been checked in a save yet. G: the square, S: sow the same crop, H: hoe and sow, P: pull up what\'s there and sow, X: your Scarecrow.</p>'
-      : '<p class="muted">No giant crop is due in the next week.</p>';
+    $("#giants").innerHTML = (pick.giants.length ? pick.giants.map(giantCard).join("") : '<p class="muted">No square is on its way this season.</p>') +
+      (pick.plans.length ? `<h3>Where to sow a block</h3>${pick.plans.map(giantCard).join("")}` : "") +
+      (pick.giants.length || pick.plans.length ? '<p class="muted small">Green outline: the square. Cross: the top-left (1), to water and leave unpicked. Orange: tiles to sow (S), hoe and sow (H), or pull up and sow (P).</p>' : "");
+    drawMaps($("#giants"));
     $("#waiting").innerHTML = pick.waiting.length ? `<ul class="list-plain">${pick.waiting.map((w) => `<li>${w.count} ${esc(w.crop)}: ${esc(w.now)} today, ${esc(w.best)} on ${esc(w.day)}${w.note ? `; ${esc(w.note)}` : ""}.</li>`).join("")}</ul>` : '<p class="muted">Everything ripe is at its best today.</p>';
     const c = v.countdown;
     $("#countdown-head").textContent = `${c.season} ${c.day}: ${c.days_left} days left this season` + (c.agriculturist ? " · Agriculturist" : "");

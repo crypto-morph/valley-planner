@@ -181,6 +181,14 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .sp-gc { background: #E8EBE2; }
 .sp-go { background: #F3EDE0; }
 .giant + .giant { margin-top: 12px; }
+.map-pic { display: block; max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; image-rendering: pixelated; }
+.sp-gone { background: #2B6A3E; color: #FFFFFF; }
+.sp-ghouse { background: #D9CBB0; color: #3E2E14; }
+.sp-gbin, .sp-gchest { background: #C9B48A; color: #3E2E14; }
+.sp-gsprinkler { background: #E3EEF6; color: #1C4C74; }
+.giant-checks { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.giant-checks li.todo { color: #8A2318; font-weight: 700; }
+.giant-checks li.ok span { color: #2B6A3E; }
 .sp-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 4px 12px; font-size: 14px; }
 .sp-keyline { display: inline-flex; align-items: center; gap: 6px; }
 .sp-keyline .sp-t { width: 18px; }

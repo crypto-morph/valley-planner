@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -35,6 +35,15 @@ class Planner:
         self.chosen: str | None = None
         self._farm: tuple[tuple, Farm] | None = None
         self._lock = threading.Lock()
+        self._textures = None
+
+    @property
+    def textures(self):
+        """The game's pictures, decoded on demand (see pictures.py)."""
+        from .pictures import Textures
+        if self._textures is None:
+            self._textures = Textures(self.data.install.content, self.data.cache)
+        return self._textures
 
     def saves(self) -> list[Path]:
         return list_saves(self.saves_root) if self.saves_root else []
@@ -137,7 +146,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     @app.get("/api/picking")
     def picking_view() -> dict:
         farm = p().farm()
-        return {"waiting": picking.waiting(farm), "giants": picking.giants(farm)}
+        return {"waiting": picking.waiting(farm), "giants": picking.giants(farm), "plans": picking.plans(farm),
+                "legend": picking.LEGEND}
 
     @app.get("/api/extras")
     def extras_view() -> list[dict]:
@@ -266,6 +276,63 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def ask_villager(name: str) -> dict:
         return ask.villager(p().farm(), name)
 
+    @app.get("/map.html")
+    def map_page() -> FileResponse:
+        """A page for looking at one map: /map.html?loc=Farm&x=61&y=21&r=8 (no x/y: the whole map)."""
+        return FileResponse(STATIC / "map.html")
+
+    @app.get("/api/tex/{asset:path}")
+    def texture(asset: str, v: str = "") -> Response:
+        """A picture from the game's Content folder as PNG, e.g. /api/tex/Maps/spring_town.png. Nothing outside it."""
+        from .pictures import NotAllowed
+        from .xnb.reader import XnbError
+        if not asset.endswith(".png"):
+            raise HTTPException(404, "Textures are served as .png")
+        try:
+            png = p().textures.png(asset[:-4])
+        except NotAllowed as e:
+            raise HTTPException(400, str(e)) from e
+        except (FileNotFoundError, XnbError) as e:
+            raise HTTPException(404, f"No picture called {asset[:-4]}") from e
+        cache = "max-age=31536000, immutable" if v else "no-cache"
+        return Response(png, media_type="image/png", headers={"Cache-Control": cache})
+
+    def map_for(location: str, season: str) -> tuple[str, str, Farm | None]:
+        """(map asset, season, the save's Farm) for a location, from the chosen save when there is one."""
+        from .pictures import NotAllowed, map_asset
+        pl = p()
+        try:
+            farm = pl.farm()
+        except HTTPException:
+            farm = None
+        try:
+            asset = map_asset(location, farm.save.farm_type if farm else 0)
+            pl.textures.path(asset)
+        except NotAllowed as e:
+            raise HTTPException(400, str(e)) from e
+        except FileNotFoundError as e:
+            raise HTTPException(404, f"No map for {location}") from e
+        return asset, (season or (farm.save.season if farm else "spring")).lower(), farm
+
+    @app.get("/api/map/{location}")
+    def map_view(location: str, season: str = "") -> JSONResponse:
+        """A map's tile sheets and layers, ready for static/map.js to draw. (Sent as it is: big lists of plain
+        numbers don't need FastAPI's slow encoder.)"""
+        from .pictures import map_draw
+        asset, season, _farm = map_for(location, season)
+        return JSONResponse({"location": location, **map_draw(p().textures, asset, season)})
+
+    @app.get("/api/map/{location}/sprites")
+    def map_sprites(location: str, season: str = "") -> JSONResponse:
+        """What the save has standing on that map today (crops, dirt, trees, objects, buildings…) as sprites."""
+        from .pictures import map_facts
+        from .views.scene import scene
+        asset, season, farm = map_for(location, season)
+        if farm is None:
+            raise HTTPException(404, "No save found; set VALLEY_PLANNER_SAVES to your Saves folder")
+        season, outdoors, front = map_facts(p().textures, asset, season)
+        return JSONResponse(scene(farm, p().textures, location, season, outdoors=outdoors, front=front))
+
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.middleware("http")
@@ -273,7 +340,7 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         """The page and its files are checked with the server on every load (a quick 'not changed' when they
         haven't), so an update shows at once instead of a browser's cached copy."""
         response = await call_next(request)
-        if request.url.path == "/" or request.url.path.startswith("/static/"):
+        if request.url.path in ("/", "/map.html") or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-cache"
         return response
     return app

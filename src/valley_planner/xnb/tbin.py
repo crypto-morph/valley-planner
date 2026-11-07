@@ -11,7 +11,9 @@ A property is a key, a type byte (0 bool, 1 int, 2 float, 3 string) and a
 value.
 
 We keep the map's properties and, per layer, the tiles that have properties
-— that's where tile actions (doors, shops…) live.
+— that's where tile actions (doors, shops…) live. Asked for `tiles`, we also
+keep what's needed to draw it: each tile sheet's image and size, and every
+layer's tile at each spot (an animated tile by its first frame).
 """
 
 from __future__ import annotations
@@ -25,12 +27,24 @@ class TbinError(ValueError):
 
 
 @dataclass
+class Sheet:
+    id: str
+    image: str  # relative to the map's own folder, e.g. "spring_outdoorsTileSheet"
+    columns: int
+    rows: int
+    tile_width: int
+    tile_height: int
+
+
+@dataclass
 class Layer:
     id: str
     width: int
     height: int
     properties: dict
     tile_properties: dict[tuple[int, int], dict] = field(default_factory=dict)
+    # with tiles=True: row by row, -1 for no tile, else (sheet number << 16) | tile index (sheet number into Map.sheets)
+    tiles: list[int] | None = None
 
 
 @dataclass
@@ -42,6 +56,7 @@ class Map:
     water: set[tuple[int, int]] = field(default_factory=set)  # Back tiles with the Water property
     no_fishing: set[tuple[int, int]] = field(default_factory=set)
     rubble: set[tuple[int, int]] = field(default_factory=set)  # logs and rocks in the water (isOpenWater)
+    sheets: list[Sheet] = field(default_factory=list)  # in the file's order
 
     def as_dict(self) -> dict:
         """Plain data: {"Id", "Properties", "Blocked": ["x,y"], "Layers": {id: {"Width", "Height", "Properties",
@@ -94,7 +109,7 @@ class _Reader:
         return out
 
 
-def read_tbin(data: bytes) -> Map:
+def read_tbin(data: bytes, tiles: bool = False) -> Map:
     r = _Reader(data)
     if r.take(6) != b"tBIN10":
         raise TbinError("not a tBIN10 map")
@@ -102,11 +117,16 @@ def read_tbin(data: bytes) -> Map:
     r.string()  # description
     props = r.properties()
     sheets: dict[str, dict] = {}
+    drawn: list[Sheet] = []
     for _ in range(r.i32()):  # tile sheets
         sheet = r.string()
-        r.string(), r.string()  # description, image
-        r.take(4 * 8)  # sheet size, tile size, margin, spacing
+        r.string()  # description
+        image = r.string()
+        cols, rows, tw, th = struct.unpack("<4i", r.take(16))
+        r.take(4 * 4)  # margin, spacing
         sheets[sheet] = r.properties()
+        drawn.append(Sheet(sheet, image, cols, rows, tw, th))
+    number = {sh.id: i for i, sh in enumerate(drawn)}
     layers = {}
     blocked: set[tuple[int, int]] = set()
     water: set[tuple[int, int]] = set()
@@ -136,6 +156,7 @@ def read_tbin(data: bytes) -> Map:
         w, h = r.i32(), r.i32()
         r.take(8)  # tile size
         layer = Layer(lid, w, h, r.properties())
+        grid = [-1] * (w * h) if tiles else None
         sheet = ""  # named only when it changes, so it carries across rows
         for y in range(h):
             x = 0
@@ -152,11 +173,13 @@ def read_tbin(data: bytes) -> Map:
                     if p:
                         layer.tile_properties[(x, y)] = p
                     walled(lid, x, y, sheet, index, p)
+                    if grid is not None:
+                        grid[y * w + x] = (number.get(sheet, 0) << 16) | index
                     x += 1
                 elif cmd == "A":
                     r.take(4)  # frame interval
                     frames = r.i32()
-                    first = None
+                    first = first_sheet = None
                     while frames:
                         c = chr(r.byte())
                         if c == "T":
@@ -165,7 +188,8 @@ def read_tbin(data: bytes) -> Map:
                             index = r.i32()
                             r.byte()
                             r.properties()
-                            first = first if first is not None else index
+                            if first is None:
+                                first, first_sheet = index, sheet
                             frames -= 1
                         else:
                             raise TbinError(f"bad animated frame command {c!r}")
@@ -173,8 +197,11 @@ def read_tbin(data: bytes) -> Map:
                     if p:
                         layer.tile_properties[(x, y)] = p
                     walled(lid, x, y, sheet, first or 0, p)
+                    if grid is not None and first is not None:
+                        grid[y * w + x] = (number.get(first_sheet, 0) << 16) | first
                     x += 1
                 else:
                     raise TbinError(f"bad tile command {cmd!r} at {lid} {x},{y}")
+        layer.tiles = grid
         layers[lid] = layer
-    return Map(map_id, props, layers, blocked, water, no_fishing, rubble)
+    return Map(map_id, props, layers, blocked, water, no_fishing, rubble, drawn if tiles else [])

@@ -370,7 +370,7 @@ def _vector(k: ET.Element) -> tuple[int, int] | None:
 
 
 def _farm_tiles(farm: ET.Element | None) -> tuple[set, dict]:
-    """(hoed tiles, what else stands on a tile): objects, trees, and the big stumps and boulders."""
+    """(hoed tiles, what else stands on a tile): objects, trees, buildings, and the big stumps and boulders."""
     hoed, things = set(), {}
     for k, v in _dict(_child(farm, "objects") if farm is not None else None):
         tile = _vector(k)
@@ -382,6 +382,11 @@ def _farm_tiles(farm: ET.Element | None) -> tuple[set, dict]:
             hoed.add(tile)
         elif tile and kind in ("Tree", "FruitTree", "Bush"):
             things[tile] = "a tree"
+    for b in _or(_child(farm, "buildings"), []) if farm is not None else []:
+        btype, x, y = _text(b, "buildingType"), _int(b, "tileX"), _int(b, "tileY")
+        if btype:
+            things.update({(x + dx, y + dy): btype for dx in range(_int(b, "tilesWide"))
+                           for dy in range(_int(b, "tilesHigh"))})
     for clump in _or(_child(farm, "resourceClumps"), []) if farm is not None else []:
         spot = _or(_child(clump, "tile"), _child(clump, "Tile"))  # 1.6 writes it in lower case
         if spot is not None:
