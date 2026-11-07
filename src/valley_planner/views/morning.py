@@ -237,9 +237,17 @@ def _priorities(farm: Farm, mine: dict, plan: dict, cc_info: dict, orders: list[
         if _out_of_reach(b):
             continue
         last = _day_number(b["last_start"])
+        gate = [u["label"] for u in b.get("unlock") or [] if u.get("gold") or u.get("days")]
+        if gate and last is not None:
+            ready = _day_number(b.get("earliest_after_unlock") or "")
+            if ready is not None and ready > last:
+                continue  # the gate can't open before the season ends: nothing to rush for this year
+            lead = sum(u.get("days") or 0 for u in b["unlock"])
+            last -= lead  # the upgrade has to start this many days earlier
         days = None if last is None else last - w.days_played
         if days is not None and 0 <= days <= DEADLINE_WINDOW:
-            add("cc", _severity(days), f"{slot['name']} for the {slot['bundle']} bundle", b["label"], _tag(days),
+            text = b["label"] + (f", once you have {' and '.join(gate)} ({b['unlock_gold']:,}g)" if gate else "")
+            add("cc", _severity(days), f"{slot['name']} for the {slot['bundle']} bundle", text, _tag(days),
                 errand="cc")
     if cc_info["bundles_done"] < cc_info["bundles"] and cc_info["gold"]["short"] > 0:
         deadline = _day_number(cc_info["deadline"])

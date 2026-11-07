@@ -25,6 +25,11 @@ def view(farm: Farm) -> dict:
         extra = raw[4].split() if len(raw) > 4 else []
         who = q["target"] or (extra[0] if extra and q["type"] in ("ItemDeliveryQuest", "LostItemQuest") else "")
         item = q["item_id"] or (extra[1].removeprefix("(O)") if len(extra) > 1 else "")
+        if q["type"] == "SlayMonsterQuest" and q.get("to_kill"):
+            from ..facts.help_wanted import SLAY_WHERE
+            m = q["monster"]
+            objective = (f"{q['killed']} of {q['to_kill']} {m}{'' if m.endswith('s') else 's'} killed, "
+                         f"in {SLAY_WHERE.get(m, 'the Mines')}")
         row = {"id": q["id"], "kind": TYPES.get(q["type"], "story"), "title": q["title"], "who": who,
                "objective": objective, "reward": q["reward"], "daily": q["daily"],
                "days_left": q["days_left"] if q["daily"] or q["days_left"] > 0 else None,

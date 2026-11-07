@@ -719,10 +719,20 @@ def _board_note(farm: Farm) -> dict:
     if quest["kind"] == "delivery":
         qid = f"(O){quest['item']}"
         have = farm.held().get(qid)
-        return {"text": f"Help Wanted: {quest['who']} wants a {farm.name(qid)}, {3 * _price(farm, qid)}g.",
-                "why": f"Take the request from the board outside Pierre's today and give {quest['who']} a "
-                       f"{farm.name(qid)} by the end of {tomorrow}. It pays three times its price and 150 "
+        name = farm.name(qid)
+        a = "an" if name[:1].lower() in "aeiou" else "a"
+        return {"text": f"Help Wanted: {quest['who']} wants {a} {name}, {3 * _price(farm, qid)}g.",
+                "why": f"Take the request from the board outside Pierre's today and give {quest['who']} {a} "
+                       f"{name} by the end of {tomorrow}. It pays three times its price and 150 "
                        f"friendship. " + ("You have one." if have else "You don't have one yet.")}
+    taken = next((q for q in s.quests if q["daily"] and not q["completed"] and q.get("to_kill")), None)
+    if quest["kind"] == "slay" and taken:
+        m = taken["monster"]
+        by = farm.label(s.days_played + max(0, taken["days_left"] - 1)).rsplit(",", 1)[0]
+        where = help_wanted.SLAY_WHERE.get(m, "the Mines")
+        return {"text": f"Help Wanted, taken: {taken['killed']} of {taken['to_kill']} {m}s killed so far.",
+                "why": f"Finish by the end of {by} for {taken['reward']:,}g. {m}s live in {where}. The count only "
+                       "moves when the game saves at night, so today's kills show tomorrow."}
     if quest["kind"] == "slay":
         m, n = quest["monster"], quest["count"]
         plural = m if m.endswith(("s", "Jelly", "Duggy")) and n == 1 else (m[:-1] + "ies" if m.endswith("y") and

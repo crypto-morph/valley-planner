@@ -665,7 +665,9 @@ def read_save(path: Path, data=None) -> Save:
                        "days_left": _int(q, "daysLeft"), "target": _text(q, "target"),
                        "item_id": (_text(q, "ItemId") or _text(q, "item")).removeprefix("(O)"),
                        "count": _int(q, "number", 1), "reward": max(_int(q, "moneyReward"), _int(q, "reward")),
-                       "greet": _strings(_child(q, "whoToGreet"))})
+                       "greet": _strings(_child(q, "whoToGreet")),
+                       "monster": _text(q, "monsterName"), "to_kill": _int(q, "numberToKill"),
+                       "killed": _int(q, "numberKilled")})
 
     board = [_order(o) for o in _or(_child(root, "availableSpecialOrders"), []) if _tag(o) == "SpecialOrder"]
 
