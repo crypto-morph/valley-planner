@@ -377,7 +377,7 @@ class Router:
         if after + lead > latest_ready:
             return None, (f"{req.label}: not in time: waiting on an earlier step, it can't be ready before "
                           f"{self.farm.label(after + lead)}")
-        why = {"days": 0, "cash": 0, "robin": 0, "clint": 0}
+        why = {"days": 0, "cash": 0, "robin": 0, "clint": 0, "only": 0}
         for b in range(first, latest_ready - lead + 1):
             # the latest free days before it (after the Steel Axe, if Hardwood needs it)
             chop = self.free_days(self.today + axe_days, b - 1)[-chops:] if chops else []
@@ -411,12 +411,21 @@ class Router:
                     act = options[0]
             elif req.activity in ("forage", "social"):
                 act = max(ready, req.earliest)  # picked up on the way: no day of its own
+                if req.days is not None:
+                    act = min((d for d in req.days if act <= d <= latest_ready), default=None)
+                    if act is None:
+                        why["only"] += 1
+                        break  # starting later only makes it later
             needs = self.needs(req.chain, b, chop)
             first_day = min([b, *chop, *mine])
             last_start = latest_ready - lead - (b - first_day)  # chopping and mining come before it
             return Step(req.label, b, act or ready, gold, chop, mine, needs, req.season, act,
                         last=last_start), ""
         last = max(1, latest_ready - lead)
+        if why["only"]:
+            return None, (f"{req.label}: none of the days it can be done is left once the rest is ready "
+                          f"(the last was {self.farm.label(max(req.days))})" if req.days else
+                          f"{req.label}: none of the days it can be done is left")
         if why["clint"] and why["clint"] >= why["days"] + why["cash"] + why["robin"]:
             free = max(e for _s, e in self.clint)
             return None, f"{req.label}: Clint has another tool until {self.farm.label(free)} (one at a time)"

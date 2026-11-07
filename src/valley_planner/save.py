@@ -383,7 +383,7 @@ def _farm_tiles(farm: ET.Element | None) -> tuple[set, dict]:
         elif tile and kind in ("Tree", "FruitTree", "Bush"):
             things[tile] = "a tree"
     for clump in _or(_child(farm, "resourceClumps"), []) if farm is not None else []:
-        spot = _child(clump, "Tile")
+        spot = _or(_child(clump, "tile"), _child(clump, "Tile"))  # 1.6 writes it in lower case
         if spot is not None:
             x, y = int(float(_text(spot, "X", "0"))), int(float(_text(spot, "Y", "0")))
             things.update({(x + dx, y + dy): "a boulder or stump" for dx in (0, 1) for dy in (0, 1)})
@@ -710,8 +710,8 @@ def read_save(path: Path, data=None) -> Save:
         machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
         hoed=hoed, farm_objects=farm_objects,
         special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
-        special_orders_board=[o for o in board if o["type"] != "QiChallenge"],
-        qi_orders_board=[o for o in board if o["type"] == "QiChallenge"],
+        special_orders_board=[o for o in board if o["type"] not in ("Qi", "QiChallenge")],
+        qi_orders_board=[o for o in board if o["type"] in ("Qi", "QiChallenge")],
         cart_guarantee=_int(root, "visitsUntilY1Guarantee", -1),
         shipped={_flat(k).removeprefix("(O)"): int(_flat(v) or 0) for k, v in _dict(_child(player, "basicShipped"))},
         dish_of_the_day=_dish(root),

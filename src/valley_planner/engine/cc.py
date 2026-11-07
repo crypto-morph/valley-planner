@@ -311,6 +311,10 @@ def cart_only(slot: dict, stock: int) -> bool:
     return stock >= slot["count"] and (slot["best"] or {}).get("kind") == "cart_day"
 
 
+GATED_FIRST = {"tapper": 0}  # a Tapper comes with Foraging 4; most machines are a long way off (a Wood Chipper is
+# Robin's from winter)
+
+
 def _best(ways: list[Way]) -> Way | None:
     """The soonest certain way you can use now; else a likely random one; else the certain way with the
     least to unlock first (random ways stay listed as the backup)."""
@@ -323,7 +327,7 @@ def _best(ways: list[Way]) -> Way | None:
         return luck[0]
     gated = [x for x in ways if x.blocked and x.earliest is not None and x.source.kind != "monster"]
     if gated:
-        return min(gated, key=lambda x: (len(x.blocked), x.earliest))
+        return min(gated, key=lambda x: (len(x.blocked), GATED_FIRST.get(x.source.kind, 1), x.earliest))
     if luck:
         return luck[0]
     if open_:  # only the cart has it, so its next visit does matter

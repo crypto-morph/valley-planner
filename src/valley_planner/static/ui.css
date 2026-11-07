@@ -174,6 +174,13 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .sp-x { background: #8A8F86; }
 .sp-o { background: #E6DCC8; }
 .sp-f { background: #F3F4EE; box-shadow: inset 0 0 0 1px #255E8C; }
+.sp-gG { background: #CFE5D3; color: #1F4F2E; }
+.sp-gS { background: #FCEFD6; color: #5C3600; box-shadow: inset 0 0 0 2px #8F5200; }
+.sp-gH, .sp-gP { background: #FCEFD6; color: #5C3600; box-shadow: inset 0 0 0 2px #8F5200; }
+.sp-gX { background: #E6DCC8; color: #5C3600; }
+.sp-gc { background: #E8EBE2; }
+.sp-go { background: #F3EDE0; }
+.giant + .giant { margin-top: 12px; }
 .sp-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 4px 12px; font-size: 14px; }
 .sp-keyline { display: inline-flex; align-items: center; gap: 6px; }
 .sp-keyline .sp-t { width: 18px; }

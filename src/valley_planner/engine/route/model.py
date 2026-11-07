@@ -85,3 +85,4 @@ class Req:
     luck: float | None = None
     season: str = ""  # the way's label: fishing at one place in one season shares a day
     fallback: Req | None = None  # what to do instead if this can't be placed (a cart visit you can't afford)
+    days: frozenset[int] | None = None  # the only days it can be done (the Old Mariner's rain); None: any day

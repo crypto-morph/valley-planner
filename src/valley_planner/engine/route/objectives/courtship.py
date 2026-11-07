@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from ....facts import romance
+from ....facts import romance, weather
+from ....facts.conditions import date_of
 from ...unlocks import Unlock
 from ..model import Req
 from .base import objective
@@ -20,6 +21,26 @@ def sweetheart(r) -> str | None:
 
 def _later(r, day: int | None) -> str:
     return f"not this year: about {r.farm.label(day)}" if day else "not within two years at this pace"
+
+
+def _rain_days(r, start: int, end: int) -> list[int] | None:
+    """The rainy days from `start` to `end`, from the seed; None when the seed isn't known."""
+    w = r.farm.when
+    if w.game_id is None:
+        return None
+    out = []
+    for d in range(start, end + 1):
+        season, day, _ = date_of(d)
+        if weather.forecast(d, w.game_id, festival=(season, day) in r.farm.calendar.festivals,
+                            legacy=w.legacy_random)[0] in ("rain", "storm"):
+            out.append(d)
+    return out
+
+
+def _first_rain(r, start: int) -> int | None:
+    """The first rainy day from `start`: known from the seed; else when rain is 80% likely."""
+    wet = _rain_days(r, start, start + 2 * romance.YEAR)
+    return romance.rain_by(start) if wet is None else (wet[0] if wet else None)
 
 
 def _married(r) -> bool:
@@ -44,7 +65,7 @@ def courtship(r) -> tuple[list[Req], int, list[str]]:
     day8 = r.today
     if status != "Dating":
         day8 = romance.points_day(points, 8 * romance.HEART, r.today, birthday=birthday, gift=gift,
-                                  cap=romance.CAP_FRIEND)
+                                  cap=romance.CAP_FRIEND, given=f.gifts_this_week if f else 0)
         if day8 is None or day8 > r.end:
             r.misses = [(f"8 hearts with {name}", _later(r, day8))]
             return [], 0, []
@@ -54,11 +75,16 @@ def courtship(r) -> tuple[list[Req], int, list[str]]:
                         [Unlock("bouquet", "buy a Bouquet from Pierre", price)], 0, season=f"give it to {name}"))
         points = 8 * romance.HEART
     day10 = romance.points_day(points, 10 * romance.HEART, day8 + 1, birthday=birthday, gift=gift)
+    if status != "Dating" and birthday:
+        bday = next((d for d in range(r.today, day10 + 1) if (d - 1) % romance.YEAR + 1 == birthday), None)
+        if bday:
+            r.info.append(f"Give {name} the Bouquet before the birthday on {r.farm.label(bday)}: until then"
+                         " hearts stop at 8, and most of the birthday gift would be lost")
     if day10 is None or day10 > r.end:
         r.misses = [(f"10 hearts with {name}", _later(r, day10))]
         return reqs, 0, []
     reqs.append(Req(f"10 hearts with {name}", day10, r.end, [], 0, "social", season=how))
-    rain = romance.rain_by(day10)
+    rain = _first_rain(r, day10)
     if rain is None or rain > r.end:
         first = next((d for d in range(day10, day10 + romance.YEAR) if romance.rain_chance(d)), day10)
         r.misses = [("the Mermaid's Pendant",
@@ -70,7 +96,9 @@ def courtship(r) -> tuple[list[Req], int, list[str]]:
     chain = r.planner.unlocks.chain("kitchen") + r.planner.unlocks.chain("place:BeachTidePools") + \
         [Unlock("pendant", "buy the Mermaid's Pendant from the Old Mariner", pendant)]
     lead = sum(u.days for u in chain)
+    wet = _rain_days(r, rain or day10, r.end)
     reqs.append(Req("the Mermaid's Pendant", rain or day10, r.end, chain, lead, "social",
-                    season=f"on a rainy day, the Old Mariner past the beach bridge; propose to {name}"))
+                    season=f"on a rainy day, the Old Mariner past the beach bridge; propose to {name}",
+                    days=frozenset(wet) if wet is not None else None))
     r.wedding = name
     return reqs, 0, notes

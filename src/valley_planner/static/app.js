@@ -484,6 +484,7 @@ function drawRomance(v, today) {
     ? `<p class="bad">Stuck at ${v.cap_hearts}♥ until you give them ${esc(v.unlock.item)} (${v.unlock.gold.toLocaleString()}g · ${esc(v.unlock.how)}).</p>`
     : `<p class="sub">${v.points_to_next.toLocaleString()} points to ${v.next_heart}♥.</p>`;
   $("#romance-where").innerHTML = whereToday(today);
+  $("#romance-events").innerHTML = v.events.length ? `<ul class="list-plain">${v.events.map((e) => `<li><strong>${e.hearts}♥${e.ready ? ", ready now" : ""}:</strong> ${esc(e.how)}.${e.advice ? ` <span class="${/1,500/.test(e.advice) ? "bad" : ""}">${esc(e.advice)}</span>` : ""}</li>`).join("")}</ul><p class="muted small">None of these are needed for the Bouquet, the Pendant or a proposal.</p>` : '<p class="muted">No heart events left.</p>';
   $("#romance-gifts").innerHTML = v.gifts.length ? "<tr><th>Gift</th><th>You hold</th><th>Taste</th><th>Points</th><th>Where</th></tr>" +
     v.gifts.map((g) => `<tr><td>${esc(g.name)}</td><td>${g.held}</td><td class="q-${g.taste === "love" ? "gold" : "silver"}">${esc(g.taste)}</td><td>+${g.points}</td><td class="sub">${esc(g.where.join(", "))}</td></tr>`).join("")
     : '<tr><td class="sub">Nothing you hold is a loved or liked gift for them.</td></tr>';
@@ -698,7 +699,12 @@ const views = {
   },
 
   async crops() {
-    const v = await get("/api/crops");
+    const [v, pick] = await Promise.all([get("/api/crops"), get("/api/picking")]);
+    $("#giants").innerHTML = pick.giants.length ? pick.giants.map((g) => `<div class="giant"><p><strong>${esc(g.crop)}, ${esc(g.day)}${g.sure ? "" : " (one of two overlapping squares)"}.</strong> ${esc(g.text)}</p>
+      <div class="sp-grid" style="grid-template-columns: repeat(${g.rows[0].length}, 1fr); max-width: ${g.rows[0].length * 26}px">${g.rows.map((r) => [...r].map((t) => `<span class="sp-t sp-g${t === "." ? "none" : t}">${"SGXHP".includes(t) ? t : ""}</span>`).join("")).join("")}</div></div>`).join("") +
+      '<p class="muted small">Worked out from the game\'s code; no giant crop has been checked in a save yet. G: the square, S: sow the same crop, H: hoe and sow, P: pull up what's there and sow, X: your Scarecrow.</p>'
+      : '<p class="muted">No giant crop is due in the next week.</p>';
+    $("#waiting").innerHTML = pick.waiting.length ? `<ul class="list-plain">${pick.waiting.map((w) => `<li>${w.count} ${esc(w.crop)}: ${esc(w.now)} today, ${esc(w.best)} on ${esc(w.day)}${w.note ? `; ${esc(w.note)}` : ""}.</li>`).join("")}</ul>` : '<p class="muted">Everything ripe is at its best today.</p>';
     const c = v.countdown;
     $("#countdown-head").textContent = `${c.season} ${c.day}: ${c.days_left} days left this season` + (c.agriculturist ? " · Agriculturist" : "");
     $("#countdown").innerHTML = "<tr><th>Crop</th><th>When</th><th>Days</th><th>Seeds</th><th>Each sells</th></tr>" + c.crops.map((r) =>
@@ -907,6 +913,9 @@ const CAL_ICONS = {
   crops: ["M12 21V8M12 8C10 7 9 5 9 3c2 1 3 3 3 5zM12 8c2-1 3-3 3-5-2 1-3 3-3 5zM12 14c-2-1-4-1-5-3 2-.5 4 1 5 3zM12 14c2-1 4-1 5-3-2-.5-4 1-5 3z", "Crops ripe"],
   season: ["M7 3h10M7 21h10M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9", "Season ends"],
   quest: ["M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M9 9h6M9 13h6", "Quest deadline"],
+  giant: ["M4 20h16M6 20c0-6 2-11 6-11s6 5 6 11M12 9V4M9 6l3-2 3 2", "Giant crop chance"],
+  night: ["M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z", "Overnight on the farm"],
+  order: ["M5 3h14v18H5zM9 7h6M9 11h6M9 15h4", "Special orders board"],
   level: ["M12 3l2.6 5.8 6.4.7-4.8 4.2 1.4 6.3-5.6-3.2-5.6 3.2 1.4-6.3L3 9.5l6.4-.7z", "New skill level"],
   bins: ["M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13", "Bins"],
 };

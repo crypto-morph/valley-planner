@@ -8,8 +8,29 @@ Mermaid's Pendant. Only gifts you actually hold are listed, at the taste the gam
 
 from __future__ import annotations
 
-from ..facts import romance
+from ..facts import heart_events, romance
+from ..facts.schedules import time_label
 from .farm import Farm, date_label
+
+
+def heart_event_rows(farm: Farm, name: str, points: int) -> list[dict]:
+    """Their heart events still to come, with when and where, and the answer to know beforehand."""
+    rows = []
+    for e in heart_events.events(farm.data, name):
+        if e.id in farm.save.events_seen:
+            continue
+        when = [f"walk into {farm.place(e.location)}"]
+        if e.start is not None:
+            when.append(f"between {time_label(e.start)} and {time_label(e.end)}")
+        if e.weather:
+            when.append(f"on a {e.weather} day")
+        if e.present:
+            when.append("while they're there")
+        if e.mail:
+            when.append("once a letter has come")
+        rows.append({"hearts": e.hearts, "ready": points >= e.points, "how": ", ".join(when),
+                     "advice": heart_events.ADVICE.get(e.id, "")})
+    return rows
 
 
 def partners(farm: Farm) -> list[dict]:
@@ -80,4 +101,4 @@ def view(farm: Farm, target: str = "") -> dict:
             "gifted_today": bool(f and f.gifts_today), "talked_today": bool(f and f.talked_today),
             "birthday_today": birthday_today,
             "birthday": date_label(bseason, c.get("BirthDay") or 0) if bseason else "",
-            "gifts": gifts, "unlock": unlock}
+            "gifts": gifts, "unlock": unlock, "events": heart_event_rows(farm, target, points)}

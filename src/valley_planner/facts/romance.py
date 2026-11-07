@@ -52,17 +52,22 @@ def rain_by(start: int, confidence: float = 0.8, limit: int = 2 * YEAR) -> int |
 
 
 def points_day(points: int, target: int, start: int, *, birthday: int | None, gift: int = GIFT["loved"],
-               cap: int = CAP_DATING, limit: int = 2 * YEAR) -> int | None:
-    """The day friendship first reaches `target`, talking every day and giving two gifts each week (on its
-    first two days) plus one on the birthday. `birthday` is the day of the year (1-112)."""
+               cap: int = CAP_DATING, limit: int = 2 * YEAR, given: int = 0) -> int | None:
+    """The day friendship first reaches `target`, talking every day and giving the week's two gifts as early as
+    it allows, plus the birthday's, which doesn't count against the two (so a birthday week can hold three).
+    The week runs Sunday to Saturday. `birthday` is the day of the year (1-112); `given`: gifts already given
+    this week."""
     if points >= target:
         return start
     for d in range(start, start + limit):
+        if d % 7 == 0 and d != start:  # Sunday: a new week
+            given = 0
         gain = TALK
         if birthday and (d - 1) % YEAR + 1 == birthday:
             gain += gift * BIRTHDAY
-        elif (d - 1) % 7 < GIFTS_PER_WEEK:  # Monday and Tuesday
+        elif given < GIFTS_PER_WEEK:
             gain += gift
+            given += 1
         points = min(cap, points + gain)
         if points >= target:
             return d

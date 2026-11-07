@@ -18,7 +18,7 @@ import json
 
 from ..engine import cc
 from ..engine.unlocks import BRIDGE_WOOD, KITCHEN
-from ..facts import bubbles, geodes, help_wanted, mine_day, skills, tools
+from ..facts import bubbles, geodes, help_wanted, mine_day, romance, skills, tools
 from ..facts.buyers import Buyers
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
@@ -87,7 +87,7 @@ def _forage_why(farm: Farm, qid: str, held: dict[str, int]) -> tuple[str, int]:
     return "a spare: sell or gift it", _price(farm, qid)
 
 
-def _stops(farm: Farm, held: dict[str, int]) -> list[dict]:
+def _stops(farm: Farm, held: dict[str, int], spouse: str = "") -> list[dict]:
     s = farm.save
     out = []
     for f in s.forage:
@@ -101,9 +101,12 @@ def _stops(farm: Farm, held: dict[str, int]) -> list[dict]:
     if quest and quest["kind"] == "delivery" and held.get(f"(O){quest['item']}"):  # only if you can fill it
         qid = f"(O){quest['item']}"
         gold = 3 * _price(farm, qid)
+        dear = quest["who"] == spouse
         out.append({"id": "quest", "kind": "quest", "title": f"Help Wanted: {farm.name(qid)} for {quest['who']}",
-                    "why": f"{gold}g and 150 friendship; take it from the board outside Pierre's first",
-                    "at": ("Town", 42, 58), "minutes": 1, "value": QUEST_VALUE})
+                    "why": f"{gold}g and 150 friendship"
+                           f"{', nearly two gifts and outside the weekly two' if dear else ''};"
+                           " take it from the board outside Pierre's first",
+                    "at": ("Town", 42, 58), "minutes": 1, "value": QUEST_VALUE + (SWEETHEART_VALUE if dear else 0)})
     marks = {m.name.removeprefix("Garbage:"): m for m in farm.walker.landmarks["Town"]}
     for can in farm.bins.day(s, farm.when):
         if can.loot and can.loot.item and _price(farm, can.loot.item) >= GOOD_BIN and can.can in marks:
@@ -147,7 +150,42 @@ def _person(farm: Farm, name: str, why: str, value: int) -> list[dict]:
 
 
 def _sweetheart(farm: Farm, name: str) -> list[dict]:
+    """A daily talk, unless they're at the cap a Bouquet lifts: then talking adds nothing and skipping costs
+    nothing, since nobody you could date loses points at 8 hearts."""
+    f = farm.save.friends.get(name)
+    if f and f.status not in ("Dating", "Engaged", "Married") and f.points >= romance.CAP_FRIEND:
+        return []
     return _person(farm, name, "a daily talk keeps the hearts moving", SWEETHEART_VALUE)
+
+
+LUAU_DAY = 11  # Summer 11
+
+
+def luau_note(farm: Farm) -> str:
+    """The Luau soup pays every townsperson you've met, so keep one good thing for it (Event.governorTaste)."""
+    s = farm.save
+    if s.season != "summer" or s.day > LUAU_DAY:
+        return ""
+    objects = farm.data.asset("Data/Objects")
+    best = None
+    for it in s.items:
+        o = objects.get(it.qualified_id.removeprefix("(O)")) if it.qualified_id.startswith("(O)") else None
+        if not o or it.category == -7 or int(o.get("Edibility") or -300) == -300:
+            continue
+        price, edible = int(o.get("Price") or 0), int(o.get("Edibility") or 0)
+        if (it.quality >= 2 and price >= 160) or (it.quality == 1 and price >= 300 and edible > 10):
+            score = 120
+        elif edible >= 20 or price >= 100 or (it.quality >= 1 and price >= 70):
+            score = 60
+        else:
+            continue
+        if not best or (score, price) > best[:2]:
+            best = (score, price, farm.name(it.qualified_id), it.quality)
+    if not best:
+        return ("The Luau on Summer 11: keep a gold crop worth 160g or more for the soup, for +120 with everyone in"
+                " town.")
+    quality = {1: "silver ", 2: "gold ", 4: "iridium "}.get(best[3], "")
+    return f"Keep your {quality}{best[2]} for the Luau soup on Summer 11: +{best[0]} with everyone in town."
 
 
 def _birthdays(farm: Farm, spouse: str = "") -> list[dict]:
@@ -582,7 +620,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     place = lambda n: farm.place(n)  # noqa: E731
     fest_today = (s.season, s.day) in farm.hours.festivals
     board = help_wanted.quest_today(s, farm.data, festival=fest_today)
-    stops = [x for x in _stops(farm, held) + _wizard(farm) + _community_center(farm) + _pierre(farm, ripe)
+    stops = [x for x in _stops(farm, held, spouse) + _wizard(farm) + _community_center(farm) + _pierre(farm, ripe)
              + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power) + _introductions(farm)
              + (_sweetheart(farm, spouse) if spouse else []) + _birthdays(farm, spouse) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
@@ -686,7 +724,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         coming.setdefault(row["skill"], row)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty),
-                                  wood_note(farm, trees), night_note(farm, power)) if x],
+                                  wood_note(farm, trees), night_note(farm, power), luau_note(farm)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),

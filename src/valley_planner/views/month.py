@@ -10,9 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..engine import cc
-from ..facts import weather
+from ..facts import night_events, special_orders, weather
 from ..facts.conditions import date_of
-from . import crops, levels
+from . import crops, levels, picking
 from .farm import Farm
 from .morning import _bins_ahead
 
@@ -216,6 +216,57 @@ def _level(row: dict) -> dict:
                  important=bool(row["pick"]), sure=row["sure"])
 
 
+NIGHT_WORDS = {
+    "meteorite": ("A meteorite lands on the farm overnight", "Break it with a Steel Pickaxe or better: Iridium Ore,"
+                  " Stone and Coal, sometimes a Prismatic Shard."),
+    "fairy": ("A crop fairy visits overnight", "She ripens a patch of one crop. Keep it watered."),
+    "witch": ("The witch flies over", "She puts a Void Egg in a coop, if you have one."),
+    "owl": ("An owl statue appears", "A small statue on the farm, to keep or sell."),
+    "capsule": ("A strange capsule lands", "Something odd on the farm, worth a look."),
+    "earthquake": ("The earthquake", "The landslide to the Railroad and the spa clears."),
+    "windstorm": ("A windstorm", "It knocks something down on the farm."),
+    "qi plane": ("Mr. Qi's plane flies over", "After it, Mystery Boxes start turning up."),
+}
+
+
+def _nights(farm: Farm, first: int) -> dict[int, dict]:
+    """This month's overnight farm events, by the morning they land. They assume no Community Center room is
+    finished before then: finishing the Pantry shifts every later night."""
+    w = farm.when
+    end = first + SEASON_DAYS - 1
+    if end < w.days_played + 1:
+        return {}
+    out = {}
+    for n in night_events.nights(farm.save, farm.data, count=end - w.days_played,
+                                 festivals=set(farm.calendar.festivals)):
+        if n.kind not in NIGHT_WORDS or not first <= n.days_played <= end:
+            continue
+        title, text = NIGHT_WORDS[n.kind]
+        if n.kind == "meteorite" and not n.lands:
+            text = f"Only if its landing spot is clear: right now it's {n.what or 'blocked'}." + " Clear it to get one."
+        out[n.days_played] = _item("night", title, text, important=n.kind in ("meteorite", "fairy"),
+                                   sure=n.sure)
+    return out
+
+
+BIG_ORDER = 2500  # gold that makes a board day worth marking
+
+
+def _boards(farm: Farm, first: int) -> dict[int, dict]:
+    """Lewis's board on the Mondays you can see it this month: what it will ask, if nothing changes first."""
+    end = first + SEASON_DAYS - 1
+    weeks = max(0, (end - farm.when.days_played) // 7 + 1)
+    out = {}
+    for b in special_orders.forecast(farm.save, farm.data, mondays=weeks) if weeks else []:
+        if not b.visible or not b.orders or not first <= b.opens <= end:
+            continue
+        lines = [f"{o.requester}: {o.requirement}, {o.reward:,}g" for o in b.orders]
+        rich = any(o.reward >= BIG_ORDER for o in b.orders)
+        out[b.opens] = _item("order", "Special orders board", ". ".join(lines) + ". You can take one at a time.",
+                             important=rich, sure=b.sure)
+    return out
+
+
 def _quests(farm: Farm, dp: int, log: list[dict]) -> list[dict]:
     today = farm.when.days_played
     return [_item("quest", q["title"], "Last day") for q in log
@@ -248,6 +299,9 @@ def view(farm: Farm, offset: int = 0, spouse: str = "") -> dict:
     log = quests.view(farm)["quests"]
     last = _last_rain(farm, first, spouse)
     coming = levels.forecast(farm)
+    giants = picking.giants(farm) if offset == 0 else []
+    nights = _nights(farm, first)
+    boards = _boards(farm, first)
     days = []
     for dp in range(first, first + SEASON_DAYS):
         past = dp < w.days_played
@@ -256,6 +310,9 @@ def view(farm: Farm, offset: int = 0, spouse: str = "") -> dict:
             items = (_events(farm, dp, spouse) + _cart(farm, dp, stock, watch, wants) + _ripe(farm, dp, mine["rows"])
                      + _rain(farm, dp, spouse, last) + _quests(farm, dp, log)
                      + [_level(r) for r in coming if r["day"] == dp]
+                     + ([nights[dp]] if dp in nights else []) + ([boards[dp]] if dp in boards else [])
+                     + [_item("giant", f"Giant {g['crop']} possible", g["text"], important=g["complete"],
+                              sure=False) for g in giants if g["days_played"] == dp]
                      + _season_end(farm, dp, mine["dies"]))
             if w.days_played <= dp <= w.days_played + BINS_AHEAD:
                 bins = _bins_ahead(farm, dp)
