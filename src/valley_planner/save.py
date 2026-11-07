@@ -215,6 +215,8 @@ class Save:
     fruit_trees: list[dict] = field(default_factory=list)
     machines: Counter = field(default_factory=Counter)  # placed, by name (things Data/Machines lists)
     sprinklers: Counter = field(default_factory=Counter)
+    hoed: set[tuple[int, int]] = field(default_factory=set)  # the Farm's dirt
+    farm_objects: dict[tuple[int, int], str] = field(default_factory=dict)  # what stands on the Farm, by tile
     crab_pots: int = 0
     quests: list[dict] = field(default_factory=list)
     special_orders: list[dict] = field(default_factory=list)  # accepted
@@ -359,6 +361,32 @@ def _forage(root: ET.Element) -> list[Forage]:
                 out.append(Forage(_text(obj, "name"), f"(O){oid}", name,
                                   (int(float(_text(tile, "X", "0"))), int(float(_text(tile, "Y", "0"))))))
     return out
+
+
+def _vector(k: ET.Element) -> tuple[int, int] | None:
+    tile = _child(k, "Vector2")
+    return None if tile is None else (int(float(_text(tile, "X", "0"))), int(float(_text(tile, "Y", "0"))))
+
+
+def _farm_tiles(farm: ET.Element | None) -> tuple[set, dict]:
+    """(hoed tiles, what else stands on a tile): objects, trees, and the big stumps and boulders."""
+    hoed, things = set(), {}
+    for k, v in _dict(_child(farm, "objects") if farm is not None else None):
+        tile = _vector(k)
+        if tile:
+            things[tile] = _text(_or(_child(v, "Object"), v), "name") or "something"
+    for k, v in _dict(_child(farm, "terrainFeatures") if farm is not None else None):
+        tile, kind = _vector(k), _type(_or(_child(v, "TerrainFeature"), v))
+        if tile and kind == "HoeDirt":
+            hoed.add(tile)
+        elif tile and kind in ("Tree", "FruitTree", "Bush"):
+            things[tile] = "a tree"
+    for clump in _or(_child(farm, "resourceClumps"), []) if farm is not None else []:
+        spot = _child(clump, "Tile")
+        if spot is not None:
+            x, y = int(float(_text(spot, "X", "0"))), int(float(_text(spot, "Y", "0")))
+            things.update({(x + dx, y + dy): "a boulder or stump" for dx in (0, 1) for dy in (0, 1)})
+    return hoed, things
 
 
 def _weather(root: ET.Element) -> tuple[str, str, bool]:
@@ -529,6 +557,7 @@ def read_save(path: Path, data=None) -> Save:
     bundle_data = {_flat(k): _flat(v) for k, v in _dict(_child(root, "bundleData"))}
 
     farm = locations.get("Farm")
+    hoed, farm_objects = _farm_tiles(farm)
     flags = {"beachBridgeFixed"} if _bool(locations.get("Beach"), "bridgeFixed") else set()
     buildings: Counter = Counter()
     building_days: dict[str, int] = {}
@@ -675,6 +704,7 @@ def read_save(path: Path, data=None) -> Save:
         buildings=buildings, building_days=building_days, animals=animals, hay=_int(farm, "piecesOfHay"),
         fruit_trees=fruit_trees,
         machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
+        hoed=hoed, farm_objects=farm_objects,
         special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
         special_orders_board=[o for o in board if o["type"] != "QiChallenge"],
         qi_orders_board=[o for o in board if o["type"] == "QiChallenge"],

@@ -77,7 +77,7 @@
     <section id="view-farm" class="view" hidden>
       <div><h1 id="farm-head">Farm</h1><div class="muted" id="farm-sub"></div></div>
       <div class="seg" role="group" aria-label="Farm">
-        <button type="button" data-sub="crops">Crops</button><button type="button" data-sub="sell">Sell</button><button type="button" data-sub="cook">Cook</button>
+        <button type="button" data-sub="crops">Crops</button><button type="button" data-sub="sell">Sell</button><button type="button" data-sub="cook">Cook</button><button type="button" data-sub="sprinklers">Sprinklers</button>
       </div>
       <div class="sub-view" data-for="crops">
       <section class="card">
@@ -115,6 +115,31 @@
           what's left raw — with its recipe and what it takes to craft.</p>
         <div id="sell-hints"></div>
       </section></div>
+      <div class="sub-view" data-for="sprinklers" hidden>
+        <section class="card">
+          <h2 id="sp-head">Sprinklers</h2>
+          <p id="sp-need"></p>
+          <div class="sp-controls">
+            <label for="sp-size">Field size</label><select id="sp-size"></select>
+            <label><input type="checkbox" id="sp-later" /> Show the Quality Sprinkler swap</label>
+          </div>
+          <p class="muted" id="sp-later-note"></p>
+          <div id="sp-grid" class="sp-grid" role="img" aria-label="Plan of your field, one square a tile"></div>
+          <div id="sp-key" class="sp-key"></div>
+          <p class="muted" id="sp-fit"></p>
+        </section>
+        <section class="card">
+          <h2>Getting them in</h2>
+          <ul class="list-plain">
+            <li>Line the plan up on your Scarecrow, marked X.</li>
+            <li>A Sprinkler won't go on a tile with a crop on it, so place them on empty dirt as crops come up, by the last day of the season.</li>
+            <li>One placed today waters from tomorrow morning. The crops around it still need the can today.</li>
+            <li>Keep the regrowing crops planted over the change of season, because bare dirt mostly disappears on day 1.</li>
+            <li>Tiles hoed today start dry. Seeds sown on dirt that was already there get watered next morning.</li>
+            <li>You can walk through normal crops, so leave no paths. Only Hops, Grapes and Green Beans block you.</li>
+          </ul>
+        </section>
+      </div>
       <div class="sub-view" data-for="cook" hidden>
       <section class="card">
         <h2>What to cook</h2>

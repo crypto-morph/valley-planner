@@ -3,8 +3,9 @@
 from . import bus, community_center, courtship, machines, qi, skull_cavern, sprinklers, unlocks  # noqa: F401
 from .base import REGISTRY, Objective
 
-ORDER = ("greenhouse", "seed_maker", "kitchen", "cc", "stable", "sprinklers", "house_2", "marriage", "qi",
-         "deluxe_barn", "deluxe_coop", "silo", "axe_steel", "pickaxe_steel", "can_steel", "mines_bottom",
+ORDER = ("greenhouse", "seed_maker", "kitchen", "cc", "stable", "sprinklers_basic", "sprinklers", "house_2",
+         "marriage", "qi", "deluxe_barn", "deluxe_coop", "silo", "axe_steel", "pickaxe_steel", "can_steel",
+         "mines_bottom",
          "bus", "skull_cavern", "jars", "kegs", "house_3")  # the order they're offered in
 OBJECTIVES: dict[str, Objective] = {k: REGISTRY[k] for k in ORDER}
 CATALOG = {k: (o.label, o.days) for k, o in OBJECTIVES.items()}  # id -> (label, default deadline in days)

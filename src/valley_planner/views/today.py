@@ -16,13 +16,15 @@ from __future__ import annotations
 import json
 
 from ..engine import cc
+from ..engine.unlocks import BRIDGE_WOOD, KITCHEN
 from ..facts import bubbles, geodes, help_wanted, skills
 from ..facts.buyers import Buyers
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
+from ..facts.items import FIXED_SALE_PRICE
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS
-from . import errands, pack, quests, sell
+from . import errands, levels, pack, quests, sell
 from .farm import Farm
 
 TILE_ENERGY = 2
@@ -153,6 +155,27 @@ def _birthdays(farm: Farm, spouse: str = "") -> list[dict]:
         if b["who"] != spouse and gift:
             out += _person(farm, b["who"], f"it's their birthday, and {gift} counts 8 times", BIRTHDAY_VALUE)
     return out
+
+
+def wood_wanted(farm: Farm) -> int:
+    """The Wood the big jobs still want: open bundles, the Beach bridge and the kitchen."""
+    s = farm.save
+    wood = sum(i.stack for b in farm.bundles.all for i in b.open_ingredients if i.item == "(O)388")
+    wood += 0 if "beachBridgeFixed" in s.flags else BRIDGE_WOOD
+    return wood + (0 if s.house_upgrade >= 1 else dict(KITCHEN[1])["388"])
+
+
+def wood_note(farm: Farm, trees: int) -> str:
+    """Energy to spare buys Wood for nothing; with none left, Robin's is the cheap way, above all in Year 1."""
+    short = wood_wanted(farm) - farm.held().get("(O)388", 0)
+    if short <= 0:
+        return ""
+    price = FIXED_SALE_PRICE["388"][0 if farm.save.year == 1 else 1]
+    if not trees:
+        return f"{short} Wood short and no energy to chop: Robin sells it at {price}g each."
+    rest = short - trees * TREE_WOOD
+    return (f"{short} Wood short: chop your {trees} spare trees, and plant a seed where each one stood."
+            + (f" Robin has the other {rest} at {price}g each, if you need it soon." if rest > 0 else ""))
 
 
 def sprinkler_note(farm: Farm, watering: int) -> str:
@@ -606,8 +629,12 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         extra.append(f"fish about {casts} times")
     if trees:
         extra.append(f"chop about {trees} trees for {trees * TREE_WOOD} Wood")
+    coming: dict[str, dict] = {}
+    for row in levels.forecast(farm):  # soonest first, so each skill keeps its next level
+        coming.setdefault(row["skill"], row)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
-            "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty)) if x],
+            "notes": [x for x in (_board_note(farm), tv_note, sprinkler_note(farm, thirsty),
+                                  wood_note(farm, trees)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
@@ -616,7 +643,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",
             "skills": [{"name": k.name, "level": k.level, "xp": k.xp, "next": k.next_xp, "to_go": k.to_go,
-                        "share": round(k.share, 3), "ways": list(k.ways)} for k in skills.progress(s.experience)],
+                        "share": round(k.share, 3), "ways": list(k.ways), "coming": coming.get(k.name)}
+                       for k in skills.progress(s.experience)],
             "places": ["Farm", "Town", "Forest", "Beach", "Mountain", "BusStop", "Backwoods"]}
 
 

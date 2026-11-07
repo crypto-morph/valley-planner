@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .discover import find_game, find_saves_root, list_saves
 from .engine import cc, todo
 from .gamedata import GameData
-from .views import ask, calendar, cart, crops, errands, month, morning, romance, sell
+from .views import ask, calendar, cart, crops, errands, layout, month, morning, romance, sell
 from .views.farm import Farm
 
 STATIC = Path(__file__).parent / "static"
@@ -133,6 +133,10 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     @app.get("/api/month")
     def month_view(offset: int = 0, spouse: str = "") -> dict:
         return month.view(p().farm(), offset, spouse)
+
+    @app.get("/api/layout")
+    def layout_view(crops: int | None = None) -> dict:
+        return layout.view(p().farm(), crops)
 
     @app.get("/api/watch")
     def watch_view() -> dict:

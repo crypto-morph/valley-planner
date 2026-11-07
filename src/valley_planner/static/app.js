@@ -626,7 +626,7 @@ const views = {
     $("#t-notes").textContent = v.notes.join(" ");
     drawNext(v);
     drawPack(v.pack);
-    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="skill"><div class="skill-name"><strong>${esc(cap(k.name))} ${k.level}</strong></div><div class="muted small">${k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div></div>`).join("");
+    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="skill"><div class="skill-name"><strong>${esc(cap(k.name))} ${k.level}</strong></div>${k.coming ? `<div class="small">${esc(levelLine(k.coming))}</div>` : ""}<div class="muted small">${k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div></div>`).join("");
   },
 
   async morning() {
@@ -683,6 +683,18 @@ const views = {
     $("#hours").innerHTML = `<p class="sub">${esc(hours.date)}</p><ul class="list">` + hours.shops.map((s) =>
       `<li><span>${esc(s.shop)}</span><span>${s.open.length ? esc(s.open.join(", ")) : `<span class="unsure">${esc(s.closed)}</span>`}${unsure(s.sure)}</span></li>`
     ).join("") + "</ul>";
+  },
+
+  async sprinklers(crops) {
+    const v = await get(`/api/layout${crops ? `?crops=${crops}` : ""}`);
+    sprinklerView = v;
+    if (!v.ready) { $("#sp-head").textContent = v.text; return; }
+    $("#sp-head").textContent = `${v.sprinklers} Sprinklers water ${v.crops} crops`;
+    $("#sp-need").textContent = v.short ? `You need ${v.short} more: ${v.need.join(" and ") || "you hold the bars, so craft them"}.` : "You have them all.";
+    $("#sp-fit").textContent = `${v.to_hoe} tiles still to hoe. ${v.lost} of your hoed tiles fall outside the pattern.` +
+      (v.scarecrow ? ` ${v.scarecrow} crops are out of the Scarecrow's reach: put a second one on the A.` : "");
+    $("#sp-size").innerHTML = v.sizes.map((n) => `<option value="${n}" ${n === v.want ? "selected" : ""}>${n} crops</option>`).join("");
+    drawSprinklers();
   },
 
   async crops() {
@@ -787,6 +799,7 @@ const views = {
   },
 };
 
+const levelLine = (c) => `Level ${c.level}, ${c.sure ? "" : "about "}${c.date}${c.pick ? `: choose ${c.pick}` : c.unlocks ? `: ${c.unlocks}` : ""}`;
 const SELL_DEFAULTS = { loved: true, liked: false, help_wanted: true, seeds: true };
 function sellFilters() {
   try { return { ...SELL_DEFAULTS, ...JSON.parse(localStorage.getItem("sellFilters") || "{}") }; } catch { return { ...SELL_DEFAULTS }; }
@@ -821,8 +834,18 @@ const LOADING = { today: "Reading your save…", goals: "Planning the rest of th
                   people: "Looking through your chests…", calendar: "Filling in the month…" };
 // Old links and pointers still land in the right place.
 const OLD = { morning: ["today"], todo: ["today"], crops: ["farm", "crops"], sell: ["farm", "sell"], cook: ["farm", "cook"],
-              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["calendar"], ahead: ["calendar"] };
-const SUBS = { crops: () => views.crops(), sell: () => views.sell(), cook: () => views.cook(), route: () => views.route(), plan: () => views.plan() };
+              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["calendar"], ahead: ["calendar"], sprinklers: ["farm", "sprinklers"] };
+const SUBS = { sprinklers: () => views.sprinklers(), crops: () => views.crops(), sell: () => views.sell(), cook: () => views.cook(), route: () => views.route(), plan: () => views.plan() };
+
+let sprinklerView = null;
+const TILE_WORDS = { S: "Sprinkler", Q: "Quality Sprinkler", f: "Free once swapped", c: "Crop", n: "Crop, hoe this tile", X: "Your Scarecrow", A: "One more Scarecrow", x: "Something stands here", o: "Dirt left out", ".": "" };
+function drawSprinklers() {
+  const v = sprinklerView, later = $("#sp-later").checked, rows = (later ? v.later : v.now).rows;
+  $("#sp-grid").style.gridTemplateColumns = `repeat(${rows[0].length}, 1fr)`;
+  $("#sp-grid").innerHTML = rows.map((r) => [...r].map((t) => `<span class="sp-t sp-${t === "." ? "none" : t}" title="${TILE_WORDS[t]}">${"SQXA".includes(t) ? t : ""}</span>`).join("")).join("");
+  $("#sp-key").innerHTML = [...new Set(rows.join(""))].filter((t) => t !== ".").map((t) => `<span class="sp-keyline"><span class="sp-t sp-${t}">${"SQXA".includes(t) ? t : ""}</span> ${TILE_WORDS[t]}</span>`).join("");
+  $("#sp-later-note").textContent = later ? `Swap the ${v.quality} marked Q for Quality Sprinklers, on the same tiles. ${v.quality_keep} old ones stay at the edges and ${v.freed} come free. No crop moves.` : "";
+}
 
 function showSub(name) {
   document.querySelectorAll(".sub-view").forEach((s) => { const peers = s.parentElement.querySelectorAll(":scope > .sub-view"); if ([...peers].some((p) => p.dataset.for === name)) s.hidden = s.dataset.for !== name; });
@@ -884,6 +907,7 @@ const CAL_ICONS = {
   crops: ["M12 21V8M12 8C10 7 9 5 9 3c2 1 3 3 3 5zM12 8c2-1 3-3 3-5-2 1-3 3-3 5zM12 14c-2-1-4-1-5-3 2-.5 4 1 5 3zM12 14c2-1 4-1 5-3-2-.5-4 1-5 3z", "Crops ripe"],
   season: ["M7 3h10M7 21h10M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9", "Season ends"],
   quest: ["M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M9 9h6M9 13h6", "Quest deadline"],
+  level: ["M12 3l2.6 5.8 6.4.7-4.8 4.2 1.4 6.3-5.6-3.2-5.6 3.2 1.4-6.3L3 9.5l6.4-.7z", "New skill level"],
   bins: ["M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13", "Bins"],
 };
 const calMonth = { offset: 0, view: null, day: null };
@@ -962,6 +986,8 @@ async function start() {
   }
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
   drawWatch().catch(() => {});
+  $("#sp-later").addEventListener("change", drawSprinklers);
+  $("#sp-size").addEventListener("change", (e) => busy("Fitting the pattern…", () => views.sprinklers(e.target.value)));
   $("#cal-prev").addEventListener("click", () => busy("Filling in the month…", () => drawMonth(calMonth.offset - 1)));
   $("#cal-next").addEventListener("click", () => busy("Filling in the month…", () => drawMonth(calMonth.offset + 1)));
   $("#cal-grid").addEventListener("click", (e) => {

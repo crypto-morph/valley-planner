@@ -5,12 +5,13 @@ What pays it, from the game's gainExperience calls:
 - Farming: a crop gives 16 x ln(0.018 x price + 1), so a Parsnip 8; petting or milking an animal 5.
 - Fishing: 3 x (quality + 1) + difficulty / 3 for a catch, so a Sunfish about 13; a crab pot pull 5.
 - Foraging: 7 for picked forage, 14 for a felled tree, 2 for its stump.
-- Mining: 1 for a stone, more for ore (copper 5).
+- Mining: 1 for a stone outdoors and nothing in the Mines; ore pays (copper 5, iron 12).
 - Combat: what the monster's data gives (a Green Slime 3, a Bug 1).
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 LEVELS = (100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000)
@@ -18,9 +19,35 @@ ACTIONS = {  # skill -> what earns it: (the action, its XP)
     "farming": (("harvest a Parsnip", 8), ("pet an animal", 5)),
     "fishing": (("catch a Sunfish-type fish", 13), ("pull a crab pot", 5)),
     "foraging": (("pick up forage", 7), ("fell a tree", 14)),
-    "mining": (("break a stone", 1), ("mine copper ore", 5)),
+    "mining": (("mine copper ore", 5), ("mine iron ore", 12)),
     "combat": (("kill a Green Slime", 3), ("kill a Bug", 1)),
 }
+
+
+UNLOCKS = {  # what a level brings, the things worth planning around (Data/CraftingRecipes)
+    "farming": {2: "Sprinkler, Mayonnaise Machine", 3: "Bee House, Speed-Gro", 4: "Preserves Jar",
+                6: "Quality Sprinkler, Cheese Press", 7: "Loom", 8: "Keg, Oil Maker",
+                9: "Seed Maker, Iridium Sprinkler"},
+    "fishing": {2: "Bait", 3: "Crab Pot", 4: "Recycling Machine, Worm Bin", 6: "Iridium Rod, Trap Bobber"},
+    "foraging": {2: "Charcoal Kiln", 4: "Tapper", 6: "Lightning Rod", 9: "Rain Totem"},
+    "mining": {2: "Staircase", 4: "Transmute (Fe)", 6: "Bomb", 7: "Transmute (Au)", 9: "Crystalarium"},
+    "combat": {},
+}
+PICKS = {  # the profession worth choosing, if the path allows it; the level-up screen comes at bedtime, unannounced
+    ("farming", 5): "Tiller", ("farming", 10): "Artisan", ("mining", 5): "Miner", ("mining", 10): "Blacksmith",
+    ("fishing", 5): "Fisher", ("fishing", 10): "Angler", ("foraging", 5): "Forester", ("foraging", 10): "Lumberjack",
+    ("combat", 5): "Fighter", ("combat", 10): "Defender",
+}
+RAISES_PRICES = {"Tiller", "Artisan", "Blacksmith", "Fisher", "Angler"}  # hold the bin back that night
+
+
+def harvest_xp(price: int) -> int:
+    """Crop.harvest: once per harvest, however many drop."""
+    return round(16 * math.log(0.018 * price + 1))
+
+
+def level_of(xp: int) -> int:
+    return sum(1 for n in LEVELS if xp >= n)
 
 
 @dataclass(frozen=True)

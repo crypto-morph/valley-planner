@@ -162,6 +162,26 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .cal-jump { font: inherit; display: block; width: 100%; min-height: 44px; padding: 6px 0; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); color: var(--ink); cursor: pointer; }
 .cal-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 4px 12px; font-size: 14px; }
 
+/* The Sprinkler plan: one square a tile, drawn to match the field, with the Scarecrow to line it up by. */
+.sp-grid { display: grid; gap: 1px; max-width: 640px; margin: 10px 0; background: var(--line); border: 1px solid var(--line); }
+.sp-t { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; min-width: 12px; font-size: 13px; font-weight: 700; background: #FFFFFF; }
+.sp-grid .sp-t { min-width: 0; }
+.sp-S, .sp-Q { background: #255E8C; color: #FFFFFF; }
+.sp-Q { background: #1C4C74; outline: 2px solid #FFFFFF; outline-offset: -3px; }
+.sp-c { background: #CFE5D3; }
+.sp-n { background: #CFE5D3; box-shadow: inset 0 0 0 2px #2B6A3E; }
+.sp-X, .sp-A { background: #FCEFD6; color: #5C3600; }
+.sp-x { background: #8A8F86; }
+.sp-o { background: #E6DCC8; }
+.sp-f { background: #F3F4EE; box-shadow: inset 0 0 0 1px #255E8C; }
+.sp-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 4px 12px; font-size: 14px; }
+.sp-keyline { display: inline-flex; align-items: center; gap: 6px; }
+.sp-keyline .sp-t { width: 18px; }
+.list-plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.sp-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.sp-controls select { font: inherit; min-height: 44px; }
+.sp-controls label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+
 @media (max-width: 640px) {
   .topbar-in { padding: 8px 12px; gap: 6px 10px; }
   .brand { display: none; }

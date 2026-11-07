@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from ..engine import cc
 from ..facts import weather
 from ..facts.conditions import date_of
-from . import crops
+from . import crops, levels
 from .farm import Farm
 from .morning import _bins_ahead
 
@@ -23,7 +23,7 @@ LAST_PLANT = 28 - CABBAGE_DAYS  # the last summer day that still ripens
 BANNER_DAYS = 7
 SEASON_DAYS = 28
 YEAR_DAYS = 112
-PIERRE_SUMMER = YEAR_DAYS + SEASON_DAYS + 1  # Summer 1 of Year 2, when the seeds go on his shelves
+PIERRE_SUMMER = YEAR_DAYS + SEASON_DAYS + 1  # Summer 1 of Year 2, when Pierre stocks the seeds
 MONTHS_AHEAD = 7  # the cart forecast below looks two years out
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")  # day 1 of every month is a Monday
 BINS_AHEAD = 7  # further out, the odds depend on too many mornings' luck
@@ -207,6 +207,15 @@ def _season_end(farm: Farm, dp: int, dies: int) -> list[dict]:
                   important=True)]
 
 
+def _level(row: dict) -> dict:
+    what = f"{row['unlocks']} from {row['ready']}" if row["unlocks"] else ""
+    if row["pick"]:
+        what = f"Choose {row['pick']} at bedtime." + (" Hold your goods out of the bin tonight: its prices start "
+                                                      "tomorrow." if row["hold_bin"] else "")
+    return _item("level", f"{row['skill'].title()} {row['level']}", f"{what} {row['how'].capitalize()}.".strip(),
+                 important=bool(row["pick"]), sure=row["sure"])
+
+
 def _quests(farm: Farm, dp: int, log: list[dict]) -> list[dict]:
     today = farm.when.days_played
     return [_item("quest", q["title"], "Last day") for q in log
@@ -238,6 +247,7 @@ def view(farm: Farm, offset: int = 0, spouse: str = "") -> dict:
     mine = crops.mine(farm)
     log = quests.view(farm)["quests"]
     last = _last_rain(farm, first, spouse)
+    coming = levels.forecast(farm)
     days = []
     for dp in range(first, first + SEASON_DAYS):
         past = dp < w.days_played
@@ -245,6 +255,7 @@ def view(farm: Farm, offset: int = 0, spouse: str = "") -> dict:
         if not past:
             items = (_events(farm, dp, spouse) + _cart(farm, dp, stock, watch, wants) + _ripe(farm, dp, mine["rows"])
                      + _rain(farm, dp, spouse, last) + _quests(farm, dp, log)
+                     + [_level(r) for r in coming if r["day"] == dp]
                      + _season_end(farm, dp, mine["dies"]))
             if w.days_played <= dp <= w.days_played + BINS_AHEAD:
                 bins = _bins_ahead(farm, dp)
