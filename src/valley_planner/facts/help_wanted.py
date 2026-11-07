@@ -81,7 +81,7 @@ def quest_today(save, data, *, festival: bool = False) -> dict | None:
     if roll < 0.08:
         return {"kind": "resource"}
     if roll < 0.2 and save.deepest_mine_level > 0 and day > 5:
-        return {"kind": "slay"}
+        return {"kind": "slay", **slay(gid, day, save.deepest_mine_level, set(save.mail), legacy=legacy)}
     if roll < 0.5:
         return None
     if roll < 0.6:
@@ -127,3 +127,45 @@ def quest_today(save, data, *, festival: bool = False) -> dict | None:
             pool.append(fields[2].split()[0])
     item = rng.choose(pool)
     return {"kind": "delivery", "who": who, "item": {"-5": "176", "-6": "184"}.get(item, item)}
+
+
+# (how many: Next(lo, hi), even only, gold each) per monster, from SlayMonsterQuest.loadQuestInfo
+SLAY = {"Green Slime": (4, 11, True, 60), "Rock Crab": (2, 6, False, 75), "Duggy": (2, 4, False, 150),
+        "Frost Jelly": (4, 11, True, 85), "Ghost": (2, 4, False, 250), "Sludge": (4, 11, True, 125),
+        "Lava Crab": (2, 6, False, 180), "Squid Kid": (1, 3, False, 350), "Skeleton": (6, 12, False, 100),
+        "Dust Spirit": (10, 21, False, 60)}
+SLAY_OTHER = (3, 7, False, 120)
+SLAY_WHERE = {"Green Slime": "the Mines, floors 1 to 29",
+              "Rock Crab": "the Mines, floors 1 to 29 (they look like rocks)",
+              "Duggy": "the Mines, floors 6 to 29 (they pop up from dirt)", "Frost Jelly": "the Mines, floors 40 to 79",
+              "Dust Spirit": "the Mines, floors 40 to 79 (dark floors)", "Skeleton": "the Mines, floors 70 to 79",
+              "Ghost": "the Mines, floors 80 to 119", "Sludge": "the Mines, floors 80 to 119",
+              "Lava Crab": "the Mines, floors 80 to 119", "Squid Kid": "the Mines, floors 80 to 119"}
+
+
+def slay(game_id: int, days_played: int, deepest: int, mail: set, *, legacy: bool = False) -> dict:
+    """SlayMonsterQuest.loadQuestInfo: which monster, how many, the reward and who asks. Seeded by the game and the
+    day; the monster list goes by the deepest Mines floor anyone has reached when the board is read."""
+    from .rng import NetRandom, random_seed
+    r = NetRandom(random_seed(game_id, days_played, legacy=legacy))
+    i = 0
+    while i < r.next(1, 100):  # the game draws a new limit on every pass
+        r.next()
+        i += 1
+    if deepest < 39:
+        pool = ["Green Slime"] + (["Rock Crab"] if deepest > 10 else []) + (["Duggy"] if deepest > 30 else [])
+    elif deepest < 79:
+        pool = ["Frost Jelly"] + (["Skeleton"] if deepest > 70 else []) + ["Dust Spirit"]
+    else:
+        pool = ["Sludge", "Ghost", "Lava Crab", "Squid Kid"]
+    monster = pool[r.next(len(pool))]
+    lo, hi, even, each = SLAY.get(monster, SLAY_OTHER)
+    count = r.next(lo, hi)
+    if even:
+        count -= count % 2
+    who = ("Lewis" if monster in ("Green Slime", "Frost Jelly", "Sludge") else
+           "Demetrius" if monster in ("Rock Crab", "Lava Crab") else "Wizard")  # Duggy: Clint, then Wizard
+    if who == "Wizard" and "wizardJunimoNote" not in mail and "JojaMember" not in mail:
+        who = "Lewis"
+    return {"monster": monster, "count": count, "reward": count * each, "who": who,
+            "where": SLAY_WHERE.get(monster, "the Mines")}

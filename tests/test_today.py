@@ -330,3 +330,22 @@ def test_crops_that_cannot_ripen_are_not_watered():
     note = today_view.doomed_note(farm, [late, late])
     assert note.startswith("Don't water 2 Cauliflower: they can't ripen")
     assert today_view.doomed_note(farm, []) == ""
+
+
+def test_slay_request_is_worked_out_from_the_seed():
+    from valley_planner.facts import help_wanted
+    q = help_wanted.slay(453557957, 26, 40, {"wizardJunimoNote"})
+    assert q["monster"] in ("Frost Jelly", "Dust Spirit")  # the pool for floors 39 to 78
+    lo, hi, even, each = help_wanted.SLAY[q["monster"]]
+    assert lo <= q["count"] < hi and q["reward"] == q["count"] * each
+    assert q["who"] == ("Lewis" if q["monster"] == "Frost Jelly" else "Wizard")
+    assert help_wanted.slay(453557957, 26, 40, set())["who"] == "Lewis"  # no Wizard before his letter
+    shallow = help_wanted.slay(453557957, 26, 5, set())
+    assert shallow["monster"] == "Green Slime" and shallow["count"] % 2 == 0
+
+
+def test_notes_split_into_a_line_and_its_reason():
+    from valley_planner.views import today as today_view
+    assert today_view._note("First part. The reason, at more length.") == {
+        "text": "First part.", "why": "The reason, at more length."}
+    assert today_view._note({"text": "a", "why": "b"}) == {"text": "a", "why": "b"}

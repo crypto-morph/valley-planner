@@ -210,3 +210,14 @@ def test_app_js_parses():
     js = Path(__file__).parent.parent / "src" / "valley_planner" / "static" / "app.js"
     run = subprocess.run([node, "--check", str(js)], capture_output=True, text=True, check=False)
     assert run.returncode == 0, run.stderr
+
+
+def test_app_js_names_each_function_once():
+    """Two functions with one name: the later silently replaces the earlier (that broke "Only today" once)."""
+    import re
+    from collections import Counter
+    from pathlib import Path
+
+    js = (Path(__file__).parent.parent / "src" / "valley_planner" / "static" / "app.js").read_text()
+    names = Counter(re.findall(r"^(?:async\s+)?function\s+(\w+)", js, re.M))
+    assert not [n for n, k in names.items() if k > 1]

@@ -130,6 +130,15 @@ class Farm:
         """A readable place name ("AnimalShop" -> "Marnie's Ranch")."""
         return self.places.name(location)
 
+    def icon(self, qid: str) -> dict | None:
+        """The item's own picture in the game's sheets (pictures.item_icon), or None without the game's files."""
+        from ..pictures import item_icon, shared
+        try:
+            return item_icon(shared(self.data.install.content, self.data.cache), self.data,
+                             qid if qid.startswith("(") else f"(O){qid}")
+        except (AttributeError, OSError, ValueError):
+            return None
+
     def name(self, qid: str) -> str:
         info = self.items.get(qid.removeprefix("(O)"))
         return info.display if info else qid

@@ -224,3 +224,23 @@ def _edge(node: Node, grids: dict) -> str:
     w, h, _ = grids[node[0]]
     gaps = {"north": node[2], "south": h - 1 - node[2], "west": node[1], "east": w - 1 - node[1]}
     return min(gaps, key=gaps.get)
+
+
+def polylines(path: list[Node]) -> list[dict]:
+    """A walk as one line per map, for drawing: {"loc", "points": [[x, y], ...]}, keeping only the tiles where
+    the line turns (and each map's first and last tile, so its exits show)."""
+    out: list[dict] = []
+    for node in path:
+        loc, x, y = node
+        if not out or out[-1]["loc"] != loc:
+            out.append({"loc": loc, "points": [[x, y]]})
+            continue
+        pts = out[-1]["points"]
+        if len(pts) >= 2:
+            (ax, ay), (bx, by) = pts[-2], pts[-1]
+            sign = lambda v: (v > 0) - (v < 0)  # noqa: E731
+            if (sign(bx - ax), sign(by - ay)) == (x - bx, y - by):  # the same step again: straight on
+                pts[-1] = [x, y]
+                continue
+        pts.append([x, y])
+    return out

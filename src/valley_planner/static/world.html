@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Valley Map</title>
+  <link rel="stylesheet" href="/static/ui.css" />
+  <style>
+    body { margin: 0; padding: 16px; background: var(--bg, #F3F4EE); color: var(--ink, #1C2620);
+           font: 15px var(--font, "Atkinson Hyperlegible", Verdana, system-ui, sans-serif); overflow-x: hidden; }
+    main { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 2px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Today on the map</h1>
+    <div id="world"></div>
+  </main>
+  <script src="/static/map.js"></script>
+  <script src="/static/world.js"></script>
+  <script>
+    // /world.html?time=900&energy=120&where=Town&done=water,harvest&spouse=Penny (all optional, as for /api/today)
+    const q = new URLSearchParams(location.search);
+    const params = {};
+    for (const k of ["time", "energy", "where", "done", "spouse"]) if (q.get(k)) params[k] = q.get(k);
+    if (params.time) params.time = Number(params.time);
+    window.world = ValleyWorld.mount(document.getElementById("world"), { params });
+    window.world.ready.then(() => { document.body.dataset.ready = "1"; });
+  </script>
+</body>
+</html>

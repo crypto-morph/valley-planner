@@ -62,7 +62,8 @@ def test_harvest_xp_and_levels():
 
 
 def wood_farm(held=0, year=1, bridge=False, house=0):
-    return NS(save=NS(year=year, house_upgrade=house, flags={"beachBridgeFixed"} if bridge else set()),
+    return NS(save=NS(year=year, house_upgrade=house, flags={"beachBridgeFixed"} if bridge else set(),
+                      tool_levels={}, skills={}),
               bundles=NS(all=[NS(open_ingredients=[NS(item="(O)388", stack=99)])]),
               held=lambda: {"(O)388": held})
 
@@ -74,17 +75,42 @@ def test_wood_counts_the_big_jobs():
 
 def test_with_energy_chop_and_replant():
     note = today.wood_note(wood_farm(held=800), 5)
-    assert "chop your 5" in note and "plant a seed" in note and "Robin" not in note
+    assert "chop your 5" in note["text"] and "replant a seed" in note["text"] and "Robin" not in note["text"]
+    assert note["lazy"] == "wood"  # opening it lists what your goals use Wood for
 
 
 def test_short_of_trees_robin_has_the_rest():
-    assert "Robin has the other" in today.wood_note(wood_farm(), 5)
+    assert "That leaves" in today.wood_note(wood_farm(), 5)["why"]
 
 
 @pytest.mark.parametrize(("year", "price"), [(1, 10), (2, 50)])
 def test_no_energy_means_robin_at_the_going_price(year, price):
-    assert f"{price}g each" in today.wood_note(wood_farm(year=year), 0)
+    note = today.wood_note(wood_farm(year=year), 0)
+    assert f"from Robin at {price}g" in note["text"] and f"{price}g each" in note["why"]
 
 
 def test_enough_wood_says_nothing():
-    assert today.wood_note(wood_farm(held=900), 5) == ""
+    assert today.wood_note(wood_farm(held=900), 5) is None
+
+
+def _wood_plan_farm(held, today=26):
+    return NS(save=NS(year=1, days_played=today, tool_levels={}, skills={}), held=lambda: {"(O)388": held},
+              label=lambda d: f"Day {d}, Year 1")
+
+
+USES = [{"what": "build a Coop", "wood": 300, "on": 29, "by": "", "goal": "CC"},
+        {"what": "build a Big Coop", "wood": 400, "on": 51, "by": "", "goal": "CC"}]
+
+
+def test_wood_names_only_the_next_job_and_its_date():
+    note = today.wood_plan(_wood_plan_farm(124), USES)
+    assert note["text"].startswith("Wood: 176 more for a Coop (Day 29, in 3 days)") and note["level"] == "soon"
+    assert [r["total"] for r in note["rows"]] == [300, 700]
+
+
+def test_wood_stays_calm_until_a_week_before():
+    later = today.wood_plan(_wood_plan_farm(124, today=10), USES)
+    assert later["level"] == "later" and "plenty of time" in later["text"]
+    covered = today.wood_plan(_wood_plan_farm(350), USES)  # the Coop is covered: the Big Coop is next
+    assert "a Big Coop (Day 51, in 25 days). You're 350 short" in covered["text"] and covered["level"] == "later"
+    assert today.wood_plan(_wood_plan_farm(700), USES) is None

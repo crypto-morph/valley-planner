@@ -18,6 +18,7 @@
         <button type="button" data-view="people">People</button>
         <button type="button" data-view="goals">Goals</button>
         <button type="button" data-view="calendar">Calendar</button>
+        <button type="button" data-view="map">Map</button>
       </nav>
       <label class="find">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
@@ -55,8 +56,8 @@
         <button type="button" id="t-reset" class="btn quiet">Back to this morning</button>
       </form>
       <div id="t-warning" class="alert amber" role="status" hidden></div>
-      <section id="t-giant" class="card" hidden></section>
-      <p id="t-notes" class="day-notes" hidden></p>
+      <div id="t-giant" hidden></div>
+      <div id="t-notes" class="day-notes" hidden></div>
       <div class="cols">
         <div class="col-main">
           <section id="t-next" class="next" aria-live="polite"></section>
@@ -275,6 +276,8 @@
       </section></div>
     </section>
 
+    <section id="view-map" class="view" hidden><div id="world"></div></section>
+
     <section id="view-calendar" class="view" hidden>
       <div><h1 id="cal-head">Calendar</h1><div class="muted" id="cal-sub"></div></div>
       <div id="cal-watch"></div>
@@ -311,6 +314,7 @@
 
   <footer class="foot"><span id="status">Reading your save…</span> · Reads your own save and your own copy of the game. Not affiliated with ConcernedApe.</footer>
   <script src="/static/map.js"></script>
+  <script src="/static/world.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

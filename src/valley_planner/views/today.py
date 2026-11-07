@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 
 from ..engine import cc
 from ..engine.unlocks import BRIDGE_WOOD, KITCHEN
@@ -36,7 +37,7 @@ from ..facts.fish import Fish
 from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
 from ..facts.schedules import Situation
-from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS
+from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS, polylines
 from . import crops, errands, levels, pack, picking, quests, sell
 from .farm import Farm
 
@@ -252,17 +253,83 @@ def wood_wanted(farm: Farm) -> int:
     return wood + (0 if s.house_upgrade >= 1 else dict(KITCHEN[1])["388"])
 
 
-def wood_note(farm: Farm, trees: int) -> str:
-    """Energy to spare buys Wood for nothing; with none left, Robin's is the cheap way, above all in Year 1."""
+def wood_note(farm: Farm, trees: int) -> dict | None:
+    """Energy to spare buys Wood for nothing; with none left, Robin's is the cheap way, above all in Year 1.
+    What the Wood is for, with dates, comes from the goals route when the note is opened (wood_uses)."""
     short = wood_wanted(farm) - farm.held().get("(O)388", 0)
     if short <= 0:
-        return ""
-    price = FIXED_SALE_PRICE["388"][0 if farm.save.year == 1 else 1]
+        return None
+    s = farm.save
+    price = FIXED_SALE_PRICE["388"][0 if s.year == 1 else 1]
+    per_tree = tools.tree(s.tool_levels.get("Axe", 0), s.skills.get("foraging", 0))
+    chop = (f"A tree and its stump give about {TREE_WOOD} Wood for about {round(per_tree)} energy and "
+            f"{TREE_MINUTES} minutes, so the {short} would take about {math.ceil(short / TREE_WOOD)} trees. ")
+    buy = (f"Robin sells Wood at {price}g each" + (" this year (it's 50g from Year 2)" if s.year == 1 else "")
+           + f": the {short} would cost {short * price:,}g.")
     if not trees:
-        return f"{short} Wood short and no energy to chop: Robin sells it at {price}g each."
+        return {"text": f"{short} Wood short for the bundles, bridge and kitchen, and no energy left to chop: "
+                        f"buy it from Robin at {price}g.",
+                "why": chop + buy, "lazy": "wood", "trees": trees}
     rest = short - trees * TREE_WOOD
-    return (f"{short} Wood short: chop your {trees} spare trees, and plant a seed where each one stood."
-            + (f" Robin has the other {rest} at {price}g each, if you need it soon." if rest > 0 else ""))
+    return {"text": f"{short} Wood short for the bundles, bridge and kitchen: chop your {trees} spare trees today "
+                    "and replant a seed where each stood.",
+            "why": chop + (f"That leaves {rest}. " if rest > 0 else "") + buy, "lazy": "wood", "trees": trees}
+
+
+def wood_uses(route: dict) -> list[dict]:
+    """The goals route's jobs that take Wood, soonest first: {what, wood, by, on (days played), goal}."""
+    out, seen = [], set()
+    for o in route.get("objectives", []):
+        for step in o.get("steps", []):
+            for need in step.get("needs", []):
+                wood = next((int(m.split()[0]) for m in need.get("materials", []) if m.endswith(" Wood")), 0)
+                if wood and need["key"] not in seen and need.get("state") == "new":
+                    seen.add(need["key"])
+                    out.append({"what": need["label"], "wood": wood, "by": need.get("ready", ""),
+                                "on": need.get("on") or 0, "goal": o.get("label", "")})
+    return sorted(out, key=lambda x: x["on"])
+
+
+WOOD_SOON, WOOD_URGENT = 7, 2  # days before the next Wood job when the note turns amber, then red
+
+
+def wood_plan(farm: Farm, uses: list[dict], trees: int = 0) -> dict | None:
+    """The Wood note from the goals' own dates: only the next job you can't cover yet, how long you have, and
+    what to do about it. Calm until a week before; the full schedule, with a running total, goes in `rows`."""
+    s = farm.save
+    held = farm.held().get("(O)388", 0)
+    today = s.days_played
+    price = FIXED_SALE_PRICE["388"][0 if s.year == 1 else 1]
+    need, rows, nxt = 0, [], None
+    for u in uses:
+        need += u["wood"]
+        row = {**u, "date": farm.label(u["on"]).rsplit(",", 1)[0] if u["on"] else u["by"], "total": need,
+               "covered": need <= held}
+        rows.append(row)
+        if nxt is None and need > held:
+            nxt = row
+    if nxt is None:
+        return None
+    short, days = nxt["total"] - held, max(0, nxt["on"] - today)
+    level = "urgent" if days <= WOOD_URGENT else "soon" if days <= WOOD_SOON else "later"
+    when = "today" if days == 0 else "tomorrow" if days == 1 else f"in {days} days"
+    job = re.sub(r"^(build|craft|repair) ", "", nxt["what"])
+    what = f"{job} ({nxt['date']}, {when})"
+    per_tree = tools.tree(s.tool_levels.get("Axe", 0), s.skills.get("foraging", 0))
+    if level == "later":
+        text = f"Wood: next needed for {what}. You're {short} short; plenty of time."
+        act = (f"Chop trees on days with energy to spare (about {TREE_WOOD} Wood a tree for {round(per_tree)} "
+               f"energy), or buy the rest from Robin nearer the time: {short} costs {short * price:,}g.")
+    else:
+        do = (f"chop your {trees} spare trees today" + (f" and buy the other {short - trees * TREE_WOOD} from "
+              f"Robin ({(short - trees * TREE_WOOD) * price:,}g)" if short > trees * TREE_WOOD else "")
+              if trees else f"buy it from Robin ({short * price:,}g)")
+        text = f"Wood: {short} more for {what}: {do}."
+        act = (f"Chopping costs about {round(per_tree)} energy a tree for about {TREE_WOOD} Wood. Robin's shop is in "
+               "the Mountains, north of Town.")
+    cheap = (f" Wood is cheap this year at {price}g (50g from Year 2), so buying is fine when energy is "
+             "better spent on crops." if s.year == 1 else "")
+    return {"text": text, "why": act + cheap, "level": level, "rows": rows, "held": held}
 
 
 def doomed_note(farm: Farm, lost: list) -> str:
@@ -488,7 +555,14 @@ def _berries(farm: Farm) -> list[dict]:
 
 
 def _all_bubbles(farm: Farm) -> list[dict]:
-    return [{"place": farm.place(loc), "spells": _bubble_words(farm, loc)} for loc in bubbles.MAPS]
+    s = farm.save
+    out = []
+    for loc in bubbles.MAPS:
+        spells = bubbles.forecast(farm.data, loc, s.days_played, int(s.unique_id), legacy=s.legacy_random)
+        out.append({"place": farm.place(loc), "spells": _bubble_words(farm, loc),
+                    "spots": [{"loc": loc, "x": x.tile[0], "y": x.tile[1], "label": clock(_minutes(x.start))}
+                              for x in spells if 700 <= x.start < 2000]})
+    return out
 
 
 def _bubble_words(farm: Farm, location: str) -> list[str]:
@@ -627,16 +701,44 @@ def _pierre(farm: Farm, ripe: int) -> list[dict]:
              "value": QUEST_VALUE, "from": 9 * 60, "until": 17 * 60}]
 
 
-def _board_note(farm: Farm) -> str:
+def _note(x) -> dict:
+    """A note as {text, why}: a plain sentence becomes its first sentence, with the rest as the why."""
+    if isinstance(x, dict):
+        return x
+    head, sep, rest = x.partition(". ")
+    return {"text": head + ("." if sep else ""), "why": rest.strip()}
+
+
+def _board_note(farm: Farm) -> dict:
+    """Today's Help Wanted request: who wants what, by when, and where to get it."""
     s = farm.save
     quest = help_wanted.quest_today(s, farm.data)
+    tomorrow = farm.label(s.days_played + 1).rsplit(",", 1)[0]
     if quest is None:
-        return "No Help Wanted request today."
+        return {"text": "No Help Wanted request today.", "why": "The board outside Pierre's is empty today."}
     if quest["kind"] == "delivery":
         qid = f"(O){quest['item']}"
-        have = "you have one" if farm.held().get(qid) else "you don't have one"
-        return f"Help Wanted: {farm.name(qid)} for {quest['who']}, {3 * _price(farm, qid)}g ({have})."
-    return f"Help Wanted: a {quest['kind']} request."
+        have = farm.held().get(qid)
+        return {"text": f"Help Wanted: {quest['who']} wants a {farm.name(qid)}, {3 * _price(farm, qid)}g.",
+                "why": f"Take the request from the board outside Pierre's today and give {quest['who']} a "
+                       f"{farm.name(qid)} by the end of {tomorrow}. It pays three times its price and 150 "
+                       f"friendship. " + ("You have one." if have else "You don't have one yet.")}
+    if quest["kind"] == "slay":
+        m, n = quest["monster"], quest["count"]
+        plural = m if m.endswith(("s", "Jelly", "Duggy")) and n == 1 else (m[:-1] + "ies" if m.endswith("y") and
+                                                                           not m.endswith("Duggy") else m + "s")
+        deep = s.deepest_mine_level
+        who = "the Wizard" if quest["who"] == "Wizard" else quest["who"]
+        return {"text": f"Help Wanted: {who} needs {n} {plural} killed by {tomorrow}, {quest['reward']:,}g.",
+                "why": f"Take the request from the board outside Pierre's today; it lasts until the end of "
+                       f"{tomorrow}. {plural} live in {quest['where']}. You've reached floor {deep}, so "
+                       + ("you can get there by the elevator." if deep >= 40 or m in ("Green Slime", "Rock Crab")
+                          else "they're on floors you've already reached.")
+                       + " The monster is fixed by how deep anyone had been when the board is read: going deeper "
+                         "first can change it."}
+    words = {"fishing": "a fish to catch", "resource": "ore or stone to gather", "socialize": "people to talk to"}
+    return {"text": f"Help Wanted: {words.get(quest['kind'], quest['kind'])}.",
+            "why": "The details are on the board outside Pierre's; the planner doesn't forecast this kind yet."}
 
 
 def view(farm: Farm, *, time: int | None = None, energy: int | None = None, where: str | None = None,
@@ -676,6 +778,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         way = walker.path(walker.reach(pos), ("Farm", *FARMHOUSE_DOOR))
         if way:
             now += walker.minutes(way)
+            legs.append((len(plan), way))
             plan.append({"id": "home", "time": clock(now), "kind": "farm", "title": "Back to the farm",
                          "why": "the crops come first", "way": walker.directions(way, farm.place),
                          "energy_after": power})
@@ -762,6 +865,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                 now += walker.minutes(way)
                 cost = TILE_ENERGY * tiles
                 power -= min(cost, max(0, power - RESERVE))
+                legs.append((len(plan), way))
                 plan.append({"id": "replant", "time": clock(now), "at": now, "kind": "farm", "title":
                              f"Home: plant and water {tiles} seeds", "why": "harvested tiles stay tilled", "way":
                              walker.directions(way, farm.place), "energy_after": power})
@@ -810,8 +914,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     for row in levels.forecast(farm):  # soonest first, so each skill keeps its next level
         coming.setdefault(row["skill"], row)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
-            "notes": [x for x in (_board_note(farm), tv_note, doomed_note(farm, lost), sprinkler_note(farm, thirsty),
-                                  wood_note(farm, trees), night_note(farm, power), luau_note(farm)) if x],
+            "notes": [_note(x) for x in (_board_note(farm), tv_note, doomed_note(farm, lost),
+                                         sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
+                                         luau_note(farm)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
@@ -820,6 +925,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "pack": pack.build(farm, plan, spouse),
             "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",
+            "route": [{"stop": i, "lines": polylines(path)} for i, path in legs],
             "skills": [{"name": k.name, "level": k.level, "xp": k.xp, "next": k.next_xp, "to_go": k.to_go,
                         "share": round(k.share, 3), "ways": list(k.ways), "coming": coming.get(k.name)}
                        for k in skills.progress(s.experience)],

@@ -95,11 +95,12 @@ def _location(root, name: str):
 
 class Scene:
     def __init__(self, data, textures, location: str, season: str, *, outdoors: bool = True, game_id: int = 0,
-                 days_played: int = 0, house_upgrade: int = 0, greenhouse_fixed: bool = True):
+                 days_played: int = 0, house_upgrade: int = 0, greenhouse_fixed: bool = True, raining: bool = False):
         self.data, self.tex, self.location = data, textures, location
         self.season = season if season in SEASONS else "spring"
         self.season_index = SEASONS.index(self.season)
         self.outdoors = outdoors
+        self.raining = raining and outdoors  # rain waters every outdoor tile, though the save doesn't say so
         self.game_id, self.days_played = game_id, days_played
         self.house_upgrade, self.greenhouse_fixed = house_upgrade, greenhouse_fixed
         self.sprites: list[dict] = []
@@ -127,7 +128,7 @@ class Scene:
         tex = "TerrainFeatures/hoeDirtDark" if self.location == "Mountain" else "TerrainFeatures/hoeDirt"
         if self.season == "winter" and self.outdoors:
             tex = "TerrainFeatures/hoeDirtSnow"
-        watered = {t for t, el in dirt.items() if _num(el, "state") == 1}
+        watered = set(dirt) if self.raining else {t for t, el in dirt.items() if _num(el, "state") == 1}
         for (x, y), _el in dirt.items():
             near = sum(bit for dx, dy, bit in NEIGHBOURS if (x + dx, y + dy) in dirt)
             pos = DIRT_GUIDE[near]
@@ -286,6 +287,8 @@ class Scene:
                 piece = FENCE_GUIDE.get(total, 5)
                 tex = data["Texture"]
                 self.add(tex, standard_rect(piece, self.width(tex), 16, 32), x * 16, y * 16 - 16, y * 16 + 8)
+            elif _bool(o, "bigCraftable") and self.chest(x, y, o, item):
+                continue
             elif _bool(o, "bigCraftable"):
                 data = self.data.asset("Data/BigCraftables").get(item)
                 if not data:
@@ -301,6 +304,25 @@ class Scene:
                 tex = data.get("Texture") or "Maps/springobjects"
                 self.add(tex, standard_rect(int(data.get("SpriteIndex") or 0), self.width(tex)), x * 16, y * 16,
                          y * 16 + 8 + x / 1000, flip=_bool(o, "flipped"))
+
+    def chest(self, x: int, y: int, o, item: str) -> bool:
+        """Chest.draw for a Chest or Big Chest painted a colour: a tinted body and lid, a plain trim strip and lid
+        shine. False when it's not one (an unpainted chest draws like any big craftable)."""
+        frames = {"130": (168, 46, 38), "BigChest": (312, 16, 8)}.get(item)
+        colour = _child(o, "playerChoiceColor")
+        rgb = [_num(colour, k) for k in ("R", "G", "B")] if colour is not None else [0, 0, 0]
+        if frames is None or rgb == [0, 0, 0]:
+            return False
+        tex = "TileSheets/Craftables"
+        body, shine, lid = frames
+        closed = int(_text(o, "startingLidFrame") or 0) or int(self.data.asset("Data/BigCraftables")[item]
+                                                               .get("SpriteIndex") or 0) + 1
+        w, z = self.width(tex), (y + 1) * 16 - 6 + x / 1000
+        self.add(tex, standard_rect(body, w, 16, 32), x * 16, y * 16 - 16, z, tint=rgb)
+        self.add(tex, [0, body // 8 * 32 + 53, 16, 11], x * 16, y * 16 + 5, z + 0.002)
+        self.add(tex, standard_rect(closed + shine, w, 16, 32), x * 16, y * 16 - 16, z + 0.002)
+        self.add(tex, standard_rect(closed + lid, w, 16, 32), x * 16, y * 16 - 16, z + 0.001, tint=rgb)
+        return True
 
     def building(self, b) -> None:
         kind = _text(b, "buildingType")
@@ -420,6 +442,7 @@ def _scene(farm, textures, location: str, season: str | None, *, outdoors: bool,
     farm_loc = _location(root, "Farm")
     sc = Scene(farm.data, textures, location, (season or s.season).lower(), outdoors=outdoors, game_id=game_id,
                days_played=s.days_played, house_upgrade=s.house_upgrade,
+               raining=bool(s.wet) and location != "Greenhouse" and not location.startswith("Island"),
                greenhouse_fixed=_bool(farm_loc, "greenhouseUnlocked") if farm_loc is not None else False)
     sprites = sc.read(loc, front) if loc is not None else []
     urls = {}
@@ -429,5 +452,6 @@ def _scene(farm, textures, location: str, season: str | None, *, outdoors: bool,
                 urls[sp["tex"]] = textures.url(sp["tex"])
             except (FileNotFoundError, ValueError):
                 urls[sp["tex"]] = None
-    return {"location": location, "season": sc.season, "sprites": [sp for sp in sprites if urls[sp["tex"]]],
+    return {"location": location, "season": sc.season, "raining": sc.raining,
+            "sprites": [sp for sp in sprites if urls[sp["tex"]]],
             "textures": {k: v for k, v in urls.items() if v}}

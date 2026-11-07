@@ -85,7 +85,8 @@ def view(farm: Farm, agenda: list[dict] | None = None) -> dict:
             today.append(_cart(farm))
         elif e.kind == "bookseller":
             from .month import bookseller_text  # month imports morning
-            today.append({"kind": e.kind, "title": e.label, "text": bookseller_text(farm, s.days_played)[0]})
+            today.append({"kind": e.kind, "title": e.label, "text": bookseller_text(farm, s.days_played)[0],
+                          "spots": [{"loc": "Town", "x": 109, "y": 27, "label": "Bookseller"}]})
         elif e.kind == "green_rain":
             today.append({"kind": e.kind, "title": e.label, "text": farm.place(e.detail) if e.detail else ""})
     if s.dish_of_the_day:
@@ -439,8 +440,12 @@ def _bins(farm: Farm) -> dict:
     if not full:
         return {"kind": "bins", "title": "Every garbage can is empty today", "text": ""}
     n = len(full)
+    marks = {m.name.removeprefix("Garbage:"): m for m in farm.walker.landmarks.get("Town", [])
+             if m.name.startswith("Garbage:")}
     return {"kind": "bins", "title": f"{n} garbage can{'s have' if n != 1 else ' has'} something today",
-            "text": " · ".join(f"{c.place}: {_can_item(c)}" for c in full)}
+            "text": " · ".join(f"{c.place}: {_can_item(c)}" for c in full),
+            "spots": [{"loc": "Town", "x": marks[c.can].x, "y": marks[c.can].y, "label": c.place}
+                      for c in full if c.can in marks]}
 
 
 def _bins_ahead(farm: Farm, days_played: int) -> str:
@@ -450,6 +455,16 @@ def _bins_ahead(farm: Farm, days_played: int) -> str:
     return f"Bins: {', '.join(parts)}" if parts else ""
 
 
+CART_TILE = (23, 10)  # Forest.GetTravelingMerchantCartTile without a TravelingCartPosition map property
+
+
+def _cart_counter(farm: Farm) -> dict:
+    """Where you stand to buy: the cart's counter is 4 east and 1 south of its tile; you stand just below."""
+    raw = (farm.data.asset("Maps/Forest").get("Properties") or {}).get("TravelingCartPosition")
+    x, y = (int(v) for v in str(raw).split()[:2]) if raw else CART_TILE
+    return {"x": x + 4, "y": y + 2}
+
+
 def _cart(farm: Farm) -> dict:
     """The cart today, and anything on it a bundle still needs."""
     days = list(farm.cart.days(farm.when, count_days=1, guarantee=farm.save.cart_guarantee))
@@ -457,9 +472,10 @@ def _cart(farm: Farm) -> dict:
     hits = [f"{i.name} ({i.price:,}g)" for d in days for i in d.items
             if i.item in want and cc.cart_only(want[i.item], i.stock)]
     place = " & ".join(farm.place(p) for p in days[0].place.split(" & ")) if days else "the Forest"
+    spots = [{"loc": "Forest", **_cart_counter(farm), "label": "Cart"}] if days and "Forest" in days[0].place else []
     return {"kind": "cart", "title": f"The Traveling Cart is at {place}, 6 AM to 8 PM",
             "text": f"Only the cart has this in time: {', '.join(hits)}" if hits
-            else "nothing you can't get elsewhere"}
+            else "nothing you can't get elsewhere", "spots": spots}
 
 
 def _time(t: int) -> str:

@@ -40,9 +40,9 @@ class Planner:
     @property
     def textures(self):
         """The game's pictures, decoded on demand (see pictures.py)."""
-        from .pictures import Textures
+        from .pictures import shared
         if self._textures is None:
-            self._textures = Textures(self.data.install.content, self.data.cache)
+            self._textures = shared(self.data.install.content, self.data.cache)
         return self._textures
 
     def saves(self) -> list[Path]:
@@ -256,6 +256,14 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         farm, targets, nice, settings, cave = route_args(ask)
         return route(farm, targets, nice, settings=settings, cave=cave)
 
+    @app.post("/api/today/wood")
+    def wood_view(ask: RouteAsk, trees: int = 0) -> dict:
+        """The Wood note from your goals' own dates: the next job you're short for, how soon, and the schedule."""
+        from .engine.route.plan import route
+        from .views.today import wood_plan, wood_uses
+        farm, targets, nice, settings, cave = route_args(ask)
+        return {"note": wood_plan(farm, wood_uses(route(farm, targets, nice, settings=settings, cave=cave)), trees)}
+
     @app.post("/api/needs")
     def needs_view(ask: RouteAsk) -> dict:
         """Everything these goals take, added up: gold, materials and days, what each is for, and every way
@@ -280,6 +288,22 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def map_page() -> FileResponse:
         """A page for looking at one map: /map.html?loc=Farm&x=61&y=21&r=8 (no x/y: the whole map)."""
         return FileResponse(STATIC / "map.html")
+
+    @app.get("/world.html")
+    def world_page() -> FileResponse:
+        """Today on the valley's maps: places of interest and the planned walk (static/world.js)."""
+        return FileResponse(STATIC / "world.html")
+
+    @app.get("/api/world")
+    def world_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
+                   spouse: str = "") -> dict:
+        """Today's places of interest and the planned walk, by map (views/world.py); same asks as /api/today."""
+        from .views import today, world
+        farm, pl = p().farm(), p()
+        store = todo.pace_file(pl.path().parent.name) if pl.path() else None
+        pace = today.learned_pace(store, farm.save.days_played, None) if store else None
+        return world.view(farm, time=time, energy=energy, where=where or None,
+                          done=set(filter(None, done.split(","))), spouse=spouse, pace=pace)
 
     @app.get("/api/tex/{asset:path}")
     def texture(asset: str, v: str = "") -> Response:
@@ -340,7 +364,7 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         """The page and its files are checked with the server on every load (a quick 'not changed' when they
         haven't), so an update shows at once instead of a browser's cached copy."""
         response = await call_next(request)
-        if request.url.path in ("/", "/map.html") or request.url.path.startswith("/static/"):
+        if request.url.path in ("/", "/map.html", "/world.html") or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-cache"
         return response
     return app

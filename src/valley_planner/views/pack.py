@@ -41,6 +41,9 @@ def _gift(farm: Farm, who: str, spare: list[dict]) -> dict | None:
     return min(ranked, key=lambda x: x[:2])[2:] if ranked else None
 
 
+QUALITY_WORDS = {1: "silver", 2: "gold", 4: "iridium"}
+
+
 def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
     s = farm.save
     order = [p["id"] for p in plan]
@@ -118,7 +121,13 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
 
     buyers = Buyers(farm.data)
     ship: list[dict] = []
-    sales: list[tuple[int, str, str]] = []  # gold, stop, item
+    sales: list[tuple[int, str, str, dict]] = []  # gold, stop, item, the row for the bin if the bag is full
+
+    def row(r: dict, gold: int, label: str) -> dict:
+        """A Shipping bin line: the words, plus the parts a table shows (item, its picture, count, price)."""
+        return {"name": label, "gold": gold, "item": r["name"], "count": r["count"], "each": r["each"],
+                "quality": QUALITY_WORDS.get(r.get("q", 0), ""), "icon": farm.icon(r["id"])}
+
     for r in spare:
         if not r["count"]:
             continue
@@ -126,9 +135,9 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
         label = f"{r['count']} {r['name']}" if r["count"] > 1 else r["name"]
         key = next((SHOP_STOPS[b] for b in buyers.of(r.get("category")) if SHOP_STOPS.get(b) in order), None)
         if key:
-            sales.append((gold, key, label))
+            sales.append((gold, key, label, row(r, gold, label)))
         else:
-            ship.append({"name": label, "gold": gold})
+            ship.append(row(r, gold, label))
 
     keep = {t for p in plan for t in TOOLS_FOR.get(p["kind"], ())}
     bag = [i for i in s.items if i.where == "Backpack"]
@@ -136,10 +145,10 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
     leave = [i.name for i in bag if i.name not in keep and i.name not in taken]
     free = max((FREE_SLOTS.get(p["kind"], 0) for p in plan), default=0)
     room = s.max_items - free - len(tool_names) - len(taken)
-    sales.sort(reverse=True)
-    for gold, _key, label in sales[max(0, room):]:
-        ship.append({"name": label, "gold": gold, "no_room": True})
-    for gold, key, label in sales[:max(0, room)]:
+    sales.sort(key=lambda x: x[0], reverse=True)
+    for _gold, _key, _label, line in sales[max(0, room):]:
+        ship.append({**line, "no_room": True})
+    for gold, key, label, _line in sales[:max(0, room)]:
         entry = stop(key, STOP_NAMES[key])
         entry["items"].append(label)
         entry["gold"] += gold

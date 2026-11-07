@@ -68,7 +68,8 @@ def test_with_no_shop_on_the_route_spares_go_in_the_bin(farm, monkeypatch):
     monkeypatch.setattr(sell, "default", lambda _f: {"sell": rows})
     monkeypatch.setattr(farm.save, "items", [Item(id="129", name="Anchovy", stack=2, quality=0, where="Farm chest")])
     v = pack.build(farm, [stop("pierre")])
-    assert v["ship"] == [{"name": "2 Anchovy", "gold": 60}]
+    assert [{k: x[k] for k in ("name", "gold", "item", "count", "each")} for x in v["ship"]] == [
+        {"name": "2 Anchovy", "gold": 60, "item": "Anchovy", "count": 2, "each": 30}]
 
 
 def test_a_gift_is_a_like_and_never_something_dear(farm, monkeypatch):

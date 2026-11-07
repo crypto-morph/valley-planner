@@ -169,6 +169,10 @@
     for (const l of layers) if (l.group === "Back" || l.group === "Buildings") drawLayer(ctx, data, l, view, s);
     drawSprites(ctx, data, view, s);
     for (const l of layers) if (l.group === "Front" || l.group === "AlwaysFront") drawLayer(ctx, data, l, view, s);
+    if (data.scene && data.scene.raining) {  // the game dims the light when it rains outdoors
+      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = "rgb(150, 160, 190)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.restore();
+    }
     drawMarks(ctx, marks, view, s);
     return { ...view, scale: s, width: data.map.width, height: data.map.height };
   }

@@ -229,3 +229,37 @@ def map_draw(textures: Textures, asset: str, season: str = "spring") -> dict:
             sheets[i]["url"] = textures.url(sheets[i]["tex"])
     return {"map": asset, "width": back.width, "height": back.height, "tile": 16, "season": season,
             "sheets": sheets, "layers": layers}
+
+
+def item_icon(textures: Textures, data, qid: str) -> dict | None:
+    """Where an item's own picture sits in the game's sheets, for a CSS sprite: {url, x, y, w, h, sw, sh}
+    (sheet width and height). Objects are 16x16, big craftables 16x32. None if it can't be found."""
+    kind, _, item = qid.partition(")")
+    kind, item = kind.lstrip("("), item or qid
+    if kind not in ("O", "BC"):
+        return None
+    table, tex, h = (("Data/Objects", "Maps/springobjects", 16) if kind == "O"
+                     else ("Data/BigCraftables", "TileSheets/Craftables", 32))
+    entry = data.asset(table).get(item)
+    if not entry:
+        return None
+    tex = str(entry.get("Texture") or tex).replace("\\", "/")
+    try:
+        sw, sh = textures.size(tex)
+        url = textures.url(tex)
+    except (FileNotFoundError, ValueError, NotAllowed):
+        return None
+    index = int(entry.get("SpriteIndex") or 0)
+    cols = max(1, sw // 16)
+    return {"url": url, "x": index % cols * 16, "y": index // cols * h, "w": 16, "h": h, "sw": sw, "sh": sh}
+
+
+_SHARED: dict[tuple, Textures] = {}
+
+
+def shared(content: Path, cache: Path | None) -> Textures:
+    """One Textures per game install, so the page's pictures and the views' icons share a memory cache."""
+    key = (str(content), str(cache))
+    if key not in _SHARED:
+        _SHARED[key] = Textures(content, cache)
+    return _SHARED[key]

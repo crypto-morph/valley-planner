@@ -40,7 +40,7 @@ function itemCard(c) {
 // Where a villager is today, from /api/ask/villager's "today" (one entry, or two on a rain-coinflip day)
 function whereToday(today) {
   return today.map((d) => (today.length > 1 ? `<p class="sub">${Math.round(d.chance * 100)}% chance:</p>` : "") +
-    (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), esc(st.place) + (st.spot ? `<details class="pic-fold"><summary>Show me where</summary>${spotPic(st.spot)}</details>` : "")))) : '<p class="sub">Stays home</p>')).join("");
+    (d.stops.length ? list(d.stops.map((st) => li(esc(st.time), placeLink(st.place, st.spot ? [{ loc: st.spot[0], x: st.spot[1], y: st.spot[2] }] : null)))) : '<p class="sub">Stays home</p>')).join("");
 }
 
 // A card's sections as tabs, so a long card opens on one short list instead of everything at once.
@@ -536,7 +536,7 @@ function tick(id, on) {
   drawNext(lastDay);
 }
 
-const extras = (rows) => rows.map((x) => `${esc(x.title)} ${x.gold}g${x.near ? ` (${esc(x.near)})` : ` (${esc(x.place)})`}`).join("; ");
+const extras = (rows) => rows.map((x) => `${placeLink(`${x.title} ${x.gold}g`, x.spot ? [{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title }] : null)}${x.near ? ` (${esc(x.near)})` : ` (${esc(x.place)})`}`).join("; ");
 
 // The one thing to do next, and everything after it. Ticking moves on without asking the server.
 function drawNext(v) {
@@ -552,28 +552,66 @@ function drawNext(v) {
   if (first) $("#t-done").onclick = () => tick(first.id, true);
   drawMaps($("#t-next"));
   const homeward = v.passing.filter((x) => x.stop >= v.plan.length);
-  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label>${x.spot ? `<details class="pic-fold"><summary>Show me where</summary>${spotPic(x.spot, x.title)}</details>` : ""}</li>`;
+  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}${x.spot ? `<button type="button" class="place-link pin" aria-label="Show ${esc(x.title)} on the map" data-spots="${esc(JSON.stringify([{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title.length < 28 ? x.title : "" }]))}">${PIN} Map</button>` : ""}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
   $("#t-plan").innerHTML = `<ul class="stops">${v.plan.filter((x) => !first || x.id !== first.id).map(line).join("")}</ul>` +
     (homeward.length ? `<p class="muted"><strong>On the way home:</strong> ${extras(homeward)}</p>` : "") +
     (v.home ? `<p class="muted">Home by about ${esc(v.home)}.${v.spare.length ? ` Then ${esc(v.spare.join(", or "))}.` : ""}</p>` : "") +
-    (v.fishing ? `<p class="muted"><strong>Fish at ${esc(v.fishing.place)}</strong> for ${v.fishing.fish.map(esc).join(", ")}.</p>` +
-      (v.fishing.spots.length ? `<details class="pic-fold"><summary>Show me today's bubbles</summary>${spotPic([v.fishing.location, ...v.fishing.spots[0]], "", v.fishing.spots.map(([x, y], i) => ({ x, y, kind: "dot", color: "#1C4C74", label: i ? "" : "Bubbles" })))}</details>` : "") : "") +
+    (v.fishing ? `<p class="muted"><strong>Fish at ${placeLink(v.fishing.place, v.fishing.spots.map(([x, y], i) => ({ loc: v.fishing.location, x, y, label: i ? "" : "Bubbles" })))}</strong> for ${v.fishing.fish.map(esc).join(", ")}.</p>` : "") +
     (v.left.length ? `<details class="fold plain"><summary>Doesn't fit today (${v.left.length})</summary><ul class="list">${v.left.map((x) => `<li><span>${esc(x.title)}</span><span class="muted">${esc(x.why)}</span></li>`).join("")}</ul></details>` : "");
   document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => tick(c.dataset.stop, c.checked)));
 }
 
 function drawPack(p) {
   const s = p.slots;
+  const worth = p.ship.filter((x) => x.gold > 0), junk = p.ship.filter((x) => !(x.gold > 0));
+  const shipRows = worth.map((x) => `<tr><td class="ic">${itemIcon(x.icon)}</td><td>${esc(x.item || x.name)}${x.quality ? ` <span class="muted small">${esc(x.quality)}</span>` : ""}${x.no_room ? ' <span class="tag">bag full</span>' : ""}</td>` +
+    `<td class="num">${x.count ?? ""}</td><td class="num">${x.gold.toLocaleString()}g</td></tr>`).join("");
   $("#t-pack").innerHTML = `<div class="pack-head"><h2>Pack your bag</h2><strong>${s.used} of ${s.max} slots</strong></div>` +
-    (p.leave.length ? `<div class="alert amber small"><strong>Put in the Chest:</strong> ${p.leave.map(esc).join(", ")}.</div>` : "") +
-    (p.tools.length ? `<p class="muted">Keep with you: ${p.tools.map(esc).join(", ")}.</p>` : "") +
-    p.stops.map((x, i) => `<div class="pack-stop"><strong>${i + 1}. ${esc(x.stop)}</strong>${x.gold ? ` <span class="muted">about ${x.gold.toLocaleString()}g</span>` : ""}` +
-      (x.first ? `<div class="first">${esc(x.first)}</div>` : "") + (x.items.length ? `<div>${x.items.map(esc).join(", ")}</div>` : "") +
-      (x.there.length ? `<div class="muted">Already in the chest there: ${x.there.map(esc).join(", ")}</div>` : "") + "</div>").join("") +
-    (p.ship.length ? `<div class="pack-stop"><strong>Shipping bin</strong> <span class="muted">about ${p.ship_gold.toLocaleString()}g</span><div>${p.ship.map((x) => esc(x.name)).join(", ")}</div></div>` : "") +
+    (p.leave.length ? `<p class="small"><span class="tag amber">Leave in the Chest</span> ${p.leave.map(esc).join(", ")}</p>` : "") +
+    (p.tools.length ? `<p class="small"><span class="tag">Keep</span> ${p.tools.map(esc).join(", ")}</p>` : "") +
+    (p.stops.length ? `<table class="pack-table"><tbody>${p.stops.map((x, i) => `<tr><td class="num">${i + 1}</td><td><strong>${esc(x.stop)}</strong>` +
+      (x.first ? `<div class="small first">${esc(x.first)}</div>` : "") +
+      (x.there.length ? `<div class="muted small">Already there: ${x.there.map(esc).join(", ")}</div>` : "") +
+      `</td><td>${x.items.map(esc).join(", ")}${x.gold ? ` <span class="muted small">about ${x.gold.toLocaleString()}g</span>` : ""}</td></tr>`).join("")}</tbody></table>` : "") +
+    (worth.length ? `<details class="fold plain"><summary><span>Shipping bin <span class="muted">· ${worth.length} item${worth.length === 1 ? "" : "s"} · about ${p.ship_gold.toLocaleString()}g</span></span></summary>` +
+      `<table class="ship-table"><thead><tr><th></th><th>Item</th><th class="num">How many</th><th class="num">Gold</th></tr></thead><tbody>${shipRows}</tbody></table>` +
+      (p.dropped.length ? '<p class="muted small">"Bag full": a shop on your route would buy these, but there isn\'t room to carry them.</p>' : "") + "</details>" : "") +
+    (junk.length ? `<p class="muted small">Worth nothing, so leave them in the Chest for a Recycling Machine: ${junk.map((x) => esc(x.name)).join(", ")}.</p>` : "") +
     (p.left_behind.length ? `<p class="muted small">Left behind today: ${p.left_behind.map((x) => `${x.items.map(esc).join(", ")} in the chest at ${esc(x.place)}`).join("; ")}.</p>` : "") +
-    (p.dropped.length ? `<p class="muted small">Bag full, so these go in the bin: ${p.dropped.map(esc).join(", ")}.</p>` : "") +
     (s.free_on_purpose ? `<p class="muted small">Leaves ${s.free_on_purpose} slots free for what you pick up.</p>` : "");
+}
+
+// One note: a line you can open for the reason (a triangle), coloured by how soon it matters.
+function noteItem(n) {
+  const cls = n.level ? ` class="lvl-${esc(n.level)}"` : "";
+  const lazy = n.lazy ? ` data-lazy="${esc(n.lazy)}"` : "";
+  return n.why || n.rows
+    ? `<li${cls}${lazy}><details class="note"><summary>${esc(n.text)}</summary><div class="note-why">${esc(n.why || "")}${n.rows ? woodRows(n) : ""}</div></details></li>`
+    : `<li class="note-plain${n.level ? ` lvl-${esc(n.level)}` : ""}"${lazy}>${esc(n.text)}</li>`;
+}
+
+function woodRows(n) {
+  return `<p>Your goals use Wood for these, in the order your route needs them (you hold ${n.held}):</p>` +
+    `<table class="ship-table"><thead><tr><th>For</th><th class="num">Wood</th><th class="num">Running total</th><th>When</th></tr></thead><tbody>${n.rows.map((u) =>
+      `<tr><td>${esc(cap(u.what))} <span class="muted small">${esc(u.goal)}</span></td><td class="num">${u.wood}</td><td class="num">${u.total.toLocaleString()}${u.covered ? ' <span class="tag">have</span>' : ""}</td><td>${esc(u.date)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+// The Wood note is worked out from your goals' own dates, so it's asked for once the plan is on screen.
+async function woodNote(trees) {
+  try {
+    const r = await fetch(`/api/today/wood?trees=${trees}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(routeBody(routeState, "save")) });
+    const { note } = await r.json();
+    const li = document.querySelector('#t-notes li[data-lazy="wood"]');
+    if (!li) return;
+    if (!note) li.remove(); else li.outerHTML = noteItem(note);
+  } catch { /* keep the plain note */ }
+}
+
+// An item's own picture from the game's sheets ({url, x, y, w, h, sw, sh}, see pictures.item_icon), `px` wide.
+function itemIcon(ic, px = 24) {
+  if (!ic) return "";
+  const k = px / 16;
+  return `<span class="item-ic" aria-hidden="true" style="width:${px}px;height:${ic.h * k}px;background:url('${ic.url}') -${ic.x * k}px -${ic.y * k}px / ${ic.sw * k}px ${ic.sh * k}px no-repeat"></span>`;
 }
 
 // Goals that are off don't need a whole row each: one line lists them, and a press brings the rows back.
@@ -619,6 +657,45 @@ function spotPic([loc, x, y], label = "", marks = null) {
   return `<canvas class="map-pic" data-map="${esc(JSON.stringify({ loc, x, y, radius: 6, marks: marks || [{ x, y, kind: "cross", label: label.length < 28 ? label : "" }] }))}"></canvas>`;
 }
 
+const PIN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+
+// A place name you can tap: it opens a picture of that spot just below (and closes it again).
+// spots: [{loc, x, y, label?}]
+function placeLink(text, spots) {
+  if (!spots || !spots.length) return esc(text);
+  return `<button type="button" class="place-link" data-spots="${esc(JSON.stringify(spots))}">${esc(text)}</button>`;
+}
+
+// One picture per map the spots are on, wide enough to show them all.
+function spotsPics(spots) {
+  const byLoc = {};
+  spots.forEach((p) => (byLoc[p.loc] = byLoc[p.loc] || []).push(p));
+  return Object.entries(byLoc).map(([loc, ps]) => {
+    const xs = ps.map((p) => p.x), ys = ps.map((p) => p.y);
+    const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    const radius = Math.min(30, Math.max(6, Math.ceil(span / 2) + 3));
+    const marks = ps.map((p) => ({ x: p.x, y: p.y, kind: ps.length === 1 ? "cross" : "dot", label: p.label || "" }));
+    return `<canvas class="map-pic" data-map="${esc(JSON.stringify({ loc, x: Math.round((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.round((Math.min(...ys) + Math.max(...ys)) / 2), radius, scale: radius > 10 ? 1 : 2, marks }))}"></canvas>`;
+  }).join("");
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest?.(".place-link");
+  if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const host = b.closest("li, p, .pack-stop, .next-extra, div") || b.parentElement;
+  const open = host.querySelector(`:scope > .place-pop[data-for="${CSS.escape(b.dataset.spots)}"]`);
+  host.querySelectorAll(":scope > .place-pop").forEach((x) => x.remove());
+  b.setAttribute("aria-expanded", "false");
+  if (open) return;
+  const pop = document.createElement("div");
+  pop.className = "place-pop"; pop.dataset.for = b.dataset.spots;
+  pop.innerHTML = spotsPics(JSON.parse(b.dataset.spots));
+  host.appendChild(pop);
+  b.setAttribute("aria-expanded", "true");
+  drawMaps(pop);
+}, true);
+
 // Draw every <canvas data-map> inside `root` with the game's own tiles (static/map.js).
 function drawMaps(root) {
   if (!window.ValleyMap) return;
@@ -654,13 +731,20 @@ const views = {
     $("#t-warning").hidden = !v.warning;
     $("#t-warning").textContent = v.warning || "";
     $("#t-giant").hidden = !v.giant;
-    $("#t-giant").innerHTML = v.giant ? `<h2>Giant crop</h2>${giantCard(v.giant)}<p class="muted small">Green outline: the square. Cross: the top-left (1). Orange: tiles to sow (S), hoe and sow (H), or pull up and sow (P).</p>` : "";
-    drawMaps($("#t-giant"));
+    if (v.giant) {
+      const g = v.giant, todo = (g.checks || []).filter((c) => !c.ok).length;
+      const line = g.sow_by ? `${g.crop}: sow by ${g.sow_by}` : `${g.crop} turns giant on ${g.day}`;
+      $("#t-giant").innerHTML = `<details class="fold"><summary><span><strong>Giant crop</strong> <span class="muted">· ${esc(line)}</span></span>${todo ? ` <span class="tag red">${todo} to do today</span>` : ""}</summary>` +
+        `${giantCard(g)}<p class="muted small">Green outline: the square. Cross: the top-left (1). Orange: tiles to sow (S), hoe and sow (H), or pull up and sow (P).</p></details>`;
+    } else $("#t-giant").innerHTML = "";
     $("#t-notes").hidden = !v.notes.length;
-    $("#t-notes").textContent = v.notes.join(" ");
+    $("#t-notes").innerHTML = `<ul class="note-list">${v.notes.map(noteItem).join("")}</ul>`;
+    const wood = v.notes.find((n) => n.lazy === "wood");
+    if (wood) woodNote(wood.trees || 0);
     drawNext(v);
     drawPack(v.pack);
-    $("#t-skills").innerHTML = v.skills.map((k) => `<div class="skill"><div class="skill-name"><strong>${esc(cap(k.name))} ${k.level}</strong></div>${k.coming ? `<div class="small">${esc(levelLine(k.coming))}</div>` : ""}<div class="muted small">${k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div></div>`).join("");
+    $("#t-skills").innerHTML = `<table class="skill-table"><tbody>${v.skills.map((k) => `<tr><th scope="row">${esc(cap(k.name))}</th><td class="num">${k.level}</td>` +
+      `<td><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div><div class="muted small">${k.coming ? esc(levelLine(k.coming)) : k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div></td></tr>`).join("")}</tbody></table>`;
   },
 
   async morning() {
@@ -674,7 +758,7 @@ const views = {
     const shown = new Set(v.day.blocks.flatMap((b) => b.lines));
     const notes = v.today.filter((x) => x.kind !== "dish");  // the plan and pack list already carry the jobs
     $("#m-first").innerHTML = notes.length ? "<ul class=\"list\">" + notes.map((x) =>
-      `<li class="day-note${x.errand ? " clickable" : ""}"${x.errand ? ` data-errand="${esc(x.errand)}"` : ""}><b>${esc(x.title)}</b><span class="muted">${esc(x.text)}</span></li>`
+      `<li class="day-note${x.errand ? " clickable" : ""}"${x.errand ? ` data-errand="${esc(x.errand)}"` : ""}><b>${placeLink(x.title, x.spots)}</b><span class="muted">${esc(x.text)}</span></li>`
     ).join("") + "</ul>" : '<p class="muted">Nothing special today.</p>';
     document.querySelectorAll("#m-first li[data-errand]").forEach((el) => el.addEventListener("click", () => showErrand(el.dataset.errand)));
     drawQuests(v.quests);
@@ -902,6 +986,7 @@ function showSub(name) {
   return SUBS[name]();
 }
 
+let worldMap = null;
 const places = {
   async today() {
     await views.dayPlan(dayAsk);  // the plan first: the rest fills in behind it, without holding the page up
@@ -934,10 +1019,15 @@ const places = {
     await planRoute();
     await showSub(sub || "route");
   },
+  async map() {
+    // the map page (static/world.js) fetches its own data; mounted once, then just refreshed
+    if (!worldMap) worldMap = window.ValleyWorld.mount($("#world"));
+    else worldMap.reload({});
+  },
   async calendar() {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     const [day] = await Promise.all([lastDay ? lastDay : views.dayPlan().then(() => lastDay), drawMonth(calMonth.offset), views.cart()]);
-    $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${esc(b.place)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
+    $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${placeLink(b.place, b.spots)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
     $("#a-geodes").innerHTML = day.geodes.length ? day.geodes.map((g) => `<div>#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(", or ")}</div>`).join("") : '<p class="muted">No geodes held.</p>';
   },
 };
@@ -966,7 +1056,7 @@ const calMonth = { offset: 0, view: null, day: null };
 const calIcon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${(CAL_ICONS[k] || CAL_ICONS.quest)[0]}"/></svg>`;
 const CAL_SHOWN = 5;  // a phone's day cell holds no more than this; the day panel lists the rest
 
-function drawDay(n, focus) {
+function drawCalDay(n, focus) {
   const d = calMonth.view.days[n - 1];
   calMonth.day = n;
   document.querySelectorAll(".cal-cell").forEach((c) => c.setAttribute("aria-pressed", String(Number(c.dataset.day) === n)));
@@ -1001,7 +1091,7 @@ async function drawMonth(offset) {
   $("#cal-important").innerHTML = n ? v.important.map((x) => `<button type="button" class="cal-jump" data-day="${x.day}"><span class="cal-ic">${calIcon(x.kind)}</span> <strong>${esc(x.date)}</strong> ${esc(x.title)}</button>`).join("") : '<p class="muted">Nothing that would be missed.</p>';
   $("#cal-key").innerHTML = Object.keys(CAL_ICONS).map((k) => `<span class="cal-keyline"><span class="cal-ic">${calIcon(k)}</span> ${CAL_ICONS[k][1]}</span>`).join("");
   const today = v.days.find((d) => d.today);
-  drawDay((today || v.days.find((d) => d.items.some((x) => x.important)) || v.days[0]).day);
+  drawCalDay((today || v.days.find((d) => d.items.some((x) => x.important)) || v.days[0]).day);
 }
 
 async function drawWatch() {
@@ -1046,9 +1136,9 @@ async function start() {
   $("#cal-grid").addEventListener("click", (e) => {
     const cell = e.target.closest(".cal-cell");
     const ic = e.target.closest(".cal-ic");
-    if (cell) drawDay(Number(cell.dataset.day), ic ? Number(ic.dataset.i) : undefined);
+    if (cell) drawCalDay(Number(cell.dataset.day), ic ? Number(ic.dataset.i) : undefined);
   });
-  $("#cal-important").addEventListener("click", (e) => { const j = e.target.closest(".cal-jump"); if (j) drawDay(Number(j.dataset.day)); });
+  $("#cal-important").addEventListener("click", (e) => { const j = e.target.closest(".cal-jump"); if (j) drawCalDay(Number(j.dataset.day)); });
   document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => busy("Loading…", () => showSub(b.dataset.sub))));
   $("#romance-target").addEventListener("change", (e) => {
     try { localStorage.setItem("romanceTarget", e.target.value); } catch { /* fine */ }
@@ -1088,4 +1178,4 @@ $("#t-reset").addEventListener("click", async () => {
 });
 
 // A folded picture is drawn the first time it's opened, wherever it is on the page.
-document.addEventListener("toggle", (e) => { if (e.target.matches?.("details.pic-fold") && e.target.open) drawMaps(e.target); }, true);
+document.addEventListener("toggle", (e) => { if (e.target.matches?.("details") && e.target.open) drawMaps(e.target); }, true);
