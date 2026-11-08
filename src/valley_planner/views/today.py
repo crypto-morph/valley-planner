@@ -586,8 +586,10 @@ def _community_center(farm: Farm) -> list[dict]:
     door = _door(farm, "Town", "CommunityCenter")
     if not items or not door:
         return []
+    what = ", ".join(f"{i['count']} {i['name']} ({i['bundle']})" if i["count"] > 1 else f"{i['name']} ({i['bundle']})"
+                     for i in items)
     return [{"id": "cc", "kind": "shop", "title": "Community Center", "minutes": 5, "at": door,
-             "why": f"{len(items)} bundle item{'s' if len(items) != 1 else ''} to hand in",
+             "why": f"hand in {what}",
              "value": QUEST_VALUE}]
 
 

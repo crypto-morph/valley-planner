@@ -536,7 +536,19 @@ function tick(id, on) {
   drawNext(lastDay);
 }
 
-const extras = (rows) => rows.map((x) => `${placeLink(`${x.title} ${x.gold}g`, x.spot ? [{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title }] : null)}${x.near ? ` (${esc(x.near)})` : ` (${esc(x.place)})`}`).join("; ");
+// Finds on the way, with the same thing in the same place merged: "2 Leek 120g (Bus Stop)", both spots marked.
+const extras = (rows) => {
+  const groups = new Map();
+  rows.forEach((x) => {
+    const key = `${x.title}|${x.place}`;
+    if (!groups.has(key)) groups.set(key, { ...x, n: 0, gold: 0, spots: [] });
+    const g = groups.get(key);
+    g.n += 1; g.gold += x.gold;
+    if (x.spot) g.spots.push({ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title });
+    if (g.n > 1) g.near = "";  // one landmark can't describe two spots
+  });
+  return [...groups.values()].map((g) => `${placeLink(`${g.n > 1 ? `${g.n} ` : ""}${g.title} ${g.gold}g`, g.spots.length ? g.spots : null)}${g.near ? ` (${esc(g.near)})` : ` (${esc(g.place)})`}`).join("; ");
+};
 
 // The one thing to do next, and everything after it. Ticking moves on without asking the server.
 function drawNext(v) {
