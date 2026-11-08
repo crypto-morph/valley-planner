@@ -222,3 +222,20 @@ def test_app_js_names_each_function_once():
     js = (Path(__file__).parent.parent / "src" / "valley_planner" / "static" / "app.js").read_text()
     names = Counter(re.findall(r"^(?:async\s+)?function\s+(\w+)", js, re.M))
     assert not [n for n, k in names.items() if k > 1]
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None or SAVES is None, reason="needs the game and a save")
+def test_one_of_every_crop_is_kept_for_the_seed_maker():
+    from valley_planner.app import Planner
+    from valley_planner.views import sell
+    try:
+        farm = Planner(shared_data()).farm()
+    except Exception:
+        pytest.skip("no save here")
+    crops = {farm.name(f"(O){c.harvest}") for c in farm.crops.by_seed.values() if c.harvest}
+    v = sell.view(farm)
+    offered = {r["name"] for r in v["sell"]} | {r["name"] for r in v["process"]}
+    assert offered & crops <= {r["name"] for r in v["keep"]}  # never down to the last one
+    off = sell.view(farm, {"seeds": False})
+    assert {r["name"] for r in off["sell"]} >= {r["name"] for r in v["sell"]}  # the rule can be switched off

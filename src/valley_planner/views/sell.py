@@ -10,8 +10,8 @@ asks for, the first copy of anything the museum hasn't had, and a loved
 gift for each birthday in the next week.
 Held unless you switch it off: gifts a villager loves (2 per villager who
 loves it, up to 4) or likes (1), one of anything a Help Wanted request can
-ask for this season (they pay 3x), and one of each crop you hold no seeds
-for (a Seed Maker turns it into seeds).
+ask for this season (they pay 3x), and one of every crop, the lowest quality you have, so a Seed Maker can
+always grow more (it gives 1-3 seeds whatever the quality: rule seedmaker.output-1-3).
 Machines: each machine you own takes one batch (we can't see which are
 busy), when its product sells for at least 1.3x the raw goods.
 
@@ -41,7 +41,7 @@ FILTERS = {
     "loved": "Gifts a villager loves (2 for each who loves it, up to 4)",
     "liked": "Gifts a villager likes (1)",
     "help_wanted": "Things a Help Wanted request can ask for this season, which pays 3x (1)",
-    "seeds": "One of every crop you hold no seeds for, for the Seed Maker (1)",
+    "seeds": "One of every crop, for the Seed Maker (1)",
 }
 DEFAULT_FILTERS = {"loved": True, "liked": False, "help_wanted": True, "seeds": True}
 PROCESS_GAIN = 1.3
@@ -145,9 +145,10 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
         if qid[3:] in help_ids:
             holds["help_wanted"] = (1, "a Help Wanted request could ask for it (3x the price)")
         seed = seed_of.get(qid)
-        if seed and not held.get(seed):
-            holds["seeds"] = (1, f"you have no {farm.name(seed)}: " + (
-                "put one in your Seed Maker" if seed_maker else "keep one until you have a Seed Maker"))
+        if seed:
+            holds["seeds"] = (1, "one of every crop, for the Seed Maker" if held.get(seed) else
+                              f"you have no {farm.name(seed)}: " + (
+                                  "put one in your Seed Maker" if seed_maker else "keep one for a Seed Maker"))
         spare = sum(x.left for x in stacks)
         cheapest = min(stacks, key=lambda x: x.it.quality).it
         for k, (n, _) in holds.items():
@@ -156,7 +157,7 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
         active = [(n, why) for k, (n, why) in holds.items() if on.get(k)]
         if not active:
             continue
-        if seed_maker and on["seeds"] and "seeds" in holds:
+        if seed_maker and on["seeds"] and "seeds" in holds and not held.get(seed):
             seed_jobs.append({"name": farm.name(qid), "count": 1, "machine": "Seed Maker",
                               "product": f"1-3 {farm.name(seed)}", "each_raw": 0, "each_product": 0, "gain": 0,
                               "seeds": True})
