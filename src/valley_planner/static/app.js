@@ -529,6 +529,16 @@ function answer(id, yes) {
   if (yes) d.delete(id); else d.add(id);
   try { localStorage.setItem("declined", JSON.stringify([...d])); } catch { /* fine without */ }
 }
+// Day preferences a note can switch (e.g. plantAll: plant every seed, not only under Sprinklers).
+function prefs() {
+  try { return JSON.parse(localStorage.getItem("dayPrefs") || "{}"); } catch { return {}; }
+}
+function setPref(key, on) {
+  try { localStorage.setItem("dayPrefs", JSON.stringify({ ...prefs(), [key]: on })); } catch { /* fine without */ }
+}
+function dayParams() {
+  return { declined: [...declined()].join(","), rules: rulesParam(), plant_all: prefs().plantAll ? "true" : "false" };
+}
 function askItem(a) {
   return `<li class="note-ask"><div><strong>${esc(a.text)}</strong> <span class="muted small">${esc(a.why)}</span></div>` +
     `<div class="seg ask-seg" role="group" aria-label="${esc(a.text)}"><button type="button" data-ask="${esc(a.id)}" data-yes="1" aria-pressed="${a.yes}"${a.yes ? ' class="on"' : ""}>Yes, keep it</button>` +
@@ -561,7 +571,7 @@ function setSatnav(on) {
   try { localStorage.setItem("satnav", on ? "1" : ""); } catch { /* fine without */ }
   if (on && !satnav && window.ValleySatnav) {
     satnav = window.ValleySatnav.mount(box, {
-      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "", declined: [...declined()].join(","), rules: rulesParam() },
+      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "", ...dayParams() },
       onDone: (id) => tick(id, true),
     });
   } else if (!on && satnav) { satnav.destroy(); satnav = null; box.innerHTML = ""; }
@@ -595,7 +605,7 @@ function drawNext(v) {
   const box = $("#t-load details");
   if (box) box.addEventListener("toggle", () => { bagOpen = box.open; });
   $("#t-next").innerHTML = (first
-    ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
+    ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${first.rare ? '<span class="tag rare">Rare</span> ' : ""}${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
       (first.way.length ? `<ol>${first.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") +
       (first.extras ? `<p class="next-extra"><strong>On the way:</strong> ${extras(first.extras)}</p>` : "") +
       (first.spot ? spotPic(first.spot, first.title) : "") +
@@ -607,7 +617,7 @@ function drawNext(v) {
   if (first) $("#t-done").onclick = () => tick(first.id, true);
   drawMaps($("#t-next"));
   const homeward = v.passing.filter((x) => x.stop >= v.plan.length);
-  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}${x.spot ? `<button type="button" class="place-link pin" aria-label="Show ${esc(x.title)} on the map" data-spots="${esc(JSON.stringify([{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title.length < 28 ? x.title : "" }]))}">${PIN} Map</button>` : ""}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.take ? `<span class="stop-extra">Take: ${x.take.map(esc).join(", ")}</span>` : ""}${x.seeds && x.seeds.length ? `<details class="fold plain seed-fold"><summary>The seeds, and what each is for</summary>${seedTable(x.seeds)}</details>` : ""}${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
+  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}${x.spot ? `<button type="button" class="place-link pin" aria-label="Show ${esc(x.title)} on the map" data-spots="${esc(JSON.stringify([{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title.length < 28 ? x.title : "" }]))}">${PIN} Map</button>` : ""}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}">${x.rare ? '<span class="tag rare">Rare</span> ' : ""}<strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.take ? `<span class="stop-extra">Take: ${x.take.map(esc).join(", ")}</span>` : ""}${x.seeds && x.seeds.length ? `<details class="fold plain seed-fold"><summary>The seeds, and what each is for</summary>${seedTable(x.seeds)}</details>` : ""}${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
   $("#t-plan").innerHTML = `<ul class="stops">${v.plan.filter((x) => !first || x.id !== first.id).map(line).join("")}</ul>` +
     (homeward.length ? `<p class="muted"><strong>On the way home:</strong> ${extras(homeward)}</p>` : "") +
     (v.home ? `<p class="muted">Home by about ${esc(v.home)}.${v.spare.length ? ` Then ${esc(v.spare.join(", or "))}.` : ""}</p>` : "") +
@@ -662,8 +672,9 @@ function problemList(problems) {
 function noteItem(n) {
   const cls = n.level ? ` class="lvl-${esc(n.level)}"` : "";
   const lazy = n.lazy ? ` data-lazy="${esc(n.lazy)}"` : "";
+  const toggle = n.toggle ? `<button type="button" class="btn quiet small" data-pref="${esc(n.toggle.key)}" data-on="${n.toggle.on ? "1" : ""}">${esc(n.toggle.label)}</button>` : "";
   return n.why || n.rows
-    ? `<li${cls}${lazy}><details class="note"><summary>${esc(n.text)}</summary><div class="note-why">${esc(n.why || "")}${n.rows ? woodRows(n) : ""}</div></details></li>`
+    ? `<li${cls}${lazy}><details class="note"><summary>${esc(n.text)}</summary><div class="note-why">${esc(n.why || "")}${n.rows ? woodRows(n) : ""}${toggle}</div></details></li>`
     : `<li class="note-plain${n.level ? ` lvl-${esc(n.level)}` : ""}"${lazy}>${esc(n.text)}</li>`;
 }
 
@@ -796,7 +807,7 @@ const views = {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     dayAsk = ask;
     if (!todayDone.date) { const m = await get("/api/meta"); loadDone(m.date); }
-    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")), declined: [...declined()].join(","), rules: rulesParam() })}`);
+    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")), ...dayParams() })}`);
     lastDay = v;
     const h = v.head;
     $("#m-date").textContent = `${h.weekday}, ${h.date.replace(/, Year \d+/, "")}`;
@@ -818,6 +829,10 @@ const views = {
     const asks = v.asks || [];
     $("#t-notes").hidden = !v.notes.length && !asks.length;
     $("#t-notes").innerHTML = `<ul class="note-list">${asks.map(askItem).join("")}${v.notes.map(noteItem).join("")}</ul>`;
+    document.querySelectorAll("#t-notes [data-pref]").forEach((b) => b.addEventListener("click", () => {
+      setPref(b.dataset.pref, Boolean(b.dataset.on));
+      views.dayPlan(dayAsk);
+    }));
     document.querySelectorAll("#t-notes [data-ask]").forEach((b) => b.addEventListener("click", () => {
       answer(b.dataset.ask, Boolean(b.dataset.yes));
       views.dayPlan(dayAsk);  // what to sell and take follows the answer

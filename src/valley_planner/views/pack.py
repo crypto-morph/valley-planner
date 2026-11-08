@@ -24,7 +24,8 @@ STOP_NAMES = {"cc": "Community Center", "museum": "the Museum", "clint": "Clint'
 PURPOSE = {"cc": "hand in at the Community Center", "museum": "donate at the Museum", "clint": "crack at Clint's"}
 WHO_STOP = {"Willy": "willy", "Clint": "clint", "Pierre": "pierre"}
 HOME_PLACES = ("Farm", "FarmHouse", "Cellar", "Greenhouse", "Coop", "Barn", "Shed", "Junimo")
-STOP_CHESTS = {"cc": "CommunityCenter chest", "mines": "Mine chest"}  # chests a stop already stands beside
+# chests a stop already stands beside
+STOP_CHESTS = {"cc": "CommunityCenter chest", "mines": "Mine chest", "cc_mines": "Mine chest"}
 GIFT_LIMIT = 400  # gold: dearer things are a choice for you, not an automatic gift
 
 
@@ -166,6 +167,7 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
                 taken.add(farm.name(pick[0]))
 
     buyers = Buyers(farm.data)
+    selling = {p["id"] for p in plan if p.get("sells")}  # shops you sell at today; the rest goes in the bin
     ship: list[dict] = []
     sales: list[tuple[int, str, str, dict]] = []  # gold, stop, item, the row for the bin if the bag is full
 
@@ -179,7 +181,7 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
             continue
         gold = r["count"] * r["each"]
         label = f"{r['count']} {r['name']}" if r["count"] > 1 else r["name"]
-        key = next((SHOP_STOPS[b] for b in buyers.of(r.get("category")) if SHOP_STOPS.get(b) in order), None)
+        key = next((SHOP_STOPS[b] for b in buyers.of(r.get("category")) if SHOP_STOPS.get(b) in selling), None)
         if key:
             sales.append((gold, key, label, row(r, gold, label)))
         else:

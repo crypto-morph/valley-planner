@@ -108,3 +108,19 @@ def next_scarecrow(crops: set, guards: list) -> tuple[int, int] | None:
     my = sum(y for _, y in open_crops) / len(open_crops)
     return max(crops, key=lambda t: (sum(_near(t, c) for c in open_crops), -((t[0] - mx) ** 2 + (t[1] - my) ** 2),
                                      t))
+
+
+SPRINKLER_RADIUS = {"Sprinkler": 0, "Quality Sprinkler": 1, "Iridium Sprinkler": 2}  # rules sprinkler.basic-4 etc.
+
+
+def sprinkler_tiles(objects: dict[tuple[int, int], str]) -> set[tuple[int, int]]:
+    """The tiles the placed Sprinklers water ({tile: object name}): a Sprinkler its 4 neighbours, a Quality one the
+    3x3 around it, an Iridium one the 5x5 (never its own tile). Pressure Nozzles aren't read from the save yet."""
+    out: set[tuple[int, int]] = set()
+    for (x, y), name in objects.items():
+        r = SPRINKLER_RADIUS.get(name)
+        if r == 0:
+            out |= {(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)}
+        elif r:
+            out |= {(x + i, y + j) for i in range(-r, r + 1) for j in range(-r, r + 1) if i or j}
+    return out

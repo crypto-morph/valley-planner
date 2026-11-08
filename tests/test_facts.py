@@ -212,3 +212,18 @@ def test_giftable_flag():
     data.tables["Data/Objects"]["999"] = {"Name": "Quest item", "Category": 0, "Price": 0, "CanBeGivenAsGift": False}
     g = Gifts(data)
     assert g.giftable("24") and not g.giftable("999") and not g.giftable("nope")
+
+
+def test_enough_to_plant_for_five_gold():
+    from valley_planner.facts.crops import gold_or_better, plant_for_gold
+    basic = gold_or_better(6, 1)
+    assert round(basic, 3) == 0.263 and round(gold_or_better(6, 0), 2) == 0.13
+    n = plant_for_gold(5, basic)
+    assert 25 <= n <= 32  # three times as many (15) would miss more often than not
+    assert plant_for_gold(5, 1.0) == 5 and plant_for_gold(0, 0.3) == 0
+    assert gold_or_better(6, 3) > gold_chance_deluxe_floor()
+
+
+def gold_chance_deluxe_floor():
+    from valley_planner.facts.crops import gold_chance
+    return gold_chance(6, 3)

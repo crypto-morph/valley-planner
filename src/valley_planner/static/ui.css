@@ -309,3 +309,6 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .rules li > div:first-child { flex: 1 1 14em; }
 .rules li > div:first-child::before { counter-increment: rule; content: counter(rule) ". "; font-weight: 700; color: var(--muted); }
 .rule-seg button { min-height: 34px; padding: 0 12px; }
+.tag.rare { background: #EADCF8; color: #4B1F7A; border-color: #B48AD9; }
+.note-list li.lvl-rare { border-left-color: #7B3FB5; background: #F5EEFC; }
+.note-why .btn { margin-top: 8px; }

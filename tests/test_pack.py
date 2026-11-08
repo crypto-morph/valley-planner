@@ -35,8 +35,8 @@ def test_shops_buy_what_the_game_says(data):
     assert b.of(None) == []
 
 
-def stop(sid, kind="shop"):
-    return {"id": sid, "kind": kind, "title": sid}
+def stop(sid, kind="shop", sells=False):
+    return {"id": sid, "kind": kind, "title": sid, "sells": sells}
 
 
 def test_tools_stay_only_if_a_stop_needs_them(farm):
@@ -56,7 +56,7 @@ def test_the_bag_never_overfills_and_what_will_not_fit_is_shipped(farm, monkeypa
     monkeypatch.setattr(sell, "default", lambda _f: {"sell": rows})
     monkeypatch.setattr(farm.save, "items", [Item(id=str(i), name=f"Thing {i}", stack=1, quality=0, where="Farm chest")
                                              for i in range(30)])
-    v = pack.build(farm, [stop("pierre")])
+    v = pack.build(farm, [stop("pierre", sells=True)])
     assert v["slots"]["used"] <= v["slots"]["max"]
     assert v["dropped"] and "Thing 0" in v["dropped"]  # the cheapest goes first
     assert "Thing 29" in next(s for s in v["stops"] if s["stop"] == "Pierre's")["items"]
@@ -98,7 +98,7 @@ def test_chests_decide_what_you_can_carry(farm, monkeypatch):
     assert v["slots"]["used"] == 1  # the Wood is already there
     assert v["left_behind"][0]["items"] == ["5 Spring Onion"]
     assert not [s for s in v["stops"] if s["stop"] == "Pierre's"]  # the onions aren't reachable
-    mines = pack.build(farm, [stop("mines", "mine"), stop("pierre")])
+    mines = pack.build(farm, [stop("mines", "mine"), stop("pierre", sells=True)])
     assert not mines["left_behind"] and "5 Spring Onion" in next(
         s for s in mines["stops"] if s["stop"] == "Pierre's")["items"]
 
@@ -127,3 +127,14 @@ def test_a_bundle_item_split_across_chests_waits_if_the_route_passes_the_other_l
     mines_first = pack.build(fake, [stop("mines", "mine"), stop("cc")])["stops"]
     cc = next(s for s in mines_first if s["key"] == "cc")
     assert cc["items"] == ["10 Bat Wing"] and not cc["short"]
+
+
+def test_a_shop_you_only_buy_at_sends_the_spares_to_the_bin(farm, monkeypatch):
+    from valley_planner.views import pack, sell
+    rows = [{"id": "(O)24", "name": "Parsnip", "each": 35, "count": 3, "category": -75, "q": 0, "where": ["chest"]}]
+    monkeypatch.setattr(sell, "default", lambda _f: {"sell": rows})
+    monkeypatch.setattr(farm.save, "items", [Item(id="24", name="Parsnip", stack=3, quality=0, where="Farm chest")])
+    buying = pack.build(farm, [stop("pierre")])  # you have the gold for the seeds: no selling there
+    assert [x["item"] for x in buying["ship"]] == ["Parsnip"]
+    short = pack.build(farm, [stop("pierre", sells=True)])
+    assert not short["ship"] and "3 Parsnip" in next(x for x in short["stops"] if x["stop"] == "Pierre's")["items"]

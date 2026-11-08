@@ -172,7 +172,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
 
     @app.get("/api/today")
     def today_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
-                   spouse: str = "", goals: str = "", declined: str = "", rules: str = "") -> dict:
+                   spouse: str = "", goals: str = "", declined: str = "", rules: str = "",
+                   plant_all: bool = False) -> dict:
         """The day's timed plan; time, energy and where for a recalculation from wherever you are. `goals`: the
         Goals page's ask (JSON), so the day follows your route (what to hold back for an earlier goal).
         `declined`: the ids of the day's questions (views/asks.py) you said no to, comma separated; `rules`: the
@@ -193,7 +194,7 @@ def create_app(planner: Planner | None = None) -> FastAPI:
             pace = today.learned_pace(store, farm.save.days_played, ratio)
         return today.view(farm, time=time, energy=energy, where=where or None, done=ticked, spouse=spouse, pace=pace,
                           route=route, declined=frozenset(filter(None, declined.split(","))),
-                          rules=keep.parse(rules))
+                          rules=keep.parse(rules), plant_all=plant_all)
 
     @app.get("/api/cook")
     def cook_view() -> dict:

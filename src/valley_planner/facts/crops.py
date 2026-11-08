@@ -148,3 +148,23 @@ class Crops:
 
     def get(self, seed: str) -> CropInfo | None:
         return self.by_seed.get(seed.removeprefix("(O)"))
+
+
+def gold_or_better(farming: int, fertilizer: int = 0) -> float:
+    """Chance one harvest is gold or better (rules crop.gold-chance, crop.gold-not-iridium-split): g, or with
+    Deluxe Fertilizer 1.5g - g²/2, since a failed iridium roll still rolls for gold."""
+    g = gold_chance(farming, fertilizer)
+    return 1.5 * g - g * g / 2 if fertilizer >= 3 else g
+
+
+def plant_for_gold(need: int, chance: float, sure: float = 0.9, most: int = 400) -> int:
+    """The fewest crops to plant for `need` of them to come up gold or better, `sure` of the time (binomial)."""
+    if need <= 0:
+        return 0
+    if chance <= 0:
+        return most
+    for n in range(need, most + 1):
+        miss = sum(math.comb(n, k) * chance**k * (1 - chance) ** (n - k) for k in range(need))
+        if 1 - miss >= sure:
+            return n
+    return most

@@ -33,11 +33,12 @@ from ..facts import (
     skills,
     tools,
 )
-from ..facts.buyers import Buyers
 from ..facts.conditions import minutes_of
+from ..facts.crops import gold_or_better, plant_for_gold
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
+from ..facts.layout import sprinkler_tiles
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS, polylines
 from . import asks, crops, errands, keep, levels, pack, picking, quests, sell
@@ -70,11 +71,11 @@ BIRTHDAY_VALUE = 300
 HEAVY_WATERING = 40  # crops: the point where sprinklers start to matter most
 TV_MINUTES = 10
 BERRIES = {"spring": "(O)296", "fall": "(O)410"}  # Salmonberry, Blackberry
-SHOP_TRIP = 100  # gold of spares that makes Pierre's worth a stop on its own
-FISH_TRIP = 150  # gold of fish that makes Willy's worth the walk
 CART_AHEAD = 10  # days of cart visits to hold gold back for
 KEEP_GOLD = 100  # never spend the last of it on seeds
 MINE_DOOR = ("Mountain", 54, 5)
+BOOK_CATEGORY = -102
+RARE_FINDS = {"(O)74"}  # Prismatic Shard
 MINES_MINUTES = 180
 MINES_MIN_ENERGY = 80  # not worth the trip below this
 MINES_LEAVE = 20
@@ -133,8 +134,73 @@ def _dig_spots(farm: Farm, held: dict[str, int]) -> list[dict]:
         kind = "worm tile" if sp.kind == "artifact" else "seed spot"
         out.append({"id": f"dig:{sp.location}:{sp.tile[0]}:{sp.tile[1]}", "kind": "forage",
                     "title": f"Hoe the {kind}: {names}" + ("" if sp.sure else " (probably)"),
-                    "why": "; ".join(whys), "at": (sp.location, *sp.tile), "minutes": 1, "value": value})
+                    "why": "; ".join(whys), "at": (sp.location, *sp.tile), "minutes": 1, "value": value,
+                    "rare": [d.name for d in sp.drops if _rare(farm, d.id)]})
     return out
+
+
+def planting_note(seeds: int, room: int, watered: set, plant_all: bool) -> dict | None:
+    """Once a Sprinkler is down, seeds go only where one waters: say what waits, with the switch to plant them all."""
+    if not watered:
+        return None
+    if plant_all:
+        return {"text": "Planting every seed you hold today, Sprinklers or not.", "why": "The ones outside a "
+                "Sprinkler's reach need the can every dry day.", "toggle": {"key": "plantAll", "on": False,
+                                                                           "label": "Only plant under Sprinklers"}}
+    if seeds <= room:
+        return None
+    return {"text": f"Planting only where a Sprinkler waters: {room} free tile{'s' if room != 1 else ''} there, so "
+                    f"{seeds - room} seeds wait for more Sprinklers.",
+            "why": "Hand-watering the rest would cost energy every dry day. Seeds for the giant square and the "
+                   "bundles are planted anyway, Sprinkler or not: they have a season to beat.",
+            "toggle": {"key": "plantAll", "on": True, "label": "Plant them all today"}}
+
+
+def _cc_via_mines(farm: Farm, stops: list[dict], hold: dict[str, str]) -> list[dict]:
+    """When something the Community Center wants waits in the chest at the Mines, a stop there first: the chest by
+    the Mines entrance, then straight on to the Community Center with everything."""
+    cc_stop = next((x for x in stops if x["id"] == "cc"), None)
+    if not cc_stop:
+        return []
+    s, far = farm.save, []
+    for r in errands.community_center(farm)["rooms"]:
+        for i in r["items"]:
+            if not i["open"] or i["name"] in hold:
+                continue
+            home = sum(it.stack for it in s.items if it.name == i["name"] and pack.is_home(it.where))
+            mine = sum(it.stack for it in s.items if it.name == i["name"] and it.where == "Mine chest")
+            if home < i["count"] <= home + mine:
+                far.append(i["name"])
+    if not far:
+        return []
+    stops.remove(cc_stop)  # the bundles want what's in that chest: the visit goes by way of it
+    return [{"id": "cc_mines", "kind": "shop", "title": "The chest at the Mines: take " + ", ".join(far),
+             "why": "for the Community Center, straight after", "at": MINE_DOOR, "minutes": 2,
+             "value": cc_stop["value"] + BUNDLE_VALUE * len(far), "then": cc_stop}]
+
+
+def _rare(farm: Farm, qid: str | None) -> bool:
+    """A find worth a note of its own: a book (category -102) or a Prismatic Shard."""
+    if not qid:
+        return False
+    o = farm.data.asset("Data/Objects").get(qid.removeprefix("(O)")) or {}
+    return o.get("Category") == BOOK_CATEGORY or qid in RARE_FINDS
+
+
+def rare_note(plan: list[dict], left: list[dict]) -> dict | None:
+    """A rare find today: on the plan, or not (then it's worth changing the day for)."""
+    on = [r for r in plan if r.get("rare")]
+    off = [r for r in left if r.get("rare")]
+    if not on and not off:
+        return None
+    r = (on or off)[0]
+    what = " and ".join(r["rare"])
+    if on:
+        return {"text": f"Rare find today: {what}, at {r['time']}.", "level": "rare",
+                "why": f"{r['title']}, {r.get('near') or r.get('place') or ''}. A book or a shard rarely turns up in "
+                       "the ground: don't skip this stop."}
+    return {"text": f"Rare find today: {what}, but it doesn't fit the day.", "level": "rare",
+            "why": f"{r['title']}: {r['why']}. Worth changing the day for: Recalculate from there, or go first."}
 
 
 def _stops(farm: Farm, held: dict[str, int], spouse: str = "") -> list[dict]:
@@ -626,17 +692,15 @@ def _museum(farm: Farm) -> list[dict]:
              "from": 8 * 60, "until": 18 * 60}]
 
 
-def _willy(farm: Farm, quest: dict | None, sold: dict) -> list[dict]:
-    """His shop is worth the walk for a request, or a good bag of fish."""
+def _willy(farm: Farm, quest: dict | None) -> list[dict]:
+    """His shop for a request. Fish go in the shipping bin: it pays the same."""
     door = _door(farm, "Beach", "FishShop")
     for_him = quest and quest.get("who") == "Willy" and farm.held().get(f"(O){quest['item']}")
     active = any(q["deliver_to"] == "Willy" for q in quests.view(farm)["quests"])
-    fish = sum(r["each"] * r["count"] for r in sold["sell"] if r.get("category") == -4)
-    if not door or not (for_him or active or fish >= FISH_TRIP):
+    if not door or not (for_him or active):
         return []
     return [{"id": "willy", "kind": "shop", "title": "Willy's shop", "minutes": 5, "at": door,
-             "why": "hand in the request and sell your fish" if for_him or active else "sell your fish",
-             "value": QUEST_VALUE if for_him or active else fish, "from": 9 * 60, "until": 17 * 60}]
+             "why": "hand in the request", "value": QUEST_VALUE, "from": 9 * 60, "until": 17 * 60}]
 
 
 def energy_warning(farm: Farm, cost: int, power: int) -> str:
@@ -714,26 +778,30 @@ def _wizard(farm: Farm) -> list[dict]:
              "minutes": 15, "value": 2 * QUEST_VALUE, "from": 6 * 60, "until": 23 * 60}]
 
 
-def _pierre(farm: Farm, ripe: int, sold: dict) -> list[dict]:
-    """A harvest is only money, and replanted, once it's been to Pierre's: he pays on the spot."""
+def _pierre(farm: Farm, shopping: list[dict]) -> list[dict]:
+    """Pierre's for seeds. The shipping bin pays the same overnight, so selling there only earns its place when
+    today's gold won't cover the seeds: he pays on the spot."""
     shop = next((x for x in farm.hours_today() if x["id"] == "SeedShop"), {})
-    selling = sum(r["each"] * r["count"] for r in sold["sell"]
-                  if "SeedShop" in Buyers(farm.data).of(r.get("category")))
-    if not (ripe or selling >= SHOP_TRIP) or shop.get("closed"):
+    seeds = [x for x in shopping if x["count"]]
+    if not seeds or shop.get("closed"):
         return []
-    seeds = seed_list(farm)
     cost = sum(x["count"] * x["price"] for x in seeds)
+    short = max(0, cost - farm.save.money)
     kinds = len(seeds)
-    return [{"id": "pierre", "kind": "shop", "title": "Pierre's: sell the harvest" + (", buy seeds" if seeds else ""),
-             "why": (f"{kinds} kind{'s' if kinds != 1 else ''} of seed, about {cost:,}g: what each is for is below"
-                     if seeds else "he pays on the spot"),
-             "seeds": seeds, "at": ("Town", 43, 57), "minutes": 5,
+    return [{"id": "pierre", "kind": "shop", "title": "Pierre's: " + ("sell, then buy seeds" if short else "buy seeds"),
+             "why": f"{kinds} kind{'s' if kinds != 1 else ''} of seed, about {cost:,}g"
+                    + (f": you're {short:,}g short, so sell to him first (he pays on the spot)" if short else
+                       ": what each is for is below; the rest goes in the shipping bin"),
+             "seeds": seeds, "sells": bool(short), "at": ("Town", 43, 57), "minutes": 5,
              "value": QUEST_VALUE, "from": 9 * 60, "until": 17 * 60}]
 
 
-def seed_list(farm: Farm) -> list[dict]:
-    """What to buy at Pierre's today, and why: the giant-crop square due now, the crops your bundles still need,
-    then the best earner for the rest of your empty dirt. Only seeds he sells today."""
+def seed_list(farm: Farm, room: int | None = None) -> list[dict]:
+    """What to buy at Pierre's today, and why: the giant-crop square due now and the crops your bundles still need
+    ("needed": planted whatever the Sprinklers reach), then the best earner for the rest of your empty dirt, or
+    for `room` tiles (the free ones your Sprinklers water) less the seeds you already hold. A gold-quality slot
+    gets enough plants for a 9-in-10 chance at the gold it needs, with the best fertilizer you can get today.
+    Each line: {seed, id, count (to buy), price, why, held, need (in all), needed}."""
     from ..engine import cc
     from . import crops as crops_view
     rows = [r for r in crops_view.countdown(farm)["crops"] if r["status"] == "ok" and r["where"] == "Pierre's"
@@ -741,42 +809,90 @@ def seed_list(farm: Farm) -> list[dict]:
     by_crop = {r["crop"]: r for r in rows}
     out: list[dict] = []
 
-    def add(row: dict, count: int, why: str) -> None:
+    def add(seed: str, qid: str, price: int, count: int, why: str, needed: bool) -> None:
         if count > 0:
-            out.append({"seed": row["seed"], "id": row["seed_id"], "count": count, "price": row["seed_price"],
-                        "why": why})
+            out.append({"seed": seed, "id": qid, "count": count, "price": price, "why": why, "needed": needed})
 
+    s, held_now = farm.save, farm.held()
     used = 0
     for plan in picking.plans(farm, limit=1):
         if plan["sow_days_played"] <= farm.when.days_played and plan["crop"] in by_crop:
-            add(by_crop[plan["crop"]], 9, "the giant square")
+            r = by_crop[plan["crop"]]
+            add(r["seed"], r["seed_id"], r["seed_price"], 9, "the giant square", True)
             used += 9
     for slot in cc.plan(farm)["slots"]:
         best = slot.get("best") or {}
         if slot["status"] != "have" and best.get("kind") in ("grow", "crop") and slot["name"] in by_crop:
-            # a gold-quality slot is a roll: plant three times as many (and fertilize them)
-            want = slot["count"] * (3 if slot.get("quality") else 1) + 1
-            add(by_crop[slot["name"]], want,
-                f"{slot['bundle']} bundle" + (", gold quality: fertilize them" if slot.get("quality") else ""))
+            if not _this_season(farm, best.get("last_start", "")):
+                continue  # it can still go in next season: buy it then
+            r = by_crop[slot["name"]]
+            if slot.get("quality"):
+                have = sum(i.stack for i in s.items if i.qualified_id == slot["item"] and i.quality >= slot["quality"])
+                fert, level, price = _best_fertilizer(farm)
+                chance = gold_or_better(s.skills.get("farming", 0), level)
+                want = plant_for_gold(slot["count"] - have, chance)
+                add(r["seed"], r["seed_id"], r["seed_price"], want,
+                    f"{slot['bundle']} bundle: {slot['count'] - have} gold at {chance:.0%} a plant"
+                    + (f" with {farm.name(fert)}" if fert else "") + ", 9 in 10 sure", True)
+                if fert:
+                    add(farm.name(fert), fert, price, want, f"for the {want} {slot['name']}: on the dirt before you "
+                        "plant", True)
+            else:
+                want = slot["count"] + 1
+                add(r["seed"], r["seed_id"], r["seed_price"], want, f"{slot['bundle']} bundle", True)
             used += want
-    s = farm.save
     planted = {c.tile for c in s.crops if c.location == "Farm" and not c.dead}
     free = len({t for t in s.hoed if t not in planted and t not in s.farm_objects}) - used
     best = max(rows, key=lambda r: r["income"], default=None)
+    if room is not None:  # the seeds you hold fill the watered tiles first
+        free = room - sum(r["held_seeds"] for r in rows if r is not best)
     if best and free > 0:
-        add(best, free, f"the rest of your dirt: {free} tiles, the best earner")
+        add(best["seed"], best["seed_id"], best["seed_price"], free,
+            f"the rest of your {'watered ' if room is not None else ''}dirt: {free} tiles, the best earner", False)
     merged: dict[str, dict] = {}
     for x in out:  # one line a seed
         if x["seed"] in merged:
-            merged[x["seed"]]["count"] += x["count"]
-            merged[x["seed"]]["why"] += f", {x['why']}"
+            m = merged[x["seed"]]
+            m["count"] += x["count"]
+            m["why"] += f", {x['why']}"
+            m["needed"] = m["needed"] or x["needed"]
         else:
             merged[x["seed"]] = dict(x)
-    held = {r["seed"]: r["held_seeds"] for r in rows}
     for x in merged.values():  # what you already hold comes off once, whatever it's for
-        x["held"] = held.get(x["seed"], 0)
+        x["need"] = x["count"]
+        x["held"] = held_now.get(x["id"], 0)
         x["count"] = max(0, x["count"] - x["held"])
-    return [x for x in merged.values() if x["count"]]
+    if room is not None:  # what nothing needs waits for the watered tiles
+        left = room - sum(i.stack for i in s.items if i.type == "Seeds" and i.category == -74)
+        for x in merged.values():
+            if not x["needed"]:
+                x["count"] = max(0, min(x["count"], left))
+                left -= x["count"]
+    return [x for x in merged.values() if x["count"] or x["needed"]]
+
+
+def _this_season(farm: Farm, label: str) -> bool:
+    """Is 'Summer 16, Year 1' (or no date at all) in the season you're in?"""
+    parts = label.replace(",", "").split()
+    if len(parts) < 4:
+        return True
+    return parts[0].lower() == farm.when.season and int(parts[3]) == farm.when.year
+
+
+FERTILIZERS = (("(O)919", 3), ("(O)369", 2), ("(O)368", 1))  # rule crop.fertilizer-levels
+FERT_IDS = {qid for qid, _ in FERTILIZERS}
+
+
+def _best_fertilizer(farm: Farm) -> tuple[str, int, int]:
+    """(qualified id, quality level, price) of the best fertilizer Pierre sells today, so a whole planting can
+    have it; else the best you hold; ("", 0, 0) if neither."""
+    for qid, level in FERTILIZERS:
+        offer = next((o for o in farm.shops.offers(farm.when, item=qid) if o.shop == "SeedShop" and o.available),
+                     None)
+        if offer:
+            return qid, level, offer.price
+    held = farm.held()
+    return next(((qid, level, 0) for qid, level in FERTILIZERS if held.get(qid)), ("", 0, 0))
 
 
 def letters_note(farm: Farm, days: int = LETTER_DAYS) -> dict | None:
@@ -856,9 +972,10 @@ def _board_note(farm: Farm) -> dict:
 
 def view(farm: Farm, *, time: int | None = None, energy: int | None = None, where: str | None = None,
          done: set[str] = frozenset(), spouse: str = "", pace: float | None = None, route: dict | None = None,
-         declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None) -> dict:
+         declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None, plant_all: bool = False) -> dict:
     """`declined`: the ids of today's questions (views/asks.py) you said no to; `rules`: the keep rules' modes
-    (views/keep.py), so the day sells what the Sell tab says."""
+    (views/keep.py), so the day sells what the Sell tab says; `plant_all`: plant every seed you hold, not only
+    where a Sprinkler waters (the default once one is down)."""
     s = farm.save
     sold = sell.default(farm, declined, rules)  # what to sell, after what today's questions keep
     walker = farm.walker
@@ -890,7 +1007,15 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     lost = [c for c in s.crops if c.location == "Farm" and not c.watered and crops.doomed(farm, c)]
     thirsty = 0 if wet else sum(1 for c in s.crops if c.location == "Farm" and not c.watered and not c.ready
                                 and not c.dead and c not in lost)
-    seeds = sum(i.stack for i in s.items if i.type == "Seeds" and i.category == -74)
+    held_seeds = sum(i.stack for i in s.items if i.type == "Seeds" and i.category == -74)
+    watered = sprinkler_tiles(s.farm_objects)
+    growing = {c.tile for c in s.crops if c.location == "Farm" and not c.dead}
+    room = len({t for t in watered if t not in growing and t not in s.farm_objects})
+    sprinklers_only = bool(watered) and not plant_all
+    shopping = seed_list(farm, room if sprinklers_only else None)
+    spoken = sum(min(x["held"], x["need"]) for x in shopping if x["needed"] and x["id"] != "(O)368")
+    # the giant square's and the bundles' seeds go in today, watered or not; the rest waits for a Sprinkler
+    seeds = spoken + min(held_seeds - spoken, room) if sprinklers_only else held_seeds
     home_first = pos[0] != "Farm" and ((thirsty and "water" not in done) or (seeds and "plant" not in done))
     if home_first:  # the farm jobs still come first: walk back for them
         way = walker.path(walker.reach(pos), ("Farm", *FARMHOUSE_DOOR))
@@ -921,8 +1046,12 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     farm_job("harvest", "Harvest", ripe, 0, HARVEST_MINUTES, "keep what the bundles need, sell the rest")
     farm_job("water", "Water", thirsty, water_e, water_m, "they won't grow tonight otherwise"
              + ("; hold the can to charge it, it's cheaper a tile" if can and thirsty >= tools.TILES[1] else ""))
+    under = seeds - spoken if sprinklers_only else 0
     farm_job("plant", "Hoe and plant", seeds, hoe_e + (0 if wet else plant_e), hoe_m + (0 if wet else plant_m),
-             "the rain waters them" if wet else "hoe, plant, water"
+             ("the rain waters them" if wet else "hoe, plant, water")
+             + (f"; {spoken} for the bundles and the giant square, wherever you can water them by hand"
+                if sprinklers_only and spoken else "")
+             + (f"; {under} under the Sprinklers, which take over tomorrow" if under else "")
              + ("; a charged hoe costs one swing however many tiles it digs" if s.tool_levels.get("Hoe") else ""))
 
     place = lambda n: farm.place(n)  # noqa: E731
@@ -930,7 +1059,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     board = help_wanted.quest_today(s, farm.data, festival=fest_today)
     hold = hold_back(farm, route)
     stops = [x for x in _stops(farm, held, spouse) + _wizard(farm) + _community_center(farm, hold)
-             + _pierre(farm, ripe, sold) + _clint(farm, held) + _museum(farm) + _willy(farm, board, sold)
+             + _pierre(farm, shopping) + _clint(farm, held) + _museum(farm)
+             + _willy(farm, board)
              + _mines(farm, power) + _introductions(farm)
              + (_sweetheart(farm, spouse) if spouse else []) + _birthdays(farm, spouse) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
@@ -939,6 +1069,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         plan.append({"id": "festival", "time": clock(max(now, _minutes(fest[1]))), "kind": "festival", "title": fest[0],
                      "why": f"at {farm.place(fest[2])}: finish the farm first, the day ends when you leave", "way": [],
                      "energy_after": power})
+    stops += _cc_via_mines(farm, stops, hold)
     prev = walker.reach(pos)
     for x in list(stops):
         if walker.path(prev, x["at"]) is None:
@@ -955,13 +1086,19 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                 if arrive >= x["until"]:
                     continue
                 cost += max(0, x["from"] - arrive)  # waiting counts as time spent
+            if x.get("then"):  # and straight on to the stop it leads to
+                nxt = x["then"]
+                hop = walker.path(walker.reach(x["at"]), nxt["at"])
+                if hop is None:
+                    continue
+                cost += walker.minutes(hop) + nxt["minutes"]
             if now + cost <= FINISH and x["value"] / max(1, cost) > score:
                 best, score = x, x["value"] / max(1, cost)
         if best is None:
             seen = {x["id"]: x for x in stops}  # one line for a stop with several time windows
             left += [{"title": x["title"], "why": "can't be there in time" if "until" in x else
                       "too far for what it's worth today", "at": x["at"], "value": x["value"], "id": x["id"],
-                      "spare": x["kind"] == "forage"} for x in seen.values()]
+                      "spare": x["kind"] == "forage", "rare": x.get("rare")} for x in seen.values()]
             break
         path = walker.path(prev, best["at"])
         legs.append((len(plan), path))
@@ -972,22 +1109,42 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                      "title": best["title"],
                      "why": best["why"], "way": walker.directions(path, place),
                      "near": walker.near(best["at"][0], tile, place), "place": place(best["at"][0]),
-                     "spot": None if best["kind"] == "farm" else list(best["at"]), "energy_after": power})
+                     "spot": None if best["kind"] == "farm" else list(best["at"]), "energy_after": power,
+                     **{k: best[k] for k in ("rare", "sells") if best.get(k)}})
         now += best["minutes"]
+        if best.get("then"):  # the stop it was for, straight after
+            nxt = best["then"]
+            path = walker.path(walker.reach(best["at"]), nxt["at"])
+            legs.append((len(plan), path))
+            now += walker.minutes(path)
+            plan.append({"id": nxt["id"], "time": clock(now), "at": now, "kind": nxt["kind"], "title": nxt["title"],
+                         "why": nxt["why"], "way": walker.directions(path, place),
+                         "near": walker.near(nxt["at"][0], (nxt["at"][1], nxt["at"][2]), place),
+                         "place": place(nxt["at"][0]), "spot": list(nxt["at"]), "energy_after": power})
+            now += nxt["minutes"]
         if best["id"] == "pierre":  # then home to get the seeds in
             way = walker.path(walker.reach(best["at"]), ("Farm", *FARMHOUSE_DOOR))
             cash = s.money + sum(_price(farm, f"(O){c.harvest_id}") for c in s.crops
                                  if c.location == "Farm" and c.ready and not c.forage and c.harvest_id)
             buy = seed_advice(farm, cash, ripe)
-            tiles = sum(x["count"] for x in buy)
-            if way and tiles >= MIN_REPLANT:  # a handful of seeds can wait for the next trip home
-                plan[-1]["why"] = "buy " + ", ".join(f"{x['count']} {x['name']}" for x in buy) + " seeds"
+            needed = [x for x in best.get("seeds", []) if x["needed"] and x["count"] and x["id"] not in FERT_IDS]
+            fresh = sum(x["count"] for x in needed)  # bought for a bundle or the giant square: in today
+            tiles = sum(x["count"] for x in buy) + fresh
+            if way and (tiles >= MIN_REPLANT or fresh):  # a handful of seeds can wait for the next trip home
+                if buy:
+                    plan[-1]["why"] = "buy " + ", ".join(f"{x['count']} {x['name']}" for x in buy) + " seeds"
                 now += walker.minutes(way)
                 cost = TILE_ENERGY * tiles
                 power -= min(cost, max(0, power - RESERVE))
                 legs.append((len(plan), way))
+                fert = [x for x in best.get("seeds", []) if x["id"] in FERT_IDS and x["count"]]
                 plan.append({"id": "replant", "time": clock(now), "at": now, "kind": "farm", "title":
-                             f"Home: plant and water {tiles} seeds", "why": "harvested tiles stay tilled", "way":
+                             f"Home: plant and water {tiles} seeds",
+                             "why": "; ".join(filter(None, [
+                                 "harvested tiles stay tilled" if buy else "",
+                                 (", ".join(f"{x['count']} {x['seed']}" for x in needed) + " can't wait for a "
+                                  "Sprinkler" + (f": {fert[0]['seed']} on the dirt first" if fert else ""))
+                                 if needed else ""])), "way":
                              walker.directions(way, farm.place), "energy_after": power})
                 now += round(tiles * TILE_MINUTES)
                 pos = ("Farm", *FARMHOUSE_DOOR)
@@ -1057,7 +1214,10 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [_note(x) for x in (_board_note(farm), tv_note, doomed_note(farm, lost),
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
-                                         letters_note(farm), *asks.notes(farm)) if x],
+                                         letters_note(farm), *asks.notes(farm),
+                                         planting_note(held_seeds - spoken, room, watered, plant_all),
+                                         rare_note(plan, left))
+                      if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),

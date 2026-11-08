@@ -114,3 +114,11 @@ def test_wood_stays_calm_until_a_week_before():
     covered = today.wood_plan(_wood_plan_farm(350), USES)  # the Coop is covered: the Big Coop is next
     assert "a Big Coop (Day 51, in 25 days). You're 350 short" in covered["text"] and covered["level"] == "later"
     assert today.wood_plan(_wood_plan_farm(700), USES) is None
+
+
+def test_sprinkler_tiles_follow_each_kind_of_sprinkler():
+    from valley_planner.facts.layout import sprinkler_tiles
+    assert sprinkler_tiles({(5, 5): "Sprinkler"}) == {(6, 5), (4, 5), (5, 6), (5, 4)}
+    assert len(sprinkler_tiles({(5, 5): "Quality Sprinkler"})) == 8
+    assert len(sprinkler_tiles({(5, 5): "Iridium Sprinkler", (0, 0): "Weeds"})) == 24
+    assert (5, 5) not in sprinkler_tiles({(5, 5): "Iridium Sprinkler"})

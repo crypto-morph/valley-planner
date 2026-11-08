@@ -376,3 +376,43 @@ def test_wood_is_held_back_for_the_next_job_but_not_when_there_is_plenty(monkeyp
     assert "Coop (Summer 23)" in today_view.hold_back(farm(310), route)["Wood"]  # 310 - 99 leaves the Coop short
     assert "Wood" not in today_view.hold_back(farm(450), route)
     assert today_view.hold_back(farm(310), None) == {}  # no goals given: nothing to weigh it against
+
+
+def test_planting_waits_for_sprinklers_unless_you_say_plant_them_all():
+    from valley_planner.views.today import planting_note
+    assert planting_note(67, 10, set(), False) is None  # no Sprinklers yet: plant as before
+    assert planting_note(5, 10, {(1, 1)}, False) is None  # room for them all
+    n = planting_note(67, 10, {(1, 1)}, False)
+    assert "57 seeds wait" in n["text"] and n["toggle"] == {"key": "plantAll", "on": True, "label": "Plant them all today"}
+    assert planting_note(67, 10, {(1, 1)}, True)["toggle"]["on"] is False
+
+
+def test_a_rare_find_gets_its_own_note_on_the_plan_or_off_it():
+    from valley_planner.views.today import rare_note
+    assert rare_note([{"id": "water"}], []) is None
+    on = rare_note([{"rare": ["Jack Be Nimble, Jack Be Thick"], "time": "8:11 AM", "title": "Hoe the worm tile",
+                     "near": "by the bridge"}], [])
+    assert on["level"] == "rare" and "8:11 AM" in on["text"]
+    off = rare_note([], [{"rare": ["Prismatic Shard"], "title": "Hoe the worm tile", "why": "too far"}])
+    assert "doesn't fit" in off["text"]
+
+
+def test_the_community_center_goes_by_the_mines_chest_when_a_bundle_item_waits_there(monkeypatch):
+    from valley_planner.views import errands, today
+    items = [SimpleNamespace(name="Aquamarine", stack=1, where="Mine chest"),
+             SimpleNamespace(name="Chub", stack=1, where="Farm chest")]
+    farm = SimpleNamespace(save=SimpleNamespace(items=items))
+    monkeypatch.setattr(errands, "community_center", lambda f: {"rooms": [{"items": [
+        {"name": "Aquamarine", "count": 1, "open": True}, {"name": "Chub", "count": 1, "open": True}]}]})
+    cc = {"id": "cc", "value": 500, "at": ("Town", 1, 1), "minutes": 5}
+    stops = [cc]
+    extra = today._cc_via_mines(farm, stops, {})
+    assert stops == [] and extra[0]["then"] is cc and "Aquamarine" in extra[0]["title"]
+    assert today._cc_via_mines(farm, [dict(cc)], {"Aquamarine": "held back"}) == []
+
+
+def test_only_crops_that_must_go_in_this_season_are_bought_now():
+    from valley_planner.views.today import _this_season
+    farm = SimpleNamespace(when=SimpleNamespace(season="summer", year=1))
+    assert _this_season(farm, "Summer 16, Year 1") and _this_season(farm, "")
+    assert not _this_season(farm, "Fall 14, Year 1") and not _this_season(farm, "Summer 16, Year 2")
