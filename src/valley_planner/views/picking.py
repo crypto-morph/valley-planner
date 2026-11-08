@@ -158,8 +158,9 @@ def _checks(farm: Farm, hit) -> list[dict]:
     if hit.complete:
         out.append({"ok": True, "text": f"All 9 tiles hold {hit.key}."})
     else:
-        out.append({"ok": False, "text": f"{len(hit.missing)} of the 9 tiles still need {hit.key} (the S, H and P"
-                                         " tiles): sow them before the night."})
+        out.append({"ok": hit.days_played - today > 1, "text": f"{len(hit.missing)} of the 9 tiles still need "
+                    f"{hit.key} (the S, H and P tiles): sow them any day before you sleep on "
+                    f"{_day(farm, hit.days_played - 1)}. They needn't grow; hoe their tiles the day you sow."})
     if crop is not None and crop.days_left > 0:
         out.append({"ok": True, "text": f"The top-left ripens on {_day(farm, today + crop.days_left)}. Water it "
                                         "every day until then, or it falls behind and misses the night."})
@@ -172,6 +173,12 @@ def _checks(farm: Farm, hit) -> list[dict]:
     return out
 
 
+def _free(farm: Farm, tiles) -> bool:
+    """Every tile still to sow is open ground: no other crop and nothing standing there."""
+    crops = {c.tile for c in farm.save.crops if c.location == "Farm" and c.tile and not c.dead}
+    return all(t not in crops and t not in farm.save.farm_objects for t in tiles)
+
+
 def _tracked(farm: Farm) -> list:
     """Squares on their way: complete ones up to the end of the season, near misses in the next week."""
     s = farm.save
@@ -179,7 +186,8 @@ def _tracked(farm: Farm) -> list:
     found, seen = [], set()
     for night in range(1, end):
         g = harvest.giant_tonight(s, farm.data, night=night)
-        for hit in (*g.ready, *(h for h in g.incomplete if night <= NIGHTS and len(h.missing) <= MOST_MISSING)):
+        for hit in (*g.ready, *(h for h in g.incomplete if (night <= NIGHTS and len(h.missing) <= MOST_MISSING)
+                                or _free(farm, h.missing))):
             if hit.tile in seen:
                 continue
             seen.add(hit.tile)
@@ -223,15 +231,18 @@ def plans(farm: Farm, *, limit: int = 1) -> list[dict]:
                                legacy=farm.when.legacy_random, limit=limit)
         for spot in best:
             missing = [t for t in spot.square]
-            clear = f", clearing {spot.to_clear} weeds or stones first" if spot.to_clear else ""
-            hoe = f"Hoe {spot.to_hoe} of the tiles{clear}, then sow" if spot.to_hoe else "Sow"
             wait = (f" It ripens on {_day(farm, spot.ripe_day)} and waits {spot.wait} "
                     f"{'night' if spot.wait == 1 else 'nights'} for it." if spot.wait else "")
+            seed = farm.name("(O)" + info.seed)
             out.append({"crop": key, "sow_by": _day(farm, spot.sow_day), "sow_days_played": spot.sow_day,
                         "day": _day(farm, spot.fires_day), "days_played": spot.fires_day,
                         "where": _landmark(farm, spot.tile),
-                        "text": f"{hoe} 9 {farm.name('(O)' + info.seed)} here by {_day(farm, spot.sow_day)}: the "
-                                f"top-left wins its roll overnight into {_day(farm, spot.fires_day)}.{wait}"
+                        "text": f"Sow 1 {seed} on the top-left (1) by {_day(farm, spot.sow_day)} and water it "
+                                f"every day: it wins its roll overnight into {_day(farm, spot.fires_day)}.{wait} Sow "
+                                f"the other 8 any day before you sleep on {_day(farm, spot.fires_day - 1)}: they "
+                                "don't need to grow or be watered, just be there. Hoe their tiles on the day you sow "
+                                "them (empty dirt can vanish overnight), and buy all 9 seeds now in case the shop's "
+                                "shut that day."
                                 + (" Sowing earlier is fine; later misses the night." if spot.sow_day > sow_days[0]
                                    else "")
                                 + (f" {spot.unguarded} of the tiles are outside your Scarecrows' reach." if

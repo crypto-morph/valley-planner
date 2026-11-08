@@ -78,3 +78,13 @@ def test_picture_marks_the_top_left_and_what_to_sow():
     assert text.count("1") == 1 and "X" in text
     assert rows[2][3:6] == "1GG"  # the square's top row: the top-left, then tiles that aren't missing
     assert rows[3][3:6] == "HGS"  # bare ground to hoe, then dirt to sow
+
+
+def test_a_square_is_watched_once_its_top_left_is_sown_if_the_rest_is_open_ground():
+    lone = SimpleNamespace(location="Farm", tile=(10, 10), forage=False, dead=False)
+    farm = _farm({}, crops=[lone])
+    rest = [(10 + i, 10 + j) for j in range(3) for i in range(3) if (i, j) != (0, 0)]
+    assert picking._free(farm, rest)
+    kale = SimpleNamespace(location="Farm", tile=(11, 10), forage=False, dead=False)
+    assert not picking._free(_farm({}, crops=[lone, kale]), rest)  # something else is growing there
+    assert not picking._free(_farm({(12, 12): "Chest"}, crops=[lone]), rest)
