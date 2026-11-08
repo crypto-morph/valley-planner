@@ -32,6 +32,7 @@ function itemCard(c) {
   ]));
   if (c.recipes && c.recipes.length) get_.push("<h3>The recipe</h3>" + list(c.recipes.map((r) => li(`${esc(r.shop)}${r.known ? " · you know it" : ""}`, `${r.price}g`))));
   if (c.cart.length) get_.push("<h3>At the cart</h3>" + list(c.cart.map((x) => li(`${esc(x.date)}${unsure(x.sure)}`, `${x.price.toLocaleString()}g`))));
+  if (c.today) use.push(`<p class="item-today"><strong>${esc(c.today)}</strong></p>`);
   if (c.machines.length) use.push("<h3>Machines</h3>" + list(c.machines.map((m) => li(`${esc(m.machine)}: ${m.uses > 1 ? `${m.uses} → ` : ""}${esc(m.product)}${m.owned ? ` <span class="sub">(you have ${m.owned})</span>` : ""}`, `${m.sells}g · ${mins(m.minutes, m.days)}`))));
   if (c.gifts) use.push("<h3>Gift tastes</h3>" + list(["love", "like", "dislike", "hate"].filter((t) => c.gifts[t].length).map((t) => li(t, esc(c.gifts[t].join(", "))))));
   return head + tabbed([["Use it", use.join("")], ["Get it", get_.join("")]]);
@@ -975,9 +976,10 @@ const views = {
       v.items.map((r) => `<tr><td class="ic">${r.icon ? itemIcon(r.icon) : ""}</td><td>${esc(r.name)}${q(r.quality)}</td><td class="num">${r.have}</td>` +
         `<td class="num">${r.sell && r.gold ? r.sell : "–"}${r.machine ? `<div class="small muted">${r.machine} in a machine</div>` : ""}</td><td class="num">${r.gold ? `${r.gold.toLocaleString()}g` : ""}</td>` +
         `<td class="small">${r.sell && !r.gold ? '<div class="muted">Worth nothing: keep it for a Recycling Machine</div>' : ""}${r.why.map((w) => `<div>${r.why.length > 1 || w.count > 1 ? `<strong>${w.count}</strong> ` : ""}${esc(w.why)}</div>`).join("")}</td></tr>`).join("") + "</tbody>";
-    $("#sell-process").innerHTML = v.process.length ? '<ul class="list">' + v.process.map((r) =>
+    const busy = (v.machines || []).map((b) => li(`${esc(b.machine)}: ${esc(b.holds)}`, b.ready ? "ready to collect" : b.at ? `ready about ${esc(b.at)}` : `about ${b.days} days`)).join("");
+    $("#sell-process").innerHTML = (busy ? `<h3>In your machines now</h3><ul class="list">${busy}</ul><h3>Then</h3>` : "") + (v.process.length ? '<ul class="list">' + v.process.map((r) =>
       `<li><span>${r.count} ${esc(r.name)} → ${esc(r.product)} <span class="sub">(${esc(r.machine)}${r.burns ? `, uses ${esc(r.burns)} each` : ""})</span></span><span>${r.seeds ? "" : `+${r.gain.toLocaleString()}g`}</span></li>`
-    ).join("") + `</ul><p class="sub">About ${v.process_gain.toLocaleString()}g more than selling them raw.</p>` : '<p class="sub">Nothing worth processing with the machines you have.</p>';
+    ).join("") + `</ul><p class="sub">About ${v.process_gain.toLocaleString()}g more than selling them raw.</p>` : '<p class="sub">Nothing worth processing with the machines you have free.</p>');
     const MODE = { always: "Always", ask: "Ask", off: "Off" };
     $("#sell-rules").innerHTML = '<ol class="rules">' + v.rules.map((r) => `<li><div><strong>${esc(r.label)}</strong>` +
       `<div class="small muted">${r.mode === "off" ? "Not keeping anything" : r.count ? `Keeping ${r.count} (about ${r.value.toLocaleString()}g)` : "Nothing to keep today"}</div></div>` +

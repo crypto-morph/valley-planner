@@ -106,6 +106,7 @@ def item(farm: Farm, qid: str) -> dict:
                                              o.get("Category"), profit_margin=s.profit_margin, preserve=out.preserve),
                          "minutes": out.minutes, "days": out.days, "owned": s.machines.get(_bc_raw(farm, mid), 0)})
     card["machines"] = made
+    card["today"] = _today(farm, card["name"], [m["machine"] for m in made if m["owned"]])
 
     if farm.gifts.giftable(qid):
         villagers = [n for n, c in farm.data.asset("Data/Characters").items() if c.get("BirthSeason")]
@@ -170,3 +171,27 @@ def _bc_raw(farm: Farm, mid: str) -> str:
 def _bc_name(farm: Farm, mid: str) -> str:
     b = farm.data.asset("Data/BigCraftables").get(mid.removeprefix("(BC)")) or {}
     return farm.data.text(b.get("DisplayName")) or b.get("Name") or mid
+
+
+def _today(farm: Farm, name: str, owned: list[str]) -> str:
+    """What today's sell plan (views/sell.py) does with what you hold of it, and why a machine you own that could
+    take it doesn't."""
+    from . import sell
+    plan = sell.default(farm)
+    rows = [r for r in plan["items"] if r["name"] == name]
+    if not rows:
+        return ""
+    made, sold, kept = (sum(r[k] for r in rows) for k in ("machine", "sell", "keep"))
+    whys = list(dict.fromkeys(w["why"] for r in rows for w in r["why"]))
+    bits = ([f"{made} in a machine"] if made else []) + ([f"sell {sold}"] if sold else []) + (
+        [f"keep {kept} ({'; '.join(whys)})"] if kept else [])
+    out = "Today: " + ", ".join(bits) + "." if bits else ""
+    if owned and not made and sold:
+        m = owned[0]
+        doing = [p for p in plan["process"] if p["machine"] == m]
+        waiting = [b for b in plan.get("machines", []) if b["machine"] == m]
+        if doing:
+            out += f" Your {m} does better with {doing[0]['name']} today (+{doing[0]['gain']:,}g)."
+        elif waiting and not waiting[0]["at"] and not waiting[0]["ready"]:
+            out += f" Your {m} is busy with {waiting[0]['holds']} for about {waiting[0]['days']} days."
+    return out

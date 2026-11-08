@@ -23,7 +23,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from ..engine.unlocks import Unlocks
+from ..facts.conditions import clock_of, minutes_of
 from ..facts.machines import Input
+from ..facts.schedules import time_label
 from ..facts.sell import item_sell_price, sell_price
 from . import keep as keep_rules
 from .farm import Farm
@@ -103,51 +105,66 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
                                       "product": f"1-3 {seed}", "each_raw": 0, "each_product": 0, "gain": 0,
                                       "seeds": True})
 
-    # Process, then sell
-    capacity = dict(owned)
+    # Process, then sell: free machines go to the loads that gain most, then the rest is sold
+    capacity, busy = _free_today(farm)
     spare = {qid: sum(x.left for x in st) for qid, st in by_id.items()}  # what's left after the holds
     spare_snapshot = dict(spare)  # for the "worth getting" hints, below, unaffected by what gets processed
     sell: dict[tuple[str, int], dict] = {}
     process: dict[tuple[str, str], dict] = {}
     materials: dict[str, int] = defaultdict(int)
     used: dict[tuple[str, int], int] = defaultdict(int)  # put through a machine, by item and quality
-    for qid, stacks in by_id.items():
-        for st in sorted(stacks, key=lambda x: -(x.it.price or 0)):
-            it, n = st.it, st.left
-            if not n:
-                continue
-            if not produce(qid, it):
-                if qid in crafting_inputs or it.category in (-15, -16):
-                    materials[farm.name(qid)] += n
-                continue
-            each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+    stacks_all = [(qid, st) for qid, stacks in by_id.items() for st in sorted(stacks, key=lambda x: -(x.it.price or 0))]
+    ranked = []
+    for qid, st in stacks_all:
+        if st.left and produce(qid, st.it):
             mids = [mid for mid, cap in capacity.items() if cap > 0 and mid != SEED_MAKER]
-            best = _best_output(farm, qid, it, n, w, mids, spare, objects)
+            best = _best_output(farm, qid, st.it, st.left, w, mids, spare, objects)
             if best:
-                mid, per_input, out, prod = best
-                use = min(n, capacity[mid] * out.uses)
-                loads = -(-use // out.uses)
-                capacity[mid] -= loads
-                for a, k in out.also:
-                    spare[a] = spare.get(a, 0) - k * loads
-                row = process.setdefault((qid, mid), {"name": farm.name(qid), "machine": _machine_name(farm, mid),
-                                                      "product": out.name, "count": 0, "each_raw": each,
-                                                      "each_product": prod, "net_each": per_input,
-                                                      "burns": ", ".join(f"{k} {farm.name(a)}" for a, k in out.also),
-                                                      "minutes": out.minutes, "days": out.days})
-                row["count"] += use
-                used[(qid, it.quality)] += use
-                n -= use
-            if not n:
-                continue
-            cat = it.category if it.category is not None else (objects.get(qid[3:]) or {}).get("Category")
-            row = sell.setdefault((qid, it.quality), {"name": farm.name(qid) if not it.preserve else it.name,
-                                                      "quality": QUALITY_WORD.get(it.quality, ""), "count": 0,
-                                                      "each": each, "kind": PRODUCE.get(cat, "Artifact"),
-                                                      "where": set(), "id": qid, "category": it.category,
-                                                      "q": it.quality})
-            row["count"] += n
-            row["where"].add(farm.where_label(it.where, it.chest))
+                each = item_sell_price(st.it, farm.farmer, profit_margin=s.profit_margin)
+                ranked.append(((best[1] - each) * best[2].uses, qid, st))
+    for _gain, qid, st in sorted(ranked, key=lambda x: -x[0]):
+        it, n = st.it, st.left
+        mids = [mid for mid, cap in capacity.items() if cap > 0 and mid != SEED_MAKER]
+        best = _best_output(farm, qid, it, n, w, mids, spare, objects) if mids else None
+        if not best:
+            continue
+        each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+        mid, per_input, out, prod = best
+        use = min(n, capacity[mid] * out.uses)
+        loads = -(-use // out.uses)
+        capacity[mid] -= loads
+        for a, k in out.also:
+            spare[a] = spare.get(a, 0) - k * loads
+        row = process.setdefault((qid, mid), {"name": farm.name(qid), "machine": _machine_name(farm, mid),
+                                              "product": out.name, "count": 0, "each_raw": each,
+                                              "each_product": prod, "net_each": per_input,
+                                              "burns": ", ".join(f"{k} {farm.name(a)}" for a, k in out.also),
+                                              "minutes": out.minutes, "days": out.days})
+        row["count"] += use
+        used[(qid, it.quality)] += use
+        st.left -= use
+    if mode["machines"] != keep_rules.OFF:  # the rest of what a machine improves waits for one to be free
+        for q, k, why in _queue(farm, stacks_all, produce, w, spare, objects):
+            keep[(q, k[0], why)] += k[1]
+            kept_by["machines"]["count"] += k[1]
+            kept_by["machines"]["value"] += k[2]
+    for qid, st in stacks_all:
+        it, n = st.it, st.left
+        if not n:
+            continue
+        if not produce(qid, it):
+            if qid in crafting_inputs or it.category in (-15, -16):
+                materials[farm.name(qid)] += n
+            continue
+        each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+        cat = it.category if it.category is not None else (objects.get(qid[3:]) or {}).get("Category")
+        row = sell.setdefault((qid, it.quality), {"name": farm.name(qid) if not it.preserve else it.name,
+                                                  "quality": QUALITY_WORD.get(it.quality, ""), "count": 0,
+                                                  "each": each, "kind": PRODUCE.get(cat, "Artifact"),
+                                                  "where": set(), "id": qid, "category": it.category,
+                                                  "q": it.quality})
+        row["count"] += n
+        row["where"].add(farm.where_label(it.where, it.chest))
     sell_rows = sorted(({**r, "total": r["count"] * r["each"], "where": sorted(r["where"])} for r in sell.values()),
                        key=lambda r: -r["total"])
     proc_rows = sorted(({**r, "gain": int((r.pop("net_each") - r["each_raw"]) * r["count"])}
@@ -171,10 +188,64 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
     return {"total": sum(r["total"] for r in sell_rows), "count": sum(r["count"] for r in sell_rows),
             "sell": sell_rows, "process": proc_rows, "process_gain": sum(r["gain"] for r in proc_rows),
             "keep": keep_rows, "materials": sorted(materials.items(), key=lambda kv: -kv[1]),
+            "machines": busy,
             "rules": [{"id": r.id, "label": r.label, "mode": mode[r.id], "modes": list(r.modes), **kept_by[r.id]}
                       for r in keep_rules.RULES],
             "items": items,
             "hints": hint_rows}
+
+
+QUEUE_DAYS = 28  # how far ahead the machines rule keeps work for your machines
+DAY_MINUTES = 20 * 60  # 6am to 2am: a machine done within that is free again today
+
+
+def _free_today(farm: Farm) -> tuple[dict[str, int], list[dict]]:
+    """({machine id: how many are free today}, what's in each busy one): empty, or done before the day ends (collect
+    it first). The Seed Maker is counted too. Saves without machine detail count every machine as free."""
+    s = farm.save
+    work = s.machine_work or [{"name": n, "holds": "", "minutes": 0, "ready": False}
+                              for n, k in s.machines.items() for _ in range(k)]
+    free: dict[str, int] = defaultdict(int)
+    busy = []
+    for m in work:
+        mid = _machine_id(farm, m["name"])
+        if not m["holds"] or m["ready"] or m["minutes"] <= DAY_MINUTES:
+            free[mid] += 1
+        if m["holds"]:
+            ready = m["ready"] or m["minutes"] <= 0
+            busy.append({"machine": m["name"], "holds": m["holds"], "ready": ready,
+                         "at": "" if ready else time_label(clock_of(minutes_of(600) + m["minutes"]))
+                         if m["minutes"] <= DAY_MINUTES else "",
+                         "days": 0 if m["minutes"] <= DAY_MINUTES else -(-m["minutes"] // 1440)})
+    return dict(free), busy
+
+
+def _queue(farm: Farm, stacks: list, produce, w, spare: dict, objects: dict) -> list[tuple[str, tuple, str]]:
+    """What's left that a machine you own turns into more, best gain a load first, as much as your machines get
+    through in QUEUE_DAYS (today's loads already taken): [(item, (quality, count, raw value), why)]."""
+    s = farm.save
+    owned = {_machine_id(farm, name): n for name, n in s.machines.items()}
+    room: dict[str, float] = {}
+    ranked = []
+    for qid, st in stacks:
+        if st.left and produce(qid, st.it):
+            best = _best_output(farm, qid, st.it, st.left, w, [m for m in owned if m != SEED_MAKER], spare, objects)
+            if best:
+                each = item_sell_price(st.it, farm.farmer, profit_margin=s.profit_margin)
+                ranked.append(((best[1] - each) * best[2].uses, qid, st, best, each))
+    out = []
+    for gain, qid, st, (mid, _per, o, _prod), each in sorted(ranked, key=lambda x: -x[0]):
+        if mid not in room:
+            minutes = o.days * 1440 if o.days else max(o.minutes, 60)
+            room[mid] = owned[mid] * QUEUE_DAYS * 1440 / minutes  # loads in the coming weeks
+        use = min(st.left, int(room[mid]) * o.uses)
+        if use <= 0:
+            continue
+        room[mid] -= -(-use // o.uses)
+        st.left -= use
+        out.append((qid, (st.it.quality, use, use * each),
+                    f"the {_machine_name(farm, mid)} when it's free: {o.name}, +{int(gain / o.uses):,}g each"))
+    return out
 
 
 def _best_output(farm: Farm, qid: str, it, n: int, w, mids: list[str], spare: dict[str, int], objects: dict):

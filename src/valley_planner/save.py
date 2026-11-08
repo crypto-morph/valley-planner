@@ -215,6 +215,9 @@ class Save:
     hay: int = 0
     fruit_trees: list[dict] = field(default_factory=list)
     machines: Counter = field(default_factory=Counter)  # placed, by name (things Data/Machines lists)
+    # each placed machine's work: {name, location, holds (product name, "" if empty), minutes (until ready),
+    # ready (done, waiting to be collected)}
+    machine_work: list[dict] = field(default_factory=list)
     sprinklers: Counter = field(default_factory=Counter)
     hoed: set[tuple[int, int]] = field(default_factory=set)  # the Farm's dirt
     farm_objects: dict[tuple[int, int], str] = field(default_factory=dict)  # what stands on the Farm, by tile
@@ -609,6 +612,7 @@ def read_save(path: Path, data=None) -> Save:
 
     house_upgrade = _int(player, "houseUpgradeLevel")
     machines: Counter = Counter()
+    machine_work: list[dict] = []
     sprinklers: Counter = Counter()
     crab_pots = 0
     for el in root.iter():
@@ -624,7 +628,13 @@ def read_save(path: Path, data=None) -> Save:
                 continue  # the game pre-places casks in every cellar; yours opens with the third house upgrade
             qid = qid if qid.startswith("(") else f"(BC){qid}"
             if qid in machines_data:
-                machines[big_names.get(qid) or _text(el, "name")] += 1
+                name = big_names.get(qid) or _text(el, "name")
+                machines[name] += 1
+                held = _child(el, "heldObject")
+                holds = "" if held is None or _nil(held) else _text(held, "name")
+                machine_work.append({"name": name, "location": where, "holds": holds,
+                                     "minutes": max(0, _int(el, "minutesUntilReady")) if holds else 0,
+                                     "ready": _bool(el, "readyForHarvest")})
         elif _text(el, "name").endswith("Sprinkler"):
             sprinklers[_text(el, "name")] += 1
 
@@ -714,7 +724,7 @@ def read_save(path: Path, data=None) -> Save:
         fish_caught=fish, museum=museum, bundle_data=bundle_data, bundle_slots=bundle_slots, areas_complete=areas,
         buildings=buildings, building_days=building_days, animals=animals, hay=_int(farm, "piecesOfHay"),
         fruit_trees=fruit_trees,
-        machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
+        machines=machines, machine_work=machine_work, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
         hoed=hoed, farm_objects=farm_objects,
         special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
         special_orders_board=[o for o in board if o["type"] not in ("Qi", "QiChallenge")],

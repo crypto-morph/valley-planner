@@ -161,6 +161,10 @@ RULES = [
          _help_wanted),
     Rule("loved", "Gifts a villager loves: 2 for each who loves it, up to 4", ALWAYS, (ALWAYS, OFF), _loved),
     Rule("liked", "Gifts a villager likes: 1", OFF, (ALWAYS, OFF), _liked),
+    # claims nothing up front: views/sell.py keeps what's left after today's machine loads that a machine you own
+    # turns into more, as much as your machines get through in the next 4 weeks (selling it raw loses money)
+    Rule("machines", "Your machines: what they turn into more, for when one is free", ALWAYS, (ALWAYS, OFF),
+         lambda _farm, _sellable: ()),
 ]
 BY_ID = {r.id: r for r in RULES}
 

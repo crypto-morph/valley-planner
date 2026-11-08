@@ -96,3 +96,44 @@ def test_real_machines():
     assert m.output("(BC)24", Input("(O)174")).quality == 2  # large egg: gold mayonnaise
     seed = m.output("(BC)25", Input("(O)24"))
     assert (seed.item, seed.stack, seed.minutes) == ("(O)472", (1, 3), 20)
+
+
+def test_a_machine_is_free_today_if_empty_or_done_before_the_day_ends(monkeypatch):
+    from types import SimpleNamespace
+
+    from valley_planner.views import sell
+    monkeypatch.setattr(sell, "_machine_id", lambda _f, name: name)
+    work = [{"name": "Preserves Jar", "holds": "Blackberry Jelly", "minutes": 190, "ready": False},
+            {"name": "Keg", "holds": "Wine", "minutes": 9000, "ready": False},
+            {"name": "Furnace", "holds": "", "minutes": 0, "ready": False}]
+    free, busy = sell._free_today(SimpleNamespace(save=SimpleNamespace(machine_work=work, machines={})))
+    assert free == {"Preserves Jar": 1, "Furnace": 1}  # the Keg's Wine takes days
+    assert busy[0] == {"machine": "Preserves Jar", "holds": "Blackberry Jelly", "ready": False, "at": "9:10 AM",
+                       "days": 0}
+    assert busy[1]["days"] == 7 and busy[1]["at"] == ""
+
+
+def test_the_machines_note_says_what_to_take_out_first():
+    from valley_planner.views.today import machines_note
+    assert machines_note({"process": []}) is None
+    n = machines_note({"process": [{"name": "Cave Carrot", "count": 1, "machine": "Preserves Jar", "gain": 75}],
+                       "machines": [{"machine": "Preserves Jar", "holds": "Blackberry Jelly", "ready": False,
+                                     "at": "9:10 AM", "days": 0}]})
+    assert n["text"] == ("Machines: 1 Cave Carrot in the Preserves Jar (take out the Blackberry Jelly first: ready "
+                         "about 9:10 AM).")
+
+
+def test_what_a_machine_improves_waits_for_it_up_to_what_it_gets_through(monkeypatch):
+    from types import SimpleNamespace
+
+    from valley_planner.views import sell
+    jar = SimpleNamespace(uses=1, minutes=4000, days=0, name="Pickles")
+    monkeypatch.setattr(sell, "_machine_id", lambda _f, name: name)
+    monkeypatch.setattr(sell, "_machine_name", lambda _f, mid: mid)
+    monkeypatch.setattr(sell, "_best_output", lambda *a, **k: ("Preserves Jar", 66, jar, 66))
+    monkeypatch.setattr(sell, "item_sell_price", lambda it, *a, **k: 8)
+    farm = SimpleNamespace(save=SimpleNamespace(machines={"Preserves Jar": 1}, profit_margin=1), farmer=None)
+    onions = sell._Stack(SimpleNamespace(quality=0), 40)
+    out = sell._queue(farm, [("(O)399", onions)], lambda q, it: True, None, {}, {})
+    assert out == [("(O)399", (0, 10, 80), "the Preserves Jar when it's free: Pickles, +58g each")]
+    assert onions.left == 30  # one jar gets through 10 loads in 4 weeks; the rest can be sold

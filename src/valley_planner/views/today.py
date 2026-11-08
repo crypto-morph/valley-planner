@@ -139,6 +139,23 @@ def _dig_spots(farm: Farm, held: dict[str, int]) -> list[dict]:
     return out
 
 
+def machines_note(sold: dict) -> dict | None:
+    """What to load into your machines today (the sell plan's best loads), after collecting what's done."""
+    loads = [p for p in sold.get("process", []) if not p.get("seeds")]
+    if not loads:
+        return None
+    waiting = {b["machine"]: b for b in sold.get("machines", [])}
+    parts = []
+    for p in loads:
+        b = waiting.get(p["machine"])
+        first = ("" if not b else f" (take out the {b['holds']} first" + ("" if b["ready"] else
+                 f": ready about {b['at']}" if b["at"] else "") + ")")
+        parts.append(f"{p['count']} {p['name']} in the {p['machine']}{first}")
+    gain = sum(p["gain"] for p in loads)
+    return {"text": "Machines: " + "; ".join(parts) + ".",
+            "why": f"About {gain:,}g more than selling them raw, the best loads for the machines you have free today."}
+
+
 def planting_note(seeds: int, room: int, watered: set, plant_all: bool) -> dict | None:
     """Once a Sprinkler is down, seeds go only where one waters: say what waits, with the switch to plant them all."""
     if not watered:
@@ -1230,6 +1247,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
                                          letters_note(farm), *asks.notes(farm),
                                          planting_note(held_seeds - spoken, room, watered, plant_all),
+                                         machines_note(sold),
                                          rare_note(plan, left))
                       if x],
             "passing": passing,
