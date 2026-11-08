@@ -29,6 +29,9 @@
       '<path d="M3 26h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>',
     arrive: '<path d="M24 3C15.7 3 9 9.6 9 17.8 9 29 24 45 24 45s15-16 15-27.2C39 9.6 32.3 3 24 3z" fill="currentColor"/>' +
       '<circle cx="24" cy="18" r="6" fill="#14181C"/>',
+    load: '<rect x="5" y="14" width="38" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="3.5"/>' +
+      '<path d="M5 22h38" stroke="currentColor" stroke-width="3.5"/><rect x="20" y="19" width="8" height="7" rx="1.5" fill="currentColor"/>' +
+      '<path d="M24 2v9m-4-4 4 4 4-4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
     home: '<path d="M6 23 24 7l18 16" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path d="M11 21v22h10V31h6v12h10V21L24 10z" fill="currentColor"/>',
   };
@@ -150,7 +153,7 @@
   }
 
   // The day as a list of instructions: each stop's walk, then the stop itself; the walk home last.
-  function buildSteps(data) {
+  function buildSteps(data, done = new Set()) {
     const out = [];
     const st = data.start || ["Farm", 64, 16];
     let pos = { loc: st[0], x: st[1], y: st[2] };
@@ -160,6 +163,14 @@
         pos = { loc: s.loc, x: s.to[0], y: s.to[1] };
       }
     };
+    if ((data.load || []).length && !done.has("load")) {  // first, what to take from the chests
+      const lines = data.load.map((c) => `From the ${c.where}: ${c.items.join(", ")}.`);
+      const held = (data.held_back || []).map((h) => `${h.item} stays home: ${h.why}.`);
+      const row = { id: "load", title: "Before you set off", kind: "farm", time: data.plan[0] ? data.plan[0].time : "" };
+      out.push({ kind: "load", stop: 0, row, loc: pos.loc, from: [pos.x, pos.y], to: [pos.x, pos.y],
+        points: [[pos.x, pos.y]], text: "Before you set off: pack your bag", why: [...lines, ...held].join(" "),
+        lines: [...lines, ...held] });
+    }
     data.plan.forEach((row, i) => {
       walkOn(row.steps, i, row);
       const at = row.spot ? { loc: row.spot[0], x: row.spot[1], y: row.spot[2] } : pos;
@@ -435,6 +446,7 @@
       if (step.kind === "exit") return ["Now", ""];
       if (step.kind === "door") return ["Door", ""];
       if (step.kind === "arrive") return [step.row.time || "Here", step.row.place ? `at ${step.row.place}` : ""];
+      if (step.kind === "load") return ["Pack", "from the chests at home"];
       return [state.data.home || "Home", "home"];
     }
 
@@ -454,9 +466,13 @@
       text.textContent = step.text;
       why.textContent = step.kind === "arrive" || step.kind === "home" ? step.why : "";
       why.classList.remove("vsn-open");
+      if (step.kind === "load") {  // the whole list, a chest a line: it's what you came for
+        why.replaceChildren(...step.lines.map((t) => el("div", { text: t })));
+        why.classList.add("vsn-open");
+      }
       const row = step.row, total = state.data.plan.length;
       meta.replaceChildren(
-          el("span", { text: row ? `Stop ${step.stop + 1} of ${total} · ${stopName(row)}` : "The walk home" }),
+          el("span", { text: step.kind === "load" ? "Before you set off" : row ? `Stop ${step.stop + 1} of ${total} · ${stopName(row)}` : "The walk home" }),
         el("strong", { text: row ? `${row.kind === "farm" ? "" : "arrive "}${row.time}` : state.data.home ? `home ${state.data.home}` : "" }));
       bar.style.width = `${((state.i + 1) / state.steps.length) * 100}%`;
       const nx = state.steps[state.i + 1];
@@ -466,8 +482,8 @@
       nextBtn.disabled = state.i >= state.steps.length - 1;
       const canTick = row && !state.gone.has(row.id);
       doneBtn.hidden = !canTick;
-      doneBtn.classList.toggle("vsn-now", step.kind === "arrive");
-      doneBtn.textContent = "Arrived — done with this stop";
+      doneBtn.classList.toggle("vsn-now", step.kind === "arrive" || step.kind === "load");
+      doneBtn.textContent = step.kind === "load" ? "Got them" : "Arrived — done with this stop";
       doneBtn.setAttribute("aria-label", row ? `Arrived, done with stop ${step.stop + 1}: ${row.title}` : "");
       renderStops(step);
       return showMap(step);
@@ -497,6 +513,7 @@
       const row = step.row;
       state.gone.add(row.id);
       try { if (opts.onDone) opts.onDone(row.id, row); } catch (e) { console.error(e); }
+      if (step.kind === "load") { go(state.i + 1); return; }  // on to the first walk
       const nx = state.steps.findIndex((s) => s.stop > step.stop && !(s.row && state.gone.has(s.row.id)));
       if (nx >= 0) go(nx); else render();
     }
@@ -514,7 +531,7 @@
       if (state.dead) return;
       state.data = data;
       state.gone.clear();
-      state.steps = buildSteps(data);
+      state.steps = buildSteps(data, new Set(String(params.done || "").split(",").filter(Boolean)));
       for (const s of state.steps) {  // "Leave by the east edge to Bus Stop": the map's own name, for the labels
         const m = s.kind === "exit" && / edge to (.+)$/.exec(s.text);
         if (m) names.set(s.onto, m[1]);
