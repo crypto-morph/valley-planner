@@ -299,3 +299,8 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .glance-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 #t-satnav { margin-bottom: 16px; }
 #view-today.satnav-on > :not(.glance):not(#t-satnav):not(#t-form) { display: none !important; }
+.load-up { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid #C77700; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.load-up .btn { align-self: flex-start; margin-top: 6px; }
+.next .seed-table { background: rgba(255,255,255,.95); color: var(--ink); border-radius: 8px; margin: 8px 0 12px; }
+.next .seed-table th, .next .seed-table td { padding: 5px 8px; }
+.next-take { margin: 6px 0; }

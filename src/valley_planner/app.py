@@ -171,9 +171,16 @@ def create_app(planner: Planner | None = None) -> FastAPI:
 
     @app.get("/api/today")
     def today_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
-                   spouse: str = "") -> dict:
-        """The day's timed plan; time, energy and where for a recalculation from wherever you are."""
+                   spouse: str = "", goals: str = "") -> dict:
+        """The day's timed plan; time, energy and where for a recalculation from wherever you are. `goals`: the
+        Goals page's ask (JSON), so the day follows your route (what to hold back for an earlier goal)."""
         from .views import today
+        route = None
+        if goals:
+            try:
+                route = planned(RouteAsk.model_validate_json(goals))
+            except ValueError:
+                route = None
         ticked = set(filter(None, done.split(",")))
         farm, pl = p().farm(), p()
         store = todo.pace_file(pl.path().parent.name) if pl.path() else None
@@ -181,7 +188,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         if store and time is not None and ticked:
             ratio = today.pace_ratio(today.view(farm, spouse=spouse, pace=pace), time, ticked)
             pace = today.learned_pace(store, farm.save.days_played, ratio)
-        return today.view(farm, time=time, energy=energy, where=where or None, done=ticked, spouse=spouse, pace=pace)
+        return today.view(farm, time=time, energy=energy, where=where or None, done=ticked, spouse=spouse, pace=pace,
+                          route=route)
 
     @app.get("/api/cook")
     def cook_view() -> dict:
@@ -252,21 +260,32 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return (farm, [t for t in ask.targets if t in known],
                 [n for n in ask.nice if n in known and n not in ask.targets], settings, cave)
 
+    memo: dict[tuple, dict] = {}
+
+    def planned(ask: RouteAsk) -> dict:
+        """The goals route for this ask, remembered until the save changes (Today, the Wood note and Goals share
+        it)."""
+        from .engine.route.plan import route
+        path = p().path() if ask.start == "save" else None
+        key = (str(path), path.stat().st_mtime if path else 0, ask.model_dump_json())
+        if key not in memo:
+            if len(memo) > 8:
+                memo.clear()
+            farm, targets, nice, settings, cave = route_args(ask)
+            memo[key] = route(farm, targets, nice, settings=settings, cave=cave)
+        return memo[key]
+
     @app.post("/api/route")
     def route_view(ask: RouteAsk) -> dict:
         """The rest of this year (from the save, or a fresh farm) planned for these targets (in order) and
         nice-to-haves (in order)."""
-        from .engine.route.plan import route
-        farm, targets, nice, settings, cave = route_args(ask)
-        return route(farm, targets, nice, settings=settings, cave=cave)
+        return planned(ask)
 
     @app.post("/api/today/wood")
     def wood_view(ask: RouteAsk, trees: int = 0) -> dict:
         """The Wood note from your goals' own dates: the next job you're short for, how soon, and the schedule."""
-        from .engine.route.plan import route
         from .views.today import wood_plan, wood_uses
-        farm, targets, nice, settings, cave = route_args(ask)
-        return {"note": wood_plan(farm, wood_uses(route(farm, targets, nice, settings=settings, cave=cave)), trees)}
+        return {"note": wood_plan(p().farm(), wood_uses(planned(ask)), trees)}
 
     @app.post("/api/needs")
     def needs_view(ask: RouteAsk) -> dict:

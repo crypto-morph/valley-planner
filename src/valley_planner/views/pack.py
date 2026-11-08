@@ -44,7 +44,7 @@ def _gift(farm: Farm, who: str, spare: list[dict]) -> dict | None:
 QUALITY_WORDS = {1: "silver", 2: "gold", 4: "iridium"}
 
 
-def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
+def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] | None = None) -> dict:
     s = farm.save
     order = [p["id"] for p in plan]
     stops: dict[str, dict] = {}
@@ -62,7 +62,7 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
         """Add an item to stop `key` with where each part comes from. False (and a 'short' line instead) when the
         chests you pass on the way don't hold enough, so it waits for another day."""
         entry = stop(key, STOP_NAMES.get(key, key))
-        ok_places = reach_before(key)
+        ok_places = reach_before(key) | ({STOP_CHESTS[key]} if key in STOP_CHESTS else set())  # and the one there
         parts: dict[str, list] = {}
         for it in s.items:
             if it.name == name and (is_home(it.where) or it.where in ok_places or it.where.endswith(" chest")):
@@ -84,8 +84,15 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
                                        f"; {where} (later today)" if comes else f"; {where}" if where else "")})
             return False
         entry["items"].append(label)
-        entry["rows"].append({"label": label, "from": [{k: r[k] for k in ("where", "count")} for r in rows
-                                                       if r["on_route"]]})
+        # what to take from where: the chest at the stop first, then the rest from the nearest you pass
+        here = STOP_CHESTS.get(key)
+        left, src = count or usable, []
+        for r in sorted((r for r in rows if r["on_route"]), key=lambda r: r["raw"] != here):
+            n = min(left, r["count"])
+            if n:
+                src.append({"where": r["where"], "count": r["count"], "take": n, "there": r["raw"] == here})
+                left -= n
+        entry["rows"].append({"label": label, "name": name, "from": src})
         return True
 
     def known(key: str) -> bool:
@@ -105,14 +112,14 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
             spare.append({**r, "count": here})
 
     if known("cc"):
-        in_cc = {i.name for i in s.items if i.where == STOP_CHESTS["cc"]}
         for room in errands.community_center(farm)["rooms"]:
             for i in room["items"]:
-                if not i["open"]:
+                if not i["open"] or i["name"] in (hold or {}):
                     continue
                 label = f"{i['count']} {i['name']}" if i["count"] > 1 else i["name"]
                 entry = stop("cc", STOP_NAMES["cc"])
-                if i["name"] in in_cc:
+                there = sum(it.stack for it in s.items if it.name == i["name"] and it.where == STOP_CHESTS["cc"])
+                if there >= i["count"]:
                     entry["there"].append(label)
                 elif take("cc", i["name"], i["count"], label):
                     taken.add(i["name"])
@@ -183,10 +190,20 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
     sales.sort(key=lambda x: x[0], reverse=True)
     for _gold, _key, _label, line in sales[max(0, room):]:
         ship.append({**line, "no_room": True})
-    for gold, key, label, _line in sales[:max(0, room)]:
+    for gold, key, label, line in sales[:max(0, room)]:
         entry = stop(key, STOP_NAMES[key])
         entry["items"].append(label)
         entry["gold"] += gold
+        left, src = line["count"], []  # spares to sell come from your bag and the chests at home
+        for it in sorted((i for i in s.items if i.name == line["item"] and is_home(i.where)),
+                         key=lambda i: i.where != "Backpack"):
+            n = min(left, it.stack)
+            if n > 0:
+                where = farm.where_label(it.where, it.chest).replace(f"({farm.place('Farm')})", "(farm)")
+                src.append({"where": where.removeprefix("the ").replace(" (", ", ").removesuffix(")"),
+                            "count": it.stack, "take": n, "there": False})
+                left -= n
+        entry["rows"].append({"label": label, "name": line["item"], "from": src})
     rank = {key: order.index(key) for key in stops if key in order}
     for key in stops:
         if key.startswith("give:"):

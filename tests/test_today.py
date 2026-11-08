@@ -349,3 +349,30 @@ def test_notes_split_into_a_line_and_its_reason():
     assert today_view._note("First part. The reason, at more length.") == {
         "text": "First part.", "why": "The reason, at more length."}
     assert today_view._note({"text": "a", "why": "b"}) == {"text": "a", "why": "b"}
+
+
+def test_take_line_counts_what_you_carry_and_what_waits_there():
+    from valley_planner.views import today as today_view
+    stop = {"items": ["10 Bat Wing"], "rows": [{"label": "10 Bat Wing", "name": "Bat Wing", "from": [
+        {"where": "plain chest, Community Center", "take": 8, "there": True},
+        {"where": "grey chest, farm", "take": 2, "there": False}]}]}
+    assert today_view._take_words(stop) == ["2 Bat Wing", "(8 Bat Wing already there)"]
+
+
+def test_wood_is_held_back_for_the_next_job_but_not_when_there_is_plenty(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from valley_planner.views import errands
+    from valley_planner.views import today as today_view
+    monkeypatch.setattr(errands, "community_center", lambda f: {"rooms": [{"items": [
+        {"name": "Wood", "count": 99, "open": True}]}]})
+    route = {"objectives": [{"label": "The CC", "steps": [{"needs": [
+        {"key": "building:Coop", "label": "build a Coop", "state": "new", "on": 51, "ready": "",
+         "materials": ["300 Wood"]}]}]}]}
+
+    def farm(wood):
+        return NS(save=NS(crafting_recipes=set(), days_played=29), held=lambda: {"(O)388": wood},
+                  label=lambda d: f"Summer {d - 28}, Year 1")
+    assert "Coop (Summer 23)" in today_view.hold_back(farm(310), route)["Wood"]  # 310 - 99 leaves the Coop short
+    assert "Wood" not in today_view.hold_back(farm(450), route)
+    assert today_view.hold_back(farm(310), None) == {}  # no goals given: nothing to weigh it against

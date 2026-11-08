@@ -530,6 +530,12 @@ function loadDone(date) {
 function saveDone() {
   try { localStorage.setItem(`done:${todayDone.date}`, JSON.stringify([...todayDone])); } catch { /* fine */ }
 }
+function seedTable(seeds) {
+  return `<table class="ship-table seed-table"><thead><tr><th>Buy</th><th class="num">How many</th><th>For</th></tr></thead><tbody>${seeds.map((x) =>
+    `<tr><td>${esc(x.seed)}</td><td class="num">${x.count}${x.held ? ` <span class="small">(+${x.held} held)</span>` : ""}</td><td class="small">${esc(x.why)}</td></tr>`).join("")}` +
+    `<tr><td><strong>Total</strong></td><td class="num" colspan="2"><strong>${seeds.reduce((a, x) => a + x.count * x.price, 0).toLocaleString()}g</strong></td></tr></tbody></table>`;
+}
+
 // Satnav mode: the day as one instruction at a time on the map (static/satnav.js), instead of the page.
 let satnav = null;
 function setSatnav(on) {
@@ -571,17 +577,25 @@ const extras = (rows) => {
 function drawNext(v) {
   const rows = v.plan.filter((x) => !todayDone.has(x.id));
   const first = rows[0];
-  $("#t-next").innerHTML = first
+  const loadUp = (v.load || []).length && !todayDone.has("load")
+    ? `<div class="load-up"><strong>Before you set off</strong>${v.load.map((c) => `<div><span class="muted">From the ${esc(c.where)}:</span> ${c.items.map(esc).join(", ")}</div>`).join("")}` +
+      ((v.held_back || []).length ? `<div class="small muted">Held back: ${v.held_back.map((h) => `${esc(h.item)} (${esc(h.why)})`).join("; ")}.</div>` : "") +
+      `<button type="button" class="btn quiet" id="t-loaded">Got them</button></div>` : "";
+  $("#t-load").innerHTML = loadUp;
+  $("#t-next").innerHTML = (first
     ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
       (first.way.length ? `<ol>${first.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") +
       (first.extras ? `<p class="next-extra"><strong>On the way:</strong> ${extras(first.extras)}</p>` : "") +
       (first.spot ? spotPic(first.spot, first.title) : "") +
+      (first.take ? `<p class="next-take"><strong>Take:</strong> ${first.take.map(esc).join(", ")}</p>` : "") +
+      (first.seeds && first.seeds.length ? seedTable(first.seeds) : "") +
       `<button type="button" class="btn light" id="t-done">Done, what's next?</button>`
-    : `<h2>All done for today</h2><p>${esc(v.spare.length ? `Energy to spare: ${v.spare.join(", or ")}.` : "Rest up, and get to bed by midnight.")}</p>`;
+    : `<h2>All done for today</h2><p>${esc(v.spare.length ? `Energy to spare: ${v.spare.join(", or ")}.` : "Rest up, and get to bed by midnight.")}</p>`);
+  if ($("#t-loaded")) $("#t-loaded").onclick = () => tick("load", true);
   if (first) $("#t-done").onclick = () => tick(first.id, true);
   drawMaps($("#t-next"));
   const homeward = v.passing.filter((x) => x.stop >= v.plan.length);
-  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}${x.spot ? `<button type="button" class="place-link pin" aria-label="Show ${esc(x.title)} on the map" data-spots="${esc(JSON.stringify([{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title.length < 28 ? x.title : "" }]))}">${PIN} Map</button>` : ""}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
+  const line = (x) => `<li class="stop"><label><input type="checkbox" data-stop="${esc(x.id)}" ${todayDone.has(x.id) ? "checked" : ""}><span class="stop-time">${esc(x.time)}${x.spot ? `<button type="button" class="place-link pin" aria-label="Show ${esc(x.title)} on the map" data-spots="${esc(JSON.stringify([{ loc: x.spot[0], x: x.spot[1], y: x.spot[2], label: x.title.length < 28 ? x.title : "" }]))}">${PIN} Map</button>` : ""}</span><span class="stop-text ${todayDone.has(x.id) ? "gone" : ""}"><strong>${esc(x.title)}</strong> <span class="muted">${esc(x.why)}</span>${x.take ? `<span class="stop-extra">Take: ${x.take.map(esc).join(", ")}</span>` : ""}${x.seeds && x.seeds.length ? `<details class="fold plain seed-fold"><summary>The seeds, and what each is for</summary>${seedTable(x.seeds)}</details>` : ""}${x.extras ? `<span class="stop-extra">On the way: ${extras(x.extras)}</span>` : ""}</span></label></li>`;
   $("#t-plan").innerHTML = `<ul class="stops">${v.plan.filter((x) => !first || x.id !== first.id).map(line).join("")}</ul>` +
     (homeward.length ? `<p class="muted"><strong>On the way home:</strong> ${extras(homeward)}</p>` : "") +
     (v.home ? `<p class="muted">Home by about ${esc(v.home)}.${v.spare.length ? ` Then ${esc(v.spare.join(", or "))}.` : ""}</p>` : "") +
@@ -761,7 +775,7 @@ const views = {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     dayAsk = ask;
     if (!todayDone.date) { const m = await get("/api/meta"); loadDone(m.date); }
-    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "" })}`);
+    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")) })}`);
     lastDay = v;
     const h = v.head;
     $("#m-date").textContent = `${h.weekday}, ${h.date.replace(/, Year \d+/, "")}`;
