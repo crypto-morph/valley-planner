@@ -265,12 +265,12 @@ def test_a_person_indoors_is_a_stop_at_the_door(data, monkeypatch):
 
 
 def test_a_birthday_with_a_gift_in_hand_is_a_stop(monkeypatch):
-    from valley_planner.views import errands, today
-    monkeypatch.setattr(errands, "birthdays", lambda _f, days=7: {"birthdays": [
-        {"who": "Pierre", "loved": [], "liked": ["Carrot"]}, {"who": "Emily", "loved": [], "liked": []}]})
+    from valley_planner.views import errands, keep, today
+    monkeypatch.setattr(errands, "birthdays", lambda _f, days=7: {"birthdays": [{"who": "Pierre"}, {"who": "Emily"}]})
+    monkeypatch.setattr(keep, "birthday_gift", lambda _f, who: ("(O)20", "like") if who == "Pierre" else None)
     monkeypatch.setattr(today, "_person", lambda _f, who, why, value: [{"id": f"talk:{who}", "why": why}])
-    stops = today._birthdays(SimpleNamespace())
-    assert [s["id"] for s in stops] == ["talk:Pierre"] and "Carrot counts 8 times" in stops[0]["why"]
+    stops = today._birthdays(SimpleNamespace(name=lambda q: "Carrot"))
+    assert [s["id"] for s in stops] == ["talk:Pierre"] and "give a Carrot, a liked gift" in stops[0]["why"]
 
 
 def test_sprinklers_say_what_is_missing():

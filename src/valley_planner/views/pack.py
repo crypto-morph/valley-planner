@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from ..facts.buyers import SHOPS, Buyers
 from . import errands, quests, sell
+from . import keep as keep_rules
 from .farm import Farm
 
 TOOLS_FOR = {"mine": ("Pickaxe", "Rusty Sword", "Steel Smallsword", "Wooden Blade"), "fish": ("Bamboo Pole",)}
@@ -63,9 +64,10 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
     def take(key: str, name: str, count: int, label: str) -> bool:
         """Add an item to stop `key` with where each part comes from. False (and a 'short' line instead) when the
         chests you pass on the way don't hold enough, so it waits for another day."""
-        entry = stop(key, STOP_NAMES.get(key, key))
+        entry = stop(key, STOP_NAMES.get(key, key.split(":", 1)[-1]))
         ok_places = reach_before(key) | ({STOP_CHESTS[key]} if key in STOP_CHESTS else set())  # and the one there
         parts: dict[str, list] = {}
+        qid = next((it.qualified_id for it in s.items if it.name == name and it.qualified_id), "")
         for it in s.items:
             if it.name == name and (is_home(it.where) or it.where in ok_places or it.where.endswith(" chest")):
                 where = farm.where_label(it.where, it.chest).replace(f"({farm.place('Farm')})", "(farm)")
@@ -94,7 +96,10 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
             if n:
                 src.append({"where": r["where"], "count": r["count"], "take": n, "there": r["raw"] == here})
                 left -= n
-        entry["rows"].append({"label": label, "name": name, "from": src, "for": PURPOSE.get(key, entry["stop"])})
+        purpose = PURPOSE.get(key) or (f"give to {entry['stop']}" if key.startswith(("talk:", "give:"))
+                                       else entry["stop"])
+        entry["rows"].append({"label": label, "name": name, "from": src, "for": purpose,
+                              "icon": farm.icon(qid) if qid else None})
         return True
 
     def known(key: str) -> bool:
@@ -156,12 +161,9 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
 
     for b in errands.birthdays(farm, days=0)["birthdays"]:
         if known(f"talk:{b['who']}") and b["who"] != spouse:
-            pick = _gift(farm, b["who"], spare)
-            if pick:
-                row, _taste = pick
-                stop(f"talk:{b['who']}", b["who"])["items"].append(f"{row['name']}, a birthday gift")
-                taken.add(row["name"])
-                row["count"] -= 1
+            pick = keep_rules.birthday_gift(farm, b["who"])  # the gift the keep rules hold back for it
+            if pick and take(f"talk:{b['who']}", farm.name(pick[0]), 1, f"{farm.name(pick[0])}, a birthday gift"):
+                taken.add(farm.name(pick[0]))
 
     buyers = Buyers(farm.data)
     ship: list[dict] = []

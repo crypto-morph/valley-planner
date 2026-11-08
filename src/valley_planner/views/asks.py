@@ -25,6 +25,7 @@ class Ask:
     text: str
     why: str
     keep: tuple[str, int, int]  # qualified id, the lowest quality that will do, how many
+    label: str = ""  # why it's kept, for the Sell tab
 
     def view(self) -> dict:
         return {"id": self.id, "text": self.text, "why": self.why}
@@ -63,7 +64,8 @@ def luau(farm: Farm) -> Ask | str | None:
     name = QUALITY_WORDS.get(quality, "") + farm.name(qid)
     return Ask(f"luau:{s.year}", f"Keep a {name} for the Luau soup?",
                f"On Summer {LUAU_DAY} it gives +{score} with everyone in town you've met; selling it gives {price}g "
-               "or so. Say no and it goes in today's selling.", (qid, quality, 1))
+               "or so. Say no and it goes in today's selling.", (qid, quality, 1),
+               f"the Luau soup on Summer {LUAU_DAY} (+{score} with everyone in town)")
 
 
 def asks(farm: Farm) -> list[Ask]:

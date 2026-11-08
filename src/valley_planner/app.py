@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .discover import find_game, find_saves_root, list_saves
 from .engine import cc, todo
 from .gamedata import GameData
-from .views import ask, calendar, cart, crops, errands, extras, layout, month, morning, picking, romance, sell
+from .views import ask, calendar, cart, crops, errands, extras, keep, layout, month, morning, picking, romance, sell
 from .views.farm import Farm
 
 STATIC = Path(__file__).parent / "static"
@@ -136,10 +136,9 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return cart.search(p().farm(), q[:40])
 
     @app.get("/api/sell")
-    def sell_view(loved: bool = True, liked: bool = False, help_wanted: bool = True, seeds: bool = True,
-                  letters: bool = True, declined: str = "") -> dict:
-        return sell.view(p().farm(), {"loved": loved, "liked": liked, "help_wanted": help_wanted, "seeds": seeds,
-                                      "letters": letters}, declined=frozenset(filter(None, declined.split(","))))
+    def sell_view(rules: str = "", declined: str = "") -> dict:
+        """`rules`: the keep rules' modes (views/keep.py) as 'id:mode,...'; `declined`: Today's questions said no to."""
+        return sell.view(p().farm(), keep.parse(rules), declined=frozenset(filter(None, declined.split(","))))
 
     @app.get("/api/romance")
     def romance_view(target: str = "") -> dict:
@@ -173,10 +172,11 @@ def create_app(planner: Planner | None = None) -> FastAPI:
 
     @app.get("/api/today")
     def today_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
-                   spouse: str = "", goals: str = "", declined: str = "") -> dict:
+                   spouse: str = "", goals: str = "", declined: str = "", rules: str = "") -> dict:
         """The day's timed plan; time, energy and where for a recalculation from wherever you are. `goals`: the
         Goals page's ask (JSON), so the day follows your route (what to hold back for an earlier goal).
-        `declined`: the ids of the day's questions (views/asks.py) you said no to, comma separated."""
+        `declined`: the ids of the day's questions (views/asks.py) you said no to, comma separated; `rules`: the
+        keep rules' modes (views/keep.py), as 'id:mode,...'."""
         from .views import today
         route = None
         if goals:
@@ -192,7 +192,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
             ratio = today.pace_ratio(today.view(farm, spouse=spouse, pace=pace), time, ticked)
             pace = today.learned_pace(store, farm.save.days_played, ratio)
         return today.view(farm, time=time, energy=energy, where=where or None, done=ticked, spouse=spouse, pace=pace,
-                          route=route, declined=frozenset(filter(None, declined.split(","))))
+                          route=route, declined=frozenset(filter(None, declined.split(","))),
+                          rules=keep.parse(rules))
 
     @app.get("/api/cook")
     def cook_view() -> dict:

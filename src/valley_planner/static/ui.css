@@ -304,3 +304,8 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .load-up > details[open] > summary { margin-bottom: 6px; }
 .note-list li.note-ask { padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-left-color: #2E6B45; }
 .ask-seg button { min-height: 36px; }
+.rules { margin: 0; padding: 0; list-style: none; counter-reset: rule; }
+.rules li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line, #E8EBE2); }
+.rules li > div:first-child { flex: 1 1 14em; }
+.rules li > div:first-child::before { counter-increment: rule; content: counter(rule) ". "; font-weight: 700; color: var(--muted); }
+.rule-seg button { min-height: 34px; padding: 0 12px; }

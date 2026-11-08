@@ -561,7 +561,7 @@ function setSatnav(on) {
   try { localStorage.setItem("satnav", on ? "1" : ""); } catch { /* fine without */ }
   if (on && !satnav && window.ValleySatnav) {
     satnav = window.ValleySatnav.mount(box, {
-      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "", declined: [...declined()].join(",") },
+      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "", declined: [...declined()].join(","), rules: rulesParam() },
       onDone: (id) => tick(id, true),
     });
   } else if (!on && satnav) { satnav.destroy(); satnav = null; box.innerHTML = ""; }
@@ -796,7 +796,7 @@ const views = {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     dayAsk = ask;
     if (!todayDone.date) { const m = await get("/api/meta"); loadDone(m.date); }
-    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")), declined: [...declined()].join(",") })}`);
+    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")), declined: [...declined()].join(","), rules: rulesParam() })}`);
     lastDay = v;
     const h = v.head;
     $("#m-date").textContent = `${h.weekday}, ${h.date.replace(/, Year \d+/, "")}`;
@@ -953,25 +953,25 @@ const views = {
   },
 
   async sell() {
-    const f = sellFilters();
-    const v = await get("/api/sell?" + new URLSearchParams({ ...Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x ? "true" : "false"])), declined: [...declined()].join(",") }));
-    $("#sell-head").textContent = `${v.count} items for about ${v.total.toLocaleString()}g`;
-    $("#sell-rows").innerHTML = "<tr><th>Item</th><th>Count</th><th>Each</th><th>Total</th><th>Where</th></tr>" + v.sell.map((r) =>
-      `<tr><td>${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</td><td>${r.count}</td><td>${r.each}g</td><td>${r.total.toLocaleString()}g</td><td class="sub">${esc(r.where.join(", "))}</td></tr>`
-    ).join("");
+    const v = await get("/api/sell?" + new URLSearchParams({ rules: rulesParam(), declined: [...declined()].join(",") }));
+    $("#sell-head").textContent = `Sell ${v.count} for about ${v.total.toLocaleString()}g; everything else stays, for the reason given.`;
+    const q = (x) => x ? ` <span class="q-${esc(x)}">${esc(x)}</span>` : "";
+    $("#sell-rows").innerHTML = `<thead><tr><th></th><th>Item</th><th class="num">Have</th><th class="num">Sell</th><th class="num">Gold</th><th>Keep</th></tr></thead><tbody>` +
+      v.items.map((r) => `<tr><td class="ic">${r.icon ? itemIcon(r.icon) : ""}</td><td>${esc(r.name)}${q(r.quality)}</td><td class="num">${r.have}</td>` +
+        `<td class="num">${r.sell && r.gold ? r.sell : "–"}${r.machine ? `<div class="small muted">${r.machine} in a machine</div>` : ""}</td><td class="num">${r.gold ? `${r.gold.toLocaleString()}g` : ""}</td>` +
+        `<td class="small">${r.sell && !r.gold ? '<div class="muted">Worth nothing: keep it for a Recycling Machine</div>' : ""}${r.why.map((w) => `<div>${r.why.length > 1 || w.count > 1 ? `<strong>${w.count}</strong> ` : ""}${esc(w.why)}</div>`).join("")}</td></tr>`).join("") + "</tbody>";
     $("#sell-process").innerHTML = v.process.length ? '<ul class="list">' + v.process.map((r) =>
       `<li><span>${r.count} ${esc(r.name)} → ${esc(r.product)} <span class="sub">(${esc(r.machine)}${r.burns ? `, uses ${esc(r.burns)} each` : ""})</span></span><span>${r.seeds ? "" : `+${r.gain.toLocaleString()}g`}</span></li>`
     ).join("") + `</ul><p class="sub">About ${v.process_gain.toLocaleString()}g more than selling them raw.</p>` : '<p class="sub">Nothing worth processing with the machines you have.</p>';
-    $("#sell-filters").innerHTML = v.filters.map((x) =>
-      `<label class="filter"><input type="checkbox" data-filter="${esc(x.id)}" ${x.on ? "checked" : ""}> ${esc(x.label)} <span class="sub">(${x.count} items, ${x.value.toLocaleString()}g)</span></label>`
-    ).join("");
-    document.querySelectorAll("#sell-filters input").forEach((box) => box.addEventListener("change", () => {
-      saveSellFilters({ ...sellFilters(), [box.dataset.filter]: box.checked });
+    const MODE = { always: "Always", ask: "Ask", off: "Off" };
+    $("#sell-rules").innerHTML = '<ol class="rules">' + v.rules.map((r) => `<li><div><strong>${esc(r.label)}</strong>` +
+      `<div class="small muted">${r.mode === "off" ? "Not keeping anything" : r.count ? `Keeping ${r.count} (about ${r.value.toLocaleString()}g)` : "Nothing to keep today"}</div></div>` +
+      `<div class="seg rule-seg" role="group" aria-label="${esc(r.label)}">${r.modes.map((m) => `<button type="button" data-rule="${esc(r.id)}" data-mode="${m}"${m === r.mode ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${MODE[m]}</button>`).join("")}</div></li>`).join("") + "</ol>";
+    document.querySelectorAll("#sell-rules [data-rule]").forEach((b) => b.addEventListener("click", () => {
+      saveRules({ ...keepRules(), [b.dataset.rule]: b.dataset.mode });
+      lastDay = null;  // Today sells by these too
       views.sell();
     }));
-    $("#sell-keep").innerHTML = '<ul class="list">' + v.keep.map((r) =>
-      `<li><span>${r.count} ${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</span><span class="sub">${esc(r.why)}</span></li>`
-    ).join("") + "</ul>";
     $("#sell-hints").innerHTML = v.hints.length ? v.hints.map((h) => `<div class="hint">` +
       `<div class="hint-head"><b>${esc(h.machine)}</b><span>+${h.gain_each.toLocaleString()}g each · about ${h.gain_total.toLocaleString()}g on the ${h.count} ${esc(h.name)} you'd put through it now</span></div>` +
       `<p class="sub">${esc(h.name)} → ${esc(h.product)}</p><ul class="list">` + h.steps.map((st) =>
@@ -1015,12 +1015,15 @@ const views = {
 };
 
 const levelLine = (c) => `Level ${c.level}, ${c.sure ? "" : "about "}${c.date}${c.pick ? `: choose ${c.pick}` : c.unlocks ? `: ${c.unlocks}` : ""}`;
-const SELL_DEFAULTS = { loved: true, liked: false, help_wanted: true, seeds: true };
-function sellFilters() {
-  try { return { ...SELL_DEFAULTS, ...JSON.parse(localStorage.getItem("sellFilters") || "{}") }; } catch { return { ...SELL_DEFAULTS }; }
+// The keep rules' modes you changed (views/keep.py ids -> always / ask / off), kept in this browser.
+function keepRules() {
+  try { return JSON.parse(localStorage.getItem("keepRules") || "{}"); } catch { return {}; }
 }
-function saveSellFilters(f) {
-  try { localStorage.setItem("sellFilters", JSON.stringify(f)); } catch { /* private window: just don't remember */ }
+function saveRules(r) {
+  try { localStorage.setItem("keepRules", JSON.stringify(r)); } catch { /* private window: just don't remember */ }
+}
+function rulesParam() {
+  return Object.entries(keepRules()).map(([k, m]) => `${k}:${m}`).join(",");
 }
 
 async function searchCart() {

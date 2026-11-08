@@ -40,7 +40,7 @@ from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS, polylines
-from . import asks, crops, errands, levels, pack, picking, quests, sell
+from . import asks, crops, errands, keep, levels, pack, picking, quests, sell
 from .farm import Farm
 
 LETTER_DAYS = 21  # how far ahead a story letter is worth a note
@@ -213,9 +213,10 @@ def _birthdays(farm: Farm, spouse: str = "") -> list[dict]:
     """Anyone with a birthday today, if you hold something they'd like: a gift counts 8 times."""
     out = []
     for b in errands.birthdays(farm, days=0)["birthdays"]:
-        gift = (b["loved"] or b["liked"] or [""])[0]
-        if b["who"] != spouse and gift:
-            out += _person(farm, b["who"], f"it's their birthday, and {gift} counts 8 times", BIRTHDAY_VALUE)
+        pick = keep.birthday_gift(farm, b["who"])
+        if b["who"] != spouse and pick:
+            out += _person(farm, b["who"], f"it's {b['who']}'s birthday: give a {farm.name(pick[0])}, a "
+                           f"{pick[1]}d gift, which counts 8 times", BIRTHDAY_VALUE)
     return out
 
 
@@ -855,10 +856,11 @@ def _board_note(farm: Farm) -> dict:
 
 def view(farm: Farm, *, time: int | None = None, energy: int | None = None, where: str | None = None,
          done: set[str] = frozenset(), spouse: str = "", pace: float | None = None, route: dict | None = None,
-         declined: frozenset[str] = frozenset()) -> dict:
-    """`declined`: the ids of today's questions (views/asks.py) you said no to."""
+         declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None) -> dict:
+    """`declined`: the ids of today's questions (views/asks.py) you said no to; `rules`: the keep rules' modes
+    (views/keep.py), so the day sells what the Sell tab says."""
     s = farm.save
-    sold = sell.default(farm, declined)  # what to sell, after what today's questions keep
+    sold = sell.default(farm, declined, rules)  # what to sell, after what today's questions keep
     walker = farm.walker
     walker.pace = pace or NEW_PLAYER_PACE
     held = farm.held()
@@ -1061,7 +1063,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
             "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
             "giant": _giant_watch(farm),
-            "asks": [{**a.view(), "yes": a.id not in declined} for a in asks.asks(farm)],
+            "asks": [{**a.view(), "yes": a.id not in declined} for a in keep.questions(farm, rules)],
             "pack": bag, "held_back": [{"item": k, "why": v} for k, v in hold.items()],
             "load": [{"where": w, "items": sorted(items.values(),
                                                   key=lambda x: (x["name"], QUALITY_ORDER[x["quality"]]))}

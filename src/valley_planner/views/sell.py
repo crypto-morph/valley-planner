@@ -5,14 +5,9 @@ the profit margin are in. Only plain produce is suggested for the bin:
 crops, forage, fish, animal goods, artisan goods, gems and minerals, but
 not the materials your known crafting recipes use.
 
-Always held: what the bundle plan has set aside, items an open request
-asks for, the first copy of anything the museum hasn't had, and a loved
-gift for each birthday in the next week.
-Held unless you switch it off: gifts a villager loves (2 per villager who
-loves it, up to 4) or likes (1), one of anything a Help Wanted request can
-ask for this season (they pay 3x), and one of every crop, the lowest quality you have, so a Seed Maker can
-always grow more (it gives 1-3 seeds whatever the quality: rule seedmaker.output-1-3), and what a story letter
-still to come will ask for (facts/letters.py: Demetrius's Melon, Evelyn's Leek), to hand over the day it comes.
+What to keep back: views/keep.py's rules, in order (bundles, requests, the Museum, festivals, birthdays, the
+Seed Maker, Help Wanted, gifts), each set to always, ask or off. What no rule keeps is sold or processed.
+The Seed Maker keeps the lowest quality: it gives 1-3 seeds whatever goes in (rule seedmaker.output-1-3).
 Machines: each machine you own takes one batch (we can't see which are
 busy), when its product sells for at least 1.3x the raw goods.
 
@@ -28,11 +23,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from ..engine.unlocks import Unlocks
-from ..facts import letters
-from ..facts.help_wanted import raw_pool
 from ..facts.machines import Input
 from ..facts.sell import item_sell_price, sell_price
-from . import asks
+from . import keep as keep_rules
 from .farm import Farm
 
 PRODUCE = {-75: "Vegetable", -79: "Fruit", -80: "Flower", -81: "Forage", -4: "Fish", -5: "Egg", -6: "Milk",
@@ -40,14 +33,6 @@ PRODUCE = {-75: "Vegetable", -79: "Fruit", -80: "Flower", -81: "Forage", -4: "Fi
            -20: "Trash", -23: "Shellfish"}
 GROWN = {-75, -79, -80, -4, -5, -6, -18, -26, -14, -23}  # never treated as a crafting material
 QUALITY_WORD = {0: "", 1: "silver", 2: "gold", 4: "iridium"}
-FILTERS = {
-    "loved": "Gifts a villager loves (2 for each who loves it, up to 4)",
-    "liked": "Gifts a villager likes (1)",
-    "help_wanted": "Things a Help Wanted request can ask for this season, which pays 3x (1)",
-    "seeds": "One of every crop, for the Seed Maker (1)",
-    "letters": "What a villager's letter will ask for, so you can hand it over the day it comes",
-}
-DEFAULT_FILTERS = {"loved": True, "liked": False, "help_wanted": True, "seeds": True, "letters": True}
 PROCESS_GAIN = 1.3
 SEED_MAKER = "(BC)25"
 
@@ -72,68 +57,19 @@ def _take(stacks: list[_Stack], n: int, min_q: int = 0) -> list[tuple[int, int]]
     return got
 
 
-def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset[str] = frozenset()) -> dict:
+def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[str] = frozenset()) -> dict:
+    """`rules`: {rule id: mode} for views/keep.py's rules; `declined`: the ids of Today's questions you said no to."""
     s, w = farm.save, farm.when
-    on = {**DEFAULT_FILTERS, **(filters or {})}
     objects = farm.data.asset("Data/Objects")
     by_id: dict[str, list[_Stack]] = defaultdict(list)
     for it in s.items:
         if it.qualified_id and not it.big:
             by_id[it.qualified_id].append(_Stack(it, it.stack))
-    keep: dict[tuple[str, int, str], int] = defaultdict(int)
-
-    def hold(qid: str, n: int, why: str, min_q: int = 0) -> None:
-        for q, k in _take(by_id.get(qid, []), n, min_q):
-            keep[(qid, q, why)] += k
-
-    # Always held
-    for a in asks.asks(farm):  # today's questions, unless you said no
-        if a.id not in declined:
-            qid, q, n = a.keep
-            hold(qid, n, a.text.removesuffix("?").replace("Keep a ", "", 1).capitalize(), q)
-    plan = farm.bundles.plan(s.items)
-    for (bkey, _), parts in plan.reserved.items():
-        b = farm.bundles.by_key[bkey]
-        for qid, q, n in parts:
-            hold(qid, n, f"{b.display} bundle", q)
-    for q in s.quests:
-        if q.get("item_id") and not q.get("completed"):
-            hold(f"(O){q['item_id']}", q.get("count") or 1, f"{q.get('target') or 'a'} request: {q.get('title')}")
-    for qid in by_id:
-        t = (objects.get(qid[3:]) or {}).get("Type")
-        if t in ("Arch", "Minerals") and qid[3:] not in s.museum:
-            hold(qid, 1, "the museum (not donated yet)")
-    villagers = [n for n, c in farm.data.asset("Data/Characters").items() if c.get("BirthSeason")]
-    for dp in range(w.days_played, w.days_played + 8):
-        day = w.on(dp)
-        for npc in farm.calendar.birthdays(day):
-            loved = [qid for qid, st in by_id.items() if any(x.left for x in st)
-                     and farm.gifts.giftable(qid) and farm.gifts.taste(npc, qid) == "love"]
-            if loved:
-                cheapest = min(loved, key=lambda qid: int((objects.get(qid[3:]) or {}).get("Price") or 0))
-                when = "today" if dp == w.days_played else farm.label(dp).rsplit(",", 1)[0]
-                hold(cheapest, 1, f"{npc}'s birthday ({when})")
-
-    # Held unless switched off
     crafting_inputs = set()
     for name, raw in farm.data.asset("Data/CraftingRecipes").items():
         if name in s.crafting_recipes:
             parts = raw.split("/")[0].split()
             crafting_inputs |= {f"(O){parts[i]}" for i in range(0, len(parts) - 1, 2)}
-    help_ids = raw_pool(w.season, w.day, w.year, mine_lowest=w.mine_lowest, vault="ccVault" in s.mail,
-                        crafting=set(s.crafting_recipes))
-    seed_of = {f"(O){c.harvest}": f"(O){seed}" for seed, c in farm.crops.by_seed.items()
-               if c.harvest and objects.get(seed, {}).get("Category") == -74}
-    asked: dict[str, tuple[int, str]] = {}  # item -> (count, why), the soonest letter for it
-    for x in letters.coming(farm.data, s, w.days_played):
-        asked.setdefault(x.item, (x.count, f"{x.who} asks for {'it' if x.count == 1 else x.count} by letter on "
-                                           f"{farm.label(x.days_played).rsplit(',', 1)[0]} ({x.title}"
-                                           + (f", {x.reward:,}g)" if x.reward else ")")))
-    held = farm.held()
-    owned = {_machine_id(farm, name): n for name, n in s.machines.items()}
-    seed_maker = bool(owned.get(SEED_MAKER))
-    impact = {k: {"count": 0, "value": 0} for k in FILTERS}
-    seed_jobs = []
 
     def produce(qid: str, it) -> bool:
         if it.price is None and not objects.get(qid[3:]):
@@ -143,42 +79,29 @@ def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset
             return False
         return cat in PRODUCE or (it.type == "Arch" and qid[3:] in s.museum)
 
-    for qid, stacks in by_id.items():
-        sample = stacks[0].it
-        if not produce(qid, sample) or not any(x.left for x in stacks):
+    # Keep: each rule in order claims from what the ones above it left (views/keep.py)
+    sellable = {qid for qid, st in by_id.items() if produce(qid, st[0].it)}
+    mode = keep_rules.modes(rules)
+    keep: dict[tuple[str, int, str], int] = defaultdict(int)
+    kept_by: dict[str, dict[str, int]] = {r.id: {"count": 0, "value": 0} for r in keep_rules.RULES}
+    owned = {_machine_id(farm, name): n for name, n in s.machines.items()}
+    seed_jobs = []
+    for rule in keep_rules.RULES:
+        if mode[rule.id] == keep_rules.OFF:
             continue
-        holds: dict[str, tuple[int, str]] = {}
-        if farm.gifts.giftable(qid):
-            loves = [v for v in villagers if farm.gifts.taste(v, qid) == "love"]
-            likes = [v for v in villagers if farm.gifts.taste(v, qid) == "like"]
-            if loves:
-                holds["loved"] = (min(4, 2 * len(loves)), "loved by " + ", ".join(loves[:4]))
-            if likes:
-                holds["liked"] = (1, "liked by " + ", ".join(likes[:3]) + ("…" if len(likes) > 3 else ""))
-        if qid[3:] in help_ids:
-            holds["help_wanted"] = (1, "a Help Wanted request could ask for it (3x the price)")
-        if qid in asked:
-            holds["letters"] = asked[qid]
-        seed = seed_of.get(qid)
-        if seed:
-            holds["seeds"] = (1, "one of every crop, for the Seed Maker" if held.get(seed) else
-                              f"you have no {farm.name(seed)}: " + (
-                                  "put one in your Seed Maker" if seed_maker else "keep one for a Seed Maker"))
-        spare = sum(x.left for x in stacks)
-        cheapest = min(stacks, key=lambda x: x.it.quality).it
-        for k, (n, _) in holds.items():
-            impact[k]["count"] += min(n, spare)
-            impact[k]["value"] += min(n, spare) * item_sell_price(cheapest, farm.farmer, profit_margin=s.profit_margin)
-        active = [(n, why) for k, (n, why) in holds.items() if on.get(k)]
-        if not active:
-            continue
-        if seed_maker and on["seeds"] and "seeds" in holds and not held.get(seed):
-            seed_jobs.append({"name": farm.name(qid), "count": 1, "machine": "Seed Maker",
-                              "product": f"1-3 {farm.name(seed)}", "each_raw": 0, "each_product": 0, "gain": 0,
-                              "seeds": True})
-        n = max(active)[0]
-        for q, k in _take(stacks, n):
-            keep[(qid, q, "; ".join(why for _, why in active))] += k
+        for c in rule.claims(farm, sellable):
+            if c.ask and c.ask in declined:
+                continue
+            for q, k in _take(by_id.get(c.item, []), c.count, c.min_quality):
+                keep[(c.item, q, c.why)] += k
+                kept_by[rule.id]["count"] += k
+                it = next(x.it for x in by_id[c.item] if x.it.quality == q)
+                kept_by[rule.id]["value"] += k * item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+                if rule.id == "seeds" and owned.get(SEED_MAKER) and "you have no" in c.why:
+                    seed = c.why.rsplit("you have no ", 1)[1]
+                    seed_jobs.append({"name": farm.name(c.item), "count": 1, "machine": "Seed Maker",
+                                      "product": f"1-3 {seed}", "each_raw": 0, "each_product": 0, "gain": 0,
+                                      "seeds": True})
 
     # Process, then sell
     capacity = dict(owned)
@@ -187,6 +110,7 @@ def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset
     sell: dict[tuple[str, int], dict] = {}
     process: dict[tuple[str, str], dict] = {}
     materials: dict[str, int] = defaultdict(int)
+    used: dict[tuple[str, int], int] = defaultdict(int)  # put through a machine, by item and quality
     for qid, stacks in by_id.items():
         for st in sorted(stacks, key=lambda x: -(x.it.price or 0)):
             it, n = st.it, st.left
@@ -212,6 +136,7 @@ def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset
                                                       "burns": ", ".join(f"{k} {farm.name(a)}" for a, k in out.also),
                                                       "minutes": out.minutes, "days": out.days})
                 row["count"] += use
+                used[(qid, it.quality)] += use
                 n -= use
             if not n:
                 continue
@@ -230,10 +155,25 @@ def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset
     keep_rows = [{"name": farm.name(qid), "quality": QUALITY_WORD.get(q, ""), "count": n, "why": why}
                  for (qid, q, why), n in sorted(keep.items(), key=lambda kv: (kv[0][2], kv[0][0]))]
     hint_rows = _hints(farm, by_id, spare_snapshot, owned, objects, produce)
+    items = []  # everything you hold that could be sold: what happens to it, and which rule decided
+    for qid, stacks in by_id.items():
+        if qid not in sellable:
+            continue
+        for q in sorted({x.it.quality for x in stacks}):
+            have = sum(x.it.stack for x in stacks if x.it.quality == q)
+            whys = [(why, n) for (i, qq, why), n in keep.items() if i == qid and qq == q]
+            sold = sell.get((qid, q), {})
+            items.append({"name": farm.name(qid), "quality": QUALITY_WORD.get(q, ""), "have": have,
+                          "keep": sum(n for _, n in whys), "why": [{"count": n, "why": why} for why, n in whys],
+                          "machine": used.get((qid, q), 0), "sell": sold.get("count", 0),
+                          "gold": sold.get("count", 0) * sold.get("each", 0), "icon": farm.icon(qid)})
+    items.sort(key=lambda r: (-r["gold"], r["name"], r["quality"]))
     return {"total": sum(r["total"] for r in sell_rows), "count": sum(r["count"] for r in sell_rows),
             "sell": sell_rows, "process": proc_rows, "process_gain": sum(r["gain"] for r in proc_rows),
             "keep": keep_rows, "materials": sorted(materials.items(), key=lambda kv: -kv[1]),
-            "filters": [{"id": k, "label": label, "on": bool(on[k]), **impact[k]} for k, label in FILTERS.items()],
+            "rules": [{"id": r.id, "label": r.label, "mode": mode[r.id], "modes": list(r.modes), **kept_by[r.id]}
+                      for r in keep_rules.RULES],
+            "items": items,
             "hints": hint_rows}
 
 
@@ -316,10 +256,10 @@ def _material_name(farm: Farm, qid: str) -> str:
     return _machine_name(farm, qid) if qid.startswith("(BC)") else farm.name(f"(O){qid}")
 
 
-def default(farm: Farm, declined: frozenset[str] = frozenset()) -> dict:
-    """The default view, worked out once per save: the day plan asks for it several times."""
+def default(farm: Farm, declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None) -> dict:
+    """The view for these answers and rule settings, worked out once per save: the day plan asks several times."""
     cache = farm.__dict__.setdefault("_sold", {})
-    key = frozenset(declined)
+    key = (frozenset(declined), tuple(sorted(keep_rules.modes(rules).items())))
     if key not in cache:
-        cache[key] = view(farm, declined=key)
+        cache[key] = view(farm, rules, declined=key[0])
     return cache[key]

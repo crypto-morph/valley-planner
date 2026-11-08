@@ -49,3 +49,22 @@ def test_the_bag_never_takes_what_the_sell_plan_holds_back():
             for r in st["rows"]:
                 for f in r["from"]:
                     assert f["take"] <= offered.get((r["name"], f.get("quality", "")), 0), (st["key"], r)
+
+
+def test_a_birthday_gift_is_the_cheapest_loved_else_liked_and_never_a_bundle_item(monkeypatch):
+    from types import SimpleNamespace
+
+    from valley_planner.views import keep
+
+    tastes = {"(O)18": "like", "(O)66": "like", "(O)266": "love", "(O)20": "like"}
+    prices = {"18": 30, "66": 100, "266": 260, "20": 60}
+    farm = SimpleNamespace(
+        data=SimpleNamespace(asset=lambda name: {k: {"Price": v} for k, v in prices.items()}),
+        held=lambda: {"(O)18": 1, "(O)66": 3, "(O)266": 1, "(O)20": 2},
+        gifts=SimpleNamespace(giftable=lambda q: True, taste=lambda npc, q: tastes[q]))
+    reserved = []
+    monkeypatch.setattr(keep, "_bundles", lambda farm, s: reserved)  # what the bundle plan sets aside
+    monkeypatch.setattr(keep, "_requests", lambda farm, s: [])
+    assert keep.birthday_gift(farm, "Jas") == ("(O)266", "love")  # loved beats a cheaper liked one
+    reserved.append(keep.Claim("(O)266", 1, "Dye bundle"))
+    assert keep.birthday_gift(farm, "Jas") == ("(O)18", "like")  # the Red Cabbage is the Dye bundle's

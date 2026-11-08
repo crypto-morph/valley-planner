@@ -32,7 +32,7 @@ def test_app_end_to_end():
     client = TestClient(create_app())
     meta = client.get("/api/meta").json()
     assert meta["game_version"] and meta["save"]
-    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/api/sell", "/api/sell?liked=true&seeds=false", "/api/ask?q=mar", "/api/ask/item/(O)266", "/api/ask/item/(O)142", "/api/ask/villager/Abigail", "/api/morning", "/api/plan", "/api/route/objectives", "/api/errand/gunther", "/api/errand/clint", "/api/errand/cc", "/api/errand/birthdays", "/"):
+    for url in ("/api/crops", "/api/calendar?days=7", "/api/hours", "/api/cart?days=7", "/api/cart/search?q=seed", "/api/sell", "/api/sell?rules=liked:always,seeds:off,festivals:always", "/api/ask?q=mar", "/api/ask/item/(O)266", "/api/ask/item/(O)142", "/api/ask/villager/Abigail", "/api/morning", "/api/plan", "/api/route/objectives", "/api/errand/gunther", "/api/errand/clint", "/api/errand/cc", "/api/errand/birthdays", "/"):
         assert client.get(url).status_code == 200, url
     crops = client.get("/api/crops").json()
     assert {"countdown", "mine"} <= set(crops)
@@ -237,7 +237,7 @@ def test_one_of_every_crop_is_kept_for_the_seed_maker():
     v = sell.view(farm)
     offered = {r["name"] for r in v["sell"]} | {r["name"] for r in v["process"]}
     assert offered & crops <= {r["name"] for r in v["keep"]}  # never down to the last one
-    off = sell.view(farm, {"seeds": False})
+    off = sell.view(farm, {"seeds": "off"})
     assert {r["name"] for r in off["sell"]} >= {r["name"] for r in v["sell"]}  # the rule can be switched off
 
 
