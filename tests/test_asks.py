@@ -23,14 +23,15 @@ def test_a_no_puts_the_luau_pick_back_on_sale():
     qid, q, n = luau.keep
     name = farm.name(qid)
 
-    def selling(declined):
+    def soup(declined):  # (sold, kept for the soup) at the pick's quality
         v = sell.view(farm, declined=declined)
-        return sum(r["count"] for r in v["sell"] if r["id"] == qid and r["q"] == q), v
+        sold = sum(r["count"] for r in v["sell"] if r["id"] == qid and r["q"] == q)
+        return sold, any(r["name"] == name and "luau soup" in r["why"].lower() for r in v["keep"])
 
-    yes, v = selling(frozenset())
-    no, _ = selling(frozenset({luau.id}))
-    assert no == yes + n
-    assert any(r["name"] == name and "luau soup" in r["why"].lower() for r in v["keep"])
+    yes_sold, yes_soup = soup(frozenset())
+    no_sold, no_soup = soup(frozenset({luau.id}))
+    assert yes_soup and not no_soup  # a no lets it go to the rules below (a gift, say) or the bin
+    assert no_sold >= yes_sold and n == 1
 
 
 @pytest.mark.game

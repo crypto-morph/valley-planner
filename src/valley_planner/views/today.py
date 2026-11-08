@@ -787,12 +787,17 @@ def _pierre(farm: Farm, shopping: list[dict]) -> list[dict]:
         return []
     cost = sum(x["count"] * x["price"] for x in seeds)
     short = max(0, cost - farm.save.money)
+    buying_fert = {x["id"] for x in seeds if x["id"] in FERT_IDS}
+    plant_after = [{"seed": x["seed"], "count": x["count"] + (min(x["held"], x["need"]) if x["fert"] in buying_fert
+                                                              else 0), "fert": x["fert"] in buying_fert}
+                   for x in shopping if x["needed"] and x["id"] not in FERT_IDS
+                   and (x["count"] or x["fert"] in buying_fert)]
     kinds = len(seeds)
     return [{"id": "pierre", "kind": "shop", "title": "Pierre's: " + ("sell, then buy seeds" if short else "buy seeds"),
              "why": f"{kinds} kind{'s' if kinds != 1 else ''} of seed, about {cost:,}g"
                     + (f": you're {short:,}g short, so sell to him first (he pays on the spot)" if short else
                        ": what each is for is below; the rest goes in the shipping bin"),
-             "seeds": seeds, "sells": bool(short), "at": ("Town", 43, 57), "minutes": 5,
+             "seeds": seeds, "plant_after": plant_after, "sells": bool(short), "at": ("Town", 43, 57), "minutes": 5,
              "value": QUEST_VALUE, "from": 9 * 60, "until": 17 * 60}]
 
 
@@ -809,9 +814,10 @@ def seed_list(farm: Farm, room: int | None = None) -> list[dict]:
     by_crop = {r["crop"]: r for r in rows}
     out: list[dict] = []
 
-    def add(seed: str, qid: str, price: int, count: int, why: str, needed: bool) -> None:
+    def add(seed: str, qid: str, price: int, count: int, why: str, needed: bool, fert: str = "") -> None:
         if count > 0:
-            out.append({"seed": seed, "id": qid, "count": count, "price": price, "why": why, "needed": needed})
+            out.append({"seed": seed, "id": qid, "count": count, "price": price, "why": why, "needed": needed,
+                        "fert": fert})
 
     s, held_now = farm.save, farm.held()
     used = 0
@@ -823,17 +829,20 @@ def seed_list(farm: Farm, room: int | None = None) -> list[dict]:
     for slot in cc.plan(farm)["slots"]:
         best = slot.get("best") or {}
         if slot["status"] != "have" and best.get("kind") in ("grow", "crop") and slot["name"] in by_crop:
-            if not _this_season(farm, best.get("last_start", "")):
-                continue  # it can still go in next season: buy it then
             r = by_crop[slot["name"]]
+            if not slot.get("quality") and not _this_season(farm, best.get("last_start", "")):
+                continue  # it can still go in next season: buy it then (a gold slot goes in now: more tries)
             if slot.get("quality"):
                 have = sum(i.stack for i in s.items if i.qualified_id == slot["item"] and i.quality >= slot["quality"])
                 fert, level, price = _best_fertilizer(farm)
                 chance = gold_or_better(s.skills.get("farming", 0), level)
-                want = plant_for_gold(slot["count"] - have, chance)
+                rolls = max(1, r.get("harvests") or 1)  # each harvest rolls its own quality
+                want = -(-plant_for_gold(slot["count"] - have, chance) // rolls)
                 add(r["seed"], r["seed_id"], r["seed_price"], want,
-                    f"{slot['bundle']} bundle: {slot['count'] - have} gold at {chance:.0%} a plant"
-                    + (f" with {farm.name(fert)}" if fert else "") + ", 9 in 10 sure", True)
+                    f"{slot['bundle']} bundle: {slot['count'] - have} gold at {chance:.0%} a harvest"
+                    + (f" with {farm.name(fert)}" if fert else "")
+                    + (f", {rolls} harvests each before the season ends" if rolls > 1 else "") + ", 9 in 10 sure",
+                    True, fert)
                 if fert:
                     add(farm.name(fert), fert, price, want, f"for the {want} {slot['name']}: on the dirt before you "
                         "plant", True)
@@ -856,6 +865,7 @@ def seed_list(farm: Farm, room: int | None = None) -> list[dict]:
             m["count"] += x["count"]
             m["why"] += f", {x['why']}"
             m["needed"] = m["needed"] or x["needed"]
+            m["fert"] = m["fert"] or x["fert"]
         else:
             merged[x["seed"]] = dict(x)
     for x in merged.values():  # what you already hold comes off once, whatever it's for
@@ -1013,7 +1023,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     room = len({t for t in watered if t not in growing and t not in s.farm_objects})
     sprinklers_only = bool(watered) and not plant_all
     shopping = seed_list(farm, room if sprinklers_only else None)
-    spoken = sum(min(x["held"], x["need"]) for x in shopping if x["needed"] and x["id"] != "(O)368")
+    no_fert = {x["id"] for x in shopping if x["id"] in FERT_IDS and x["count"]}  # still to buy at Pierre's
+    spoken = sum(min(x["held"], x["need"]) for x in shopping if x["needed"] and x["id"] not in FERT_IDS
+                 and x["fert"] not in no_fert)
     # the giant square's and the bundles' seeds go in today, watered or not; the rest waits for a Sprinkler
     seeds = spoken + min(held_seeds - spoken, room) if sprinklers_only else held_seeds
     home_first = pos[0] != "Farm" and ((thirsty and "water" not in done) or (seeds and "plant" not in done))
@@ -1127,8 +1139,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             cash = s.money + sum(_price(farm, f"(O){c.harvest_id}") for c in s.crops
                                  if c.location == "Farm" and c.ready and not c.forage and c.harvest_id)
             buy = seed_advice(farm, cash, ripe)
-            needed = [x for x in best.get("seeds", []) if x["needed"] and x["count"] and x["id"] not in FERT_IDS]
-            fresh = sum(x["count"] for x in needed)  # bought for a bundle or the giant square: in today
+            needed = [x for x in best.get("plant_after", []) if x["count"]]
+            fresh = sum(x["count"] for x in needed)  # for a bundle or the giant square: in today
             tiles = sum(x["count"] for x in buy) + fresh
             if way and (tiles >= MIN_REPLANT or fresh):  # a handful of seeds can wait for the next trip home
                 if buy:
@@ -1138,12 +1150,14 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                 power -= min(cost, max(0, power - RESERVE))
                 legs.append((len(plan), way))
                 fert = [x for x in best.get("seeds", []) if x["id"] in FERT_IDS and x["count"]]
+                fed = [x["seed"] for x in needed if x["fert"]]
                 plan.append({"id": "replant", "time": clock(now), "at": now, "kind": "farm", "title":
                              f"Home: plant and water {tiles} seeds",
                              "why": "; ".join(filter(None, [
                                  "harvested tiles stay tilled" if buy else "",
                                  (", ".join(f"{x['count']} {x['seed']}" for x in needed) + " can't wait for a "
-                                  "Sprinkler" + (f": {fert[0]['seed']} on the dirt first" if fert else ""))
+                                  "Sprinkler" + (f"; {fert[0]['seed']} on the dirt first for the "
+                                                 + " and ".join(fed) if fert and fed else ""))
                                  if needed else ""])), "way":
                              walker.directions(way, farm.place), "energy_after": power})
                 now += round(tiles * TILE_MINUTES)
