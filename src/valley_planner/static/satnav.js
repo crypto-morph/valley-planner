@@ -164,7 +164,8 @@
       }
     };
     if ((data.load || []).length && !done.has("load")) {  // first, what to take from the chests
-      const lines = data.load.map((c) => `From the ${c.where}: ${c.items.join(", ")}.`);
+      const lines = data.load.map((c) => `From the ${c.where}: ${c.items.map((x) =>
+        [x.count > 1 ? x.count : "", x.quality, x.name, x.for ? `(${x.for})` : ""].filter(Boolean).join(" ")).join(", ")}.`);
       const held = (data.held_back || []).map((h) => `${h.item} stays home: ${h.why}.`);
       const row = { id: "load", title: "Before you set off", kind: "farm", time: data.plan[0] ? data.plan[0].time : "" };
       out.push({ kind: "load", stop: 0, row, loc: pos.loc, from: [pos.x, pos.y], to: [pos.x, pos.y],

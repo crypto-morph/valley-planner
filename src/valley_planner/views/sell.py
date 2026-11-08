@@ -11,7 +11,8 @@ gift for each birthday in the next week.
 Held unless you switch it off: gifts a villager loves (2 per villager who
 loves it, up to 4) or likes (1), one of anything a Help Wanted request can
 ask for this season (they pay 3x), and one of every crop, the lowest quality you have, so a Seed Maker can
-always grow more (it gives 1-3 seeds whatever the quality: rule seedmaker.output-1-3).
+always grow more (it gives 1-3 seeds whatever the quality: rule seedmaker.output-1-3), and what a story letter
+still to come will ask for (facts/letters.py: Demetrius's Melon, Evelyn's Leek), to hand over the day it comes.
 Machines: each machine you own takes one batch (we can't see which are
 busy), when its product sells for at least 1.3x the raw goods.
 
@@ -27,9 +28,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from ..engine.unlocks import Unlocks
+from ..facts import letters
 from ..facts.help_wanted import raw_pool
 from ..facts.machines import Input
 from ..facts.sell import item_sell_price, sell_price
+from . import asks
 from .farm import Farm
 
 PRODUCE = {-75: "Vegetable", -79: "Fruit", -80: "Flower", -81: "Forage", -4: "Fish", -5: "Egg", -6: "Milk",
@@ -42,8 +45,9 @@ FILTERS = {
     "liked": "Gifts a villager likes (1)",
     "help_wanted": "Things a Help Wanted request can ask for this season, which pays 3x (1)",
     "seeds": "One of every crop, for the Seed Maker (1)",
+    "letters": "What a villager's letter will ask for, so you can hand it over the day it comes",
 }
-DEFAULT_FILTERS = {"loved": True, "liked": False, "help_wanted": True, "seeds": True}
+DEFAULT_FILTERS = {"loved": True, "liked": False, "help_wanted": True, "seeds": True, "letters": True}
 PROCESS_GAIN = 1.3
 SEED_MAKER = "(BC)25"
 
@@ -68,7 +72,7 @@ def _take(stacks: list[_Stack], n: int, min_q: int = 0) -> list[tuple[int, int]]
     return got
 
 
-def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
+def view(farm: Farm, filters: dict[str, bool] | None = None, declined: frozenset[str] = frozenset()) -> dict:
     s, w = farm.save, farm.when
     on = {**DEFAULT_FILTERS, **(filters or {})}
     objects = farm.data.asset("Data/Objects")
@@ -83,6 +87,10 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
             keep[(qid, q, why)] += k
 
     # Always held
+    for a in asks.asks(farm):  # today's questions, unless you said no
+        if a.id not in declined:
+            qid, q, n = a.keep
+            hold(qid, n, a.text.removesuffix("?").replace("Keep a ", "", 1).capitalize(), q)
     plan = farm.bundles.plan(s.items)
     for (bkey, _), parts in plan.reserved.items():
         b = farm.bundles.by_key[bkey]
@@ -116,6 +124,11 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
                         crafting=set(s.crafting_recipes))
     seed_of = {f"(O){c.harvest}": f"(O){seed}" for seed, c in farm.crops.by_seed.items()
                if c.harvest and objects.get(seed, {}).get("Category") == -74}
+    asked: dict[str, tuple[int, str]] = {}  # item -> (count, why), the soonest letter for it
+    for x in letters.coming(farm.data, s, w.days_played):
+        asked.setdefault(x.item, (x.count, f"{x.who} asks for {'it' if x.count == 1 else x.count} by letter on "
+                                           f"{farm.label(x.days_played).rsplit(',', 1)[0]} ({x.title}"
+                                           + (f", {x.reward:,}g)" if x.reward else ")")))
     held = farm.held()
     owned = {_machine_id(farm, name): n for name, n in s.machines.items()}
     seed_maker = bool(owned.get(SEED_MAKER))
@@ -144,6 +157,8 @@ def view(farm: Farm, filters: dict[str, bool] | None = None) -> dict:
                 holds["liked"] = (1, "liked by " + ", ".join(likes[:3]) + ("…" if len(likes) > 3 else ""))
         if qid[3:] in help_ids:
             holds["help_wanted"] = (1, "a Help Wanted request could ask for it (3x the price)")
+        if qid in asked:
+            holds["letters"] = asked[qid]
         seed = seed_of.get(qid)
         if seed:
             holds["seeds"] = (1, "one of every crop, for the Seed Maker" if held.get(seed) else
@@ -301,8 +316,10 @@ def _material_name(farm: Farm, qid: str) -> str:
     return _machine_name(farm, qid) if qid.startswith("(BC)") else farm.name(f"(O){qid}")
 
 
-def default(farm: Farm) -> dict:
+def default(farm: Farm, declined: frozenset[str] = frozenset()) -> dict:
     """The default view, worked out once per save: the day plan asks for it several times."""
-    if not hasattr(farm, "_sold"):
-        farm._sold = view(farm)
-    return farm._sold
+    cache = farm.__dict__.setdefault("_sold", {})
+    key = frozenset(declined)
+    if key not in cache:
+        cache[key] = view(farm, declined=key)
+    return cache[key]

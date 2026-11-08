@@ -20,6 +20,7 @@ FREE_SLOTS = {"mine": 3, "fish": 3}
 SHOP_STOPS = {"SeedShop": "pierre", "Blacksmith": "clint", "FishShop": "willy"}
 STOP_NAMES = {"cc": "Community Center", "museum": "the Museum", "clint": "Clint's", "pierre": "Pierre's",
               "willy": "Willy's"}
+PURPOSE = {"cc": "hand in at the Community Center", "museum": "donate at the Museum", "clint": "crack at Clint's"}
 WHO_STOP = {"Willy": "willy", "Clint": "clint", "Pierre": "pierre"}
 HOME_PLACES = ("Farm", "FarmHouse", "Cellar", "Greenhouse", "Coop", "Barn", "Shed", "Junimo")
 STOP_CHESTS = {"cc": "CommunityCenter chest", "mines": "Mine chest"}  # chests a stop already stands beside
@@ -44,7 +45,8 @@ def _gift(farm: Farm, who: str, spare: list[dict]) -> dict | None:
 QUALITY_WORDS = {1: "silver", 2: "gold", 4: "iridium"}
 
 
-def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] | None = None) -> dict:
+def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] | None = None,
+          sold: dict | None = None) -> dict:
     s = farm.save
     order = [p["id"] for p in plan]
     stops: dict[str, dict] = {}
@@ -92,7 +94,7 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
             if n:
                 src.append({"where": r["where"], "count": r["count"], "take": n, "there": r["raw"] == here})
                 left -= n
-        entry["rows"].append({"label": label, "name": name, "from": src})
+        entry["rows"].append({"label": label, "name": name, "from": src, "for": PURPOSE.get(key, entry["stop"])})
         return True
 
     def known(key: str) -> bool:
@@ -102,14 +104,14 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
     at_stops = {STOP_CHESTS[k] for k in STOP_CHESTS if known(k)}
     stranded: dict[str, list[str]] = {}
     spare = []
-    for r in sell.default(farm)["sell"]:
+    for r in (sold or sell.default(farm))["sell"]:
         stacks = [i for i in s.items if i.qualified_id == r["id"] and i.quality == r["q"]]
         here = sum(i.stack for i in stacks if is_home(i.where) or i.where in at_stops)
         for i in stacks:
             if not (is_home(i.where) or i.where in at_stops):
                 stranded.setdefault(i.where.removesuffix(" chest"), []).append(f"{i.stack} {i.name}")
-        if here:
-            spare.append({**r, "count": here})
+        if here:  # never more than the sell plan offers: the rest is held back for something
+            spare.append({**r, "count": min(here, r["count"])})
 
     if known("cc"):
         for room in errands.community_center(farm)["rooms"]:
@@ -168,7 +170,7 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
     def row(r: dict, gold: int, label: str) -> dict:
         """A Shipping bin line: the words, plus the parts a table shows (item, its picture, count, price)."""
         return {"name": label, "gold": gold, "item": r["name"], "count": r["count"], "each": r["each"],
-                "quality": QUALITY_WORDS.get(r.get("q", 0), ""), "icon": farm.icon(r["id"])}
+                "q": r.get("q", 0), "quality": QUALITY_WORDS.get(r.get("q", 0), ""), "icon": farm.icon(r["id"])}
 
     for r in spare:
         if not r["count"]:
@@ -194,16 +196,17 @@ def build(farm: Farm, plan: list[dict], spouse: str = "", hold: dict[str, str] |
         entry = stop(key, STOP_NAMES[key])
         entry["items"].append(label)
         entry["gold"] += gold
-        left, src = line["count"], []  # spares to sell come from your bag and the chests at home
-        for it in sorted((i for i in s.items if i.name == line["item"] and is_home(i.where)),
-                         key=lambda i: i.where != "Backpack"):
+        left, src = line["count"], []  # spares to sell come from your bag and the chests at home, at their quality
+        for it in sorted((i for i in s.items if i.name == line["item"] and i.quality == line["q"]
+                          and is_home(i.where)), key=lambda i: i.where != "Backpack"):
             n = min(left, it.stack)
             if n > 0:
                 where = farm.where_label(it.where, it.chest).replace(f"({farm.place('Farm')})", "(farm)")
                 src.append({"where": where.removeprefix("the ").replace(" (", ", ").removesuffix(")"),
-                            "count": it.stack, "take": n, "there": False})
+                            "count": it.stack, "take": n, "there": False, "quality": line["quality"]})
                 left -= n
-        entry["rows"].append({"label": label, "name": line["item"], "from": src})
+        entry["rows"].append({"label": label, "name": line["item"], "icon": line["icon"], "from": src,
+                              "for": f"sell at {STOP_NAMES[key]}"})
     rank = {key: order.index(key) for key in stops if key in order}
     for key in stops:
         if key.startswith("give:"):

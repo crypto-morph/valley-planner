@@ -520,6 +520,20 @@ function flashInto(id) {
 }
 
 const todayDone = new Set();
+// The day's questions you said no to (views/asks.py ids, e.g. "luau:1"): kept in this browser until that day.
+function declined() {
+  try { return new Set(JSON.parse(localStorage.getItem("declined") || "[]")); } catch { return new Set(); }
+}
+function answer(id, yes) {
+  const d = declined();
+  if (yes) d.delete(id); else d.add(id);
+  try { localStorage.setItem("declined", JSON.stringify([...d])); } catch { /* fine without */ }
+}
+function askItem(a) {
+  return `<li class="note-ask"><div><strong>${esc(a.text)}</strong> <span class="muted small">${esc(a.why)}</span></div>` +
+    `<div class="seg ask-seg" role="group" aria-label="${esc(a.text)}"><button type="button" data-ask="${esc(a.id)}" data-yes="1" aria-pressed="${a.yes}"${a.yes ? ' class="on"' : ""}>Yes, keep it</button>` +
+    `<button type="button" data-ask="${esc(a.id)}" data-yes="" aria-pressed="${!a.yes}"${a.yes ? "" : ' class="on"'}>No, sell it</button></div></li>`;
+}
 let dayAsk = {}, lastDay = null, morningView = null;
 
 function loadDone(date) {
@@ -547,7 +561,7 @@ function setSatnav(on) {
   try { localStorage.setItem("satnav", on ? "1" : ""); } catch { /* fine without */ }
   if (on && !satnav && window.ValleySatnav) {
     satnav = window.ValleySatnav.mount(box, {
-      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "" },
+      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "", declined: [...declined()].join(",") },
       onDone: (id) => tick(id, true),
     });
   } else if (!on && satnav) { satnav.destroy(); satnav = null; box.innerHTML = ""; }
@@ -577,11 +591,9 @@ const extras = (rows) => {
 function drawNext(v) {
   const rows = v.plan.filter((x) => !todayDone.has(x.id));
   const first = rows[0];
-  const loadUp = (v.load || []).length && !todayDone.has("load")
-    ? `<div class="load-up"><strong>Before you set off</strong>${v.load.map((c) => `<div><span class="muted">From the ${esc(c.where)}:</span> ${c.items.map(esc).join(", ")}</div>`).join("")}` +
-      ((v.held_back || []).length ? `<div class="small muted">Held back: ${v.held_back.map((h) => `${esc(h.item)} (${esc(h.why)})`).join("; ")}.</div>` : "") +
-      `<button type="button" class="btn quiet" id="t-loaded">Got them</button></div>` : "";
-  $("#t-load").innerHTML = loadUp;
+  $("#t-load").innerHTML = bagBox(v);
+  const box = $("#t-load details");
+  if (box) box.addEventListener("toggle", () => { bagOpen = box.open; });
   $("#t-next").innerHTML = (first
     ? `<div class="next-when">NEXT, ABOUT ${esc(first.time)}</div><h2>${esc(first.title)}</h2><p>${esc(cap(first.why))}${first.near ? `. ${esc(cap(first.near))}.` : ""}</p>` +
       (first.way.length ? `<ol>${first.way.map((w) => `<li>${esc(w)}</li>`).join("")}</ol>` : "") +
@@ -604,28 +616,37 @@ function drawNext(v) {
   document.querySelectorAll("#t-plan input[data-stop]").forEach((c) => c.addEventListener("change", () => tick(c.dataset.stop, c.checked)));
 }
 
-function drawPack(p) {
-  const s = p.slots;
+// Before you set off: what to take from which chest (a table, by quality), folded under a one-line summary with
+// what the bag holds, what stays home, the shipping bin and what's left behind. Ticking "Got them" leaves the rest.
+let bagOpen = false;
+function bagBox(v) {
+  const p = v.pack || { slots: {}, leave: [], tools: [], ship: [], dropped: [], left_behind: [] };
+  const s = p.slots || {};
+  const packed = todayDone.has("load");
+  const load = packed ? [] : (v.load || []);
+  const count = load.reduce((n, c) => n + c.items.reduce((m, x) => m + x.count, 0), 0);
   const worth = p.ship.filter((x) => x.gold > 0), junk = p.ship.filter((x) => !(x.gold > 0));
+  const table = load.length ? `<table class="ship-table load-table"><thead><tr><th></th><th>Item</th><th>Quality</th><th class="num">Take</th><th>For</th></tr></thead>` +
+    load.map((c) => `<tbody><tr class="load-chest"><th colspan="5" scope="rowgroup">From the ${esc(c.where)}</th></tr>` +
+      c.items.map((x) => `<tr><td class="ic">${x.icon ? itemIcon(x.icon) : ""}</td><td>${esc(x.name)}</td>` +
+        `<td>${x.quality ? `<span class="q-${esc(x.quality)}">${esc(x.quality)}</span>` : '<span class="muted">normal</span>'}</td><td class="num">${x.count}</td><td class="small muted">${esc(x.for || "")}</td></tr>`).join("") + "</tbody>").join("") +
+    "</table>" : "";
   const shipRows = worth.map((x) => `<tr><td class="ic">${itemIcon(x.icon)}</td><td>${esc(x.item || x.name)}${x.quality ? ` <span class="muted small">${esc(x.quality)}</span>` : ""}${x.no_room ? ' <span class="tag">bag full</span>' : ""}</td>` +
     `<td class="num">${x.count ?? ""}</td><td class="num">${x.gold.toLocaleString()}g</td></tr>`).join("");
-  $("#t-pack").innerHTML = `<div class="pack-head"><h2>Pack your bag</h2><strong>${s.used} of ${s.max} slots</strong></div>` +
-    (p.leave.length ? `<p class="small"><span class="tag amber">Leave in the Chest</span> ${p.leave.map(esc).join(", ")}</p>` : "") +
+  const rest = (p.leave.length ? `<p class="small"><span class="tag amber">Leave in the Chest</span> ${p.leave.map(esc).join(", ")}</p>` : "") +
     (p.tools.length ? `<p class="small"><span class="tag">Keep</span> ${p.tools.map(esc).join(", ")}</p>` : "") +
-    (p.stops.length ? `<table class="pack-table"><thead><tr><th></th><th>Stop</th><th>Take</th><th>From</th></tr></thead><tbody>${p.stops.map((x, i) => {
-      const from = new Map((x.rows || []).map((r) => [r.label, r.from.map((f) => f.where).join("; ")]));
-      const items = (x.rows || []).length ? x.items : (x.items.length ? [x.items.join(", ")] : []);
-      const lines = items.map((it) => `<tr${items.indexOf(it) === 0 ? ' class="first-row"' : ""}><td class="num">${items.indexOf(it) === 0 ? i + 1 : ""}</td><td>${items.indexOf(it) === 0 ? `<strong>${esc(x.stop)}</strong>${x.first ? `<div class="small first">${esc(x.first)}</div>` : ""}${x.gold ? `<div class="muted small">about ${x.gold.toLocaleString()}g</div>` : ""}` : ""}</td><td>${esc(it)}</td><td class="small">${esc(from.get(it) || "")}</td></tr>`);
-      const short = (x.short || []).map((sh) => `<tr class="short"><td></td><td>${x.items.length ? "" : `<strong>${esc(x.stop)}</strong>`}</td><td>${esc(sh.label)}</td><td class="small"><strong>Not today</strong>: ${esc(sh.text)}</td></tr>`);
-      const there = x.there.length ? [`<tr><td></td><td></td><td colspan="2" class="muted small">Already in the chest there: ${x.there.map(esc).join(", ")}</td></tr>`] : [];
-      return [...lines, ...short, ...there].join("");
-    }).join("")}</tbody></table>` : "") +
+    ((v.held_back || []).length ? `<p class="small muted">Held back: ${v.held_back.map((h) => `${esc(h.item)} (${esc(h.why)})`).join("; ")}.</p>` : "") +
     (worth.length ? `<details class="fold plain"><summary><span>Shipping bin <span class="muted">· ${worth.length} item${worth.length === 1 ? "" : "s"} · about ${p.ship_gold.toLocaleString()}g</span></span></summary>` +
       `<table class="ship-table"><thead><tr><th></th><th>Item</th><th class="num">How many</th><th class="num">Gold</th></tr></thead><tbody>${shipRows}</tbody></table>` +
       (p.dropped.length ? '<p class="muted small">"Bag full": a shop on your route would buy these, but there isn\'t room to carry them.</p>' : "") + "</details>" : "") +
     (junk.length ? `<p class="muted small">Worth nothing, so leave them in the Chest for a Recycling Machine: ${junk.map((x) => esc(x.name)).join(", ")}.</p>` : "") +
     (p.left_behind.length ? `<p class="muted small">Left behind today: ${p.left_behind.map((x) => `${x.items.map(esc).join(", ")} in the chest at ${esc(x.place)}`).join("; ")}.</p>` : "") +
     (s.free_on_purpose ? `<p class="muted small">Leaves ${s.free_on_purpose} slots free for what you pick up.</p>` : "");
+  if (!table && !rest) return "";
+  const sum = [load.length ? `${count} item${count === 1 ? "" : "s"} from ${load.length} chest${load.length === 1 ? "" : "s"}` : "packed",
+    s.max ? `${s.used} of ${s.max} slots` : "", worth.length ? `${p.ship_gold.toLocaleString()}g in the bin` : ""].filter(Boolean).join(" · ");
+  return `<div class="load-up"><details${bagOpen ? " open" : ""}><summary><strong>${packed ? "Your bag" : "Before you set off"}</strong> <span class="muted">· ${esc(sum)}</span></summary>${table}${rest}</details>` +
+    (load.length ? '<button type="button" class="btn quiet" id="t-loaded">Got them</button>' : "") + "</div>";
 }
 
 // A goal's problems, biggest first: the gold ones by how much, then what's blocked; one shown, the rest folded.
@@ -775,7 +796,7 @@ const views = {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     dayAsk = ask;
     if (!todayDone.date) { const m = await get("/api/meta"); loadDone(m.date); }
-    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")) })}`);
+    const v = await get(`/api/today?${new URLSearchParams({ ...ask, done: [...todayDone].join(","), spouse: routeState.settings.spouse || "", goals: JSON.stringify(routeBody(routeState, "save")), declined: [...declined()].join(",") })}`);
     lastDay = v;
     const h = v.head;
     $("#m-date").textContent = `${h.weekday}, ${h.date.replace(/, Year \d+/, "")}`;
@@ -794,12 +815,16 @@ const views = {
       $("#t-giant").innerHTML = `<details class="fold"><summary><span><strong>Giant crop</strong> <span class="muted">· ${esc(line)}</span></span>${todo ? ` <span class="tag red">${todo} to do today</span>` : ""}</summary>` +
         `${giantCard(g)}<p class="muted small">Green outline: the square. Cross: the top-left (1). Orange: tiles to sow (S), hoe and sow (H), or pull up and sow (P).</p></details>`;
     } else $("#t-giant").innerHTML = "";
-    $("#t-notes").hidden = !v.notes.length;
-    $("#t-notes").innerHTML = `<ul class="note-list">${v.notes.map(noteItem).join("")}</ul>`;
+    const asks = v.asks || [];
+    $("#t-notes").hidden = !v.notes.length && !asks.length;
+    $("#t-notes").innerHTML = `<ul class="note-list">${asks.map(askItem).join("")}${v.notes.map(noteItem).join("")}</ul>`;
+    document.querySelectorAll("#t-notes [data-ask]").forEach((b) => b.addEventListener("click", () => {
+      answer(b.dataset.ask, Boolean(b.dataset.yes));
+      views.dayPlan(dayAsk);  // what to sell and take follows the answer
+    }));
     const wood = v.notes.find((n) => n.lazy === "wood");
     if (wood) woodNote(wood.trees || 0);
     drawNext(v);
-    drawPack(v.pack);
     $("#t-skills").innerHTML = `<table class="skill-table"><tbody>${v.skills.map((k) => `<tr><th scope="row">${esc(cap(k.name))}</th><td class="num">${k.level}</td>` +
       `<td><div class="bar-track thin"><span style="width:${Math.round(k.share * 100)}%"></span></div><div class="muted small">${k.coming ? esc(levelLine(k.coming)) : k.next ? esc(cap(k.ways[0] || "")) : "Maxed"}</div></td></tr>`).join("")}</tbody></table>`;
   },
@@ -929,7 +954,7 @@ const views = {
 
   async sell() {
     const f = sellFilters();
-    const v = await get("/api/sell?" + new URLSearchParams(Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x ? "true" : "false"]))));
+    const v = await get("/api/sell?" + new URLSearchParams({ ...Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x ? "true" : "false"])), declined: [...declined()].join(",") }));
     $("#sell-head").textContent = `${v.count} items for about ${v.total.toLocaleString()}g`;
     $("#sell-rows").innerHTML = "<tr><th>Item</th><th>Count</th><th>Each</th><th>Total</th><th>Where</th></tr>" + v.sell.map((r) =>
       `<tr><td>${esc(r.name)}${r.quality ? ` <span class="q-${esc(r.quality)}">${esc(r.quality)}</span>` : ""}</td><td>${r.count}</td><td>${r.each}g</td><td>${r.total.toLocaleString()}g</td><td class="sub">${esc(r.where.join(", "))}</td></tr>`

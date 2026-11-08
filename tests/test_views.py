@@ -239,3 +239,19 @@ def test_one_of_every_crop_is_kept_for_the_seed_maker():
     assert offered & crops <= {r["name"] for r in v["keep"]}  # never down to the last one
     off = sell.view(farm, {"seeds": False})
     assert {r["name"] for r in off["sell"]} >= {r["name"] for r in v["sell"]}  # the rule can be switched off
+
+
+@pytest.mark.game
+@pytest.mark.skipif(GAME is None or SAVES is None, reason="needs the game and a save")
+def test_what_to_take_names_a_quality_you_hold():
+    from valley_planner.app import Planner
+    from valley_planner.views import today
+    try:
+        farm = Planner(shared_data()).farm()
+    except Exception:
+        pytest.skip("no save here")
+    words = {0: "", 1: "silver", 2: "gold", 4: "iridium"}
+    for chest in today.view(farm)["load"]:
+        for x in chest["items"]:
+            have = sum(i.stack for i in farm.save.items if i.name == x["name"] and words.get(i.quality) == x["quality"])
+            assert 0 < x["count"] <= have, (chest["where"], x)

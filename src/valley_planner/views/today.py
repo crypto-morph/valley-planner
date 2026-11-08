@@ -26,6 +26,7 @@ from ..facts import (
     comforts,
     geodes,
     help_wanted,
+    letters,
     mine_day,
     mine_floors,
     romance,
@@ -39,9 +40,11 @@ from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
 from ..facts.schedules import Situation
 from ..facts.walk import FARMHOUSE_DOOR, NEW_PLAYER_PACE, OUTDOORS, polylines
-from . import crops, errands, levels, pack, picking, quests, sell
+from . import asks, crops, errands, levels, pack, picking, quests, sell
 from .farm import Farm
 
+LETTER_DAYS = 21  # how far ahead a story letter is worth a note
+QUALITY_ORDER = {"": 0, "silver": 1, "gold": 2, "iridium": 3}  # how the bag table sorts
 TILE_ENERGY = 2  # a tile hand-watered at Farming 0, for the odd job
 TILE_MINUTES = 1.6
 HARVEST_MINUTES = 0.3  # a crop: the clock stops while you pick, so it's the step to the next one
@@ -204,36 +207,6 @@ def _sweetheart(farm: Farm, name: str) -> list[dict]:
     if f and f.status not in ("Dating", "Engaged", "Married") and f.points >= romance.CAP_FRIEND:
         return []
     return _person(farm, name, "a daily talk keeps the hearts moving", SWEETHEART_VALUE)
-
-
-LUAU_DAY = 11  # Summer 11
-
-
-def luau_note(farm: Farm) -> str:
-    """The Luau soup pays every townsperson you've met, so keep one good thing for it (Event.governorTaste)."""
-    s = farm.save
-    if s.season != "summer" or s.day > LUAU_DAY:
-        return ""
-    objects = farm.data.asset("Data/Objects")
-    best = None
-    for it in s.items:
-        o = objects.get(it.qualified_id.removeprefix("(O)")) if it.qualified_id.startswith("(O)") else None
-        if not o or it.category == -7 or int(o.get("Edibility") or -300) == -300:
-            continue
-        price, edible = int(o.get("Price") or 0), int(o.get("Edibility") or 0)
-        if (it.quality >= 2 and price >= 160) or (it.quality == 1 and price >= 300 and edible > 10):
-            score = 120
-        elif edible >= 20 or price >= 100 or (it.quality >= 1 and price >= 70):
-            score = 60
-        else:
-            continue
-        if not best or (score, price) > best[:2]:
-            best = (score, price, farm.name(it.qualified_id), it.quality)
-    if not best:
-        return ("The Luau on Summer 11: keep a gold crop worth 160g or more for the soup, for +120 with everyone in"
-                " town.")
-    quality = {1: "silver ", 2: "gold ", 4: "iridium "}.get(best[3], "")
-    return f"Keep your {quality}{best[2]} for the Luau soup on Summer 11: +{best[0]} with everyone in town."
 
 
 def _birthdays(farm: Farm, spouse: str = "") -> list[dict]:
@@ -652,12 +625,12 @@ def _museum(farm: Farm) -> list[dict]:
              "from": 8 * 60, "until": 18 * 60}]
 
 
-def _willy(farm: Farm, quest: dict | None) -> list[dict]:
+def _willy(farm: Farm, quest: dict | None, sold: dict) -> list[dict]:
     """His shop is worth the walk for a request, or a good bag of fish."""
     door = _door(farm, "Beach", "FishShop")
     for_him = quest and quest.get("who") == "Willy" and farm.held().get(f"(O){quest['item']}")
     active = any(q["deliver_to"] == "Willy" for q in quests.view(farm)["quests"])
-    fish = sum(r["each"] * r["count"] for r in sell.default(farm)["sell"] if r.get("category") == -4)
+    fish = sum(r["each"] * r["count"] for r in sold["sell"] if r.get("category") == -4)
     if not door or not (for_him or active or fish >= FISH_TRIP):
         return []
     return [{"id": "willy", "kind": "shop", "title": "Willy's shop", "minutes": 5, "at": door,
@@ -740,10 +713,10 @@ def _wizard(farm: Farm) -> list[dict]:
              "minutes": 15, "value": 2 * QUEST_VALUE, "from": 6 * 60, "until": 23 * 60}]
 
 
-def _pierre(farm: Farm, ripe: int) -> list[dict]:
+def _pierre(farm: Farm, ripe: int, sold: dict) -> list[dict]:
     """A harvest is only money, and replanted, once it's been to Pierre's: he pays on the spot."""
     shop = next((x for x in farm.hours_today() if x["id"] == "SeedShop"), {})
-    selling = sum(r["each"] * r["count"] for r in sell.default(farm)["sell"]
+    selling = sum(r["each"] * r["count"] for r in sold["sell"]
                   if "SeedShop" in Buyers(farm.data).of(r.get("category")))
     if not (ripe or selling >= SHOP_TRIP) or shop.get("closed"):
         return []
@@ -805,6 +778,31 @@ def seed_list(farm: Farm) -> list[dict]:
     return [x for x in merged.values() if x["count"]]
 
 
+def letters_note(farm: Farm, days: int = LETTER_DAYS) -> dict | None:
+    """The story letters of the next few weeks asking for something you don't hold: a crop gets its sow-by day."""
+    s, today, held = farm.save, farm.save.days_played, farm.held()
+    grows = {f"(O){c.harvest}": c for c in farm.crops.by_seed.values() if c.harvest}
+    lines = []
+    for x in letters.coming(farm.data, s, today):
+        if x.days_played > today + days or held.get(x.item, 0) >= x.count:
+            continue
+        when = farm.label(x.days_played).rsplit(",", 1)[0]
+        name = farm.name(x.item)
+        what = f"{x.count} {name}" if x.count > 1 else f"{'an' if name[0] in 'AEIOU' else 'a'} {name}"
+        line = f"{x.who} asks for {what} on {when} ({x.title}{f', {x.reward:,}g' if x.reward else ''})"
+        crop = grows.get(x.item)
+        if crop and farm.when.season in crop.seasons:
+            sow = x.days_played - crop.grow
+            line += (f": sow {farm.name('(O)' + crop.seed)} by {farm.label(sow).rsplit(',', 1)[0]}" if sow >= today
+                     else f": it takes {crop.grow} days to grow, so sow it today to hand it over soon after")
+        lines.append(line)
+    if not lines:
+        return None
+    return {"text": f"Coming by letter: {lines[0]}." if len(lines) == 1 else "Coming by letter: "
+            + "; ".join(lines) + ".", "why": "Have it ready and you hand it over the day the letter comes. The "
+            "Sell tab keeps one back once you have it."}
+
+
 def _note(x) -> dict:
     """A note as {text, why}: a plain sentence becomes its first sentence, with the rest as the why."""
     if isinstance(x, dict):
@@ -856,8 +854,11 @@ def _board_note(farm: Farm) -> dict:
 
 
 def view(farm: Farm, *, time: int | None = None, energy: int | None = None, where: str | None = None,
-         done: set[str] = frozenset(), spouse: str = "", pace: float | None = None, route: dict | None = None) -> dict:
+         done: set[str] = frozenset(), spouse: str = "", pace: float | None = None, route: dict | None = None,
+         declined: frozenset[str] = frozenset()) -> dict:
+    """`declined`: the ids of today's questions (views/asks.py) you said no to."""
     s = farm.save
+    sold = sell.default(farm, declined)  # what to sell, after what today's questions keep
     walker = farm.walker
     walker.pace = pace or NEW_PLAYER_PACE
     held = farm.held()
@@ -926,8 +927,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     fest_today = (s.season, s.day) in farm.hours.festivals
     board = help_wanted.quest_today(s, farm.data, festival=fest_today)
     hold = hold_back(farm, route)
-    stops = [x for x in _stops(farm, held, spouse) + _wizard(farm) + _community_center(farm, hold) + _pierre(farm, ripe)
-             + _clint(farm, held) + _museum(farm) + _willy(farm, board) + _mines(farm, power) + _introductions(farm)
+    stops = [x for x in _stops(farm, held, spouse) + _wizard(farm) + _community_center(farm, hold)
+             + _pierre(farm, ripe, sold) + _clint(farm, held) + _museum(farm) + _willy(farm, board, sold)
+             + _mines(farm, power) + _introductions(farm)
              + (_sweetheart(farm, spouse) if spouse else []) + _birthdays(farm, spouse) if x["id"] not in done]
     fest = farm.hours.festivals.get((s.season, s.day))
     if fest:  # the map is the festival's and the day ends with it: only the farm jobs and the festival itself
@@ -1032,8 +1034,8 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     coming: dict[str, dict] = {}
     for row in levels.forecast(farm):  # soonest first, so each skill keeps its next level
         coming.setdefault(row["skill"], row)
-    bag = pack.build(farm, plan, spouse, hold=hold)
-    load: dict[str, dict[str, int]] = {}
+    bag = pack.build(farm, plan, spouse, hold=hold, sold=sold)
+    load: dict[str, dict[tuple[str, str], dict]] = {}  # chest -> (item, quality) -> a row of the table
     for st in bag["stops"]:  # a stop's words shouldn't promise what you won't have with you
         row = next((r for r in plan if r["id"] == st.get("key")), None)
         if row is not None and st["items"]:
@@ -1041,9 +1043,11 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
         for r in st.get("rows", []):
             for f in r["from"]:
                 if (f["where"].endswith("farm") or f["where"] == "your backpack") and not f.get("there"):
-                    chest = load.setdefault(f["where"], {})
-                    name = r.get("name", r["label"])
-                    chest[name] = chest.get(name, 0) + (f.get("take") or 1)
+                    name, quality, why = r.get("name", r["label"]), f.get("quality", ""), r.get("for", "")
+                    line = load.setdefault(f["where"], {}).setdefault(
+                        (name, quality, why), {"name": name, "quality": quality, "count": 0, "icon": r.get("icon"),
+                                               "for": why})
+                    line["count"] += f.get("take") or 1
         if row is not None and st.get("short"):
             if st["key"] == "cc" and st["items"]:
                 row["why"] = "hand in " + ", ".join(st["items"])
@@ -1051,14 +1055,16 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [_note(x) for x in (_board_note(farm), tv_note, doomed_note(farm, lost),
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
-                                         luau_note(farm)) if x],
+                                         letters_note(farm), *asks.notes(farm)) if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
             "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
             "giant": _giant_watch(farm),
+            "asks": [{**a.view(), "yes": a.id not in declined} for a in asks.asks(farm)],
             "pack": bag, "held_back": [{"item": k, "why": v} for k, v in hold.items()],
-            "load": [{"where": w, "items": [f"{n} {k}" if n > 1 else k for k, n in items.items()]}
+            "load": [{"where": w, "items": sorted(items.values(),
+                                                  key=lambda x: (x["name"], QUALITY_ORDER[x["quality"]]))}
                      for w, items in load.items() if w != "your backpack"],
             "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",
