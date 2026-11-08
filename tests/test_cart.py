@@ -1,6 +1,7 @@
 """The game's random numbers and the Traveling Cart: known values, small fake shops, plus the real game."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game
 from valley_planner.facts.cart import Cart
@@ -106,8 +107,7 @@ GAME = find_game()
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_real_cart_seen_in_a_game():
     """A cart a player saw in 1.6.15 (game id 452453427, Fall 5 Year 1), item for item."""
-    from valley_planner.gamedata import GameData
-    data = GameData(GAME)
+    data = shared_data()
     if not data.version.startswith("1.6.15"):
         pytest.skip("observed on 1.6.15")
     w = When("fall", 5, 1, 61, game_id=452453427, world_fields={"VisitsUntilY1Guarantee": -1})

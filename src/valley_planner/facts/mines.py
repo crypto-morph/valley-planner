@@ -36,11 +36,4 @@ FLOORS: dict[str, tuple[int, int, str]] = {
     "769": (81, 119, "shadow brutes and shamans"), "684": (2, 39, "bugs"),
     "420": (21, 39, "red mushrooms on the ground"), "422": (81, 119, "purple mushrooms on the ground"),
 }
-ELEVATOR_STEP = 5
 BOTTOM = 120
-
-
-def floor_for(item: str) -> int | None:
-    """The shallowest floor that gives this item, or None if the Mines don't."""
-    row = FLOORS.get(item.removeprefix("(O)"))
-    return row[0] if row else None

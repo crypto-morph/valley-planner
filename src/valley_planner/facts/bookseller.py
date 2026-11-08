@@ -54,8 +54,6 @@ from .rng import NetRandom, day_save_random
 SHOP = "Bookseller"
 TRADE_SHOP = "BooksellerTrade"
 TRADE_UNLOCK_MAIL = "read_a_book"
-PLACE = "Town"
-COUNTER_TILES = ((109, 26), (110, 26))
 LANDMARK = "his van in the north-east of Pelican Town, north of JojaMart"
 PLAYER_KEYS = {"PLAYER_STAT", "WORLD_STATE_FIELD"}  # true now or later depending on what you do
 

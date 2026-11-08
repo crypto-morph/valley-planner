@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts.buyers import Buyers
 from valley_planner.save import Item
@@ -10,9 +11,8 @@ from valley_planner.save import Item
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 
@@ -21,7 +21,7 @@ def data():
 def farm():
     from valley_planner.app import Planner
     try:
-        return Planner(None).farm()
+        return Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
 

@@ -1,6 +1,7 @@
 """The spa, the horse, heaters and truffles."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts import comforts as c
 from valley_planner.facts.walk import MINUTES_PER_TILE, NEW_PLAYER_PACE
@@ -44,9 +45,8 @@ def test_truffles():
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

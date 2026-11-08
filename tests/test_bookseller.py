@@ -1,6 +1,7 @@
 """The Bookseller: his visit days and his seeded stock, on small fake shops plus the real game when it's here."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game
 from valley_planner.facts.bookseller import Bookseller, visit_days, visits
@@ -77,8 +78,7 @@ GAME = find_game()
 @pytest.mark.game
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_real_shop_reads():
-    from valley_planner.gamedata import GameData
-    data = GameData(GAME)
+    data = shared_data()
     w = When("summer", 12, 2, 152, game_id=GAME_ID, world_fields={"GoldenWalnutsFound": 0})
     d = Bookseller(data).day(w, {}, today=True)
     names = [i.name for i in d.items]

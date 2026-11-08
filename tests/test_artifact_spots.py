@@ -1,6 +1,7 @@
 """Artifact and seed spots: the draw order of a dig, with a made-up drop table, then the real one when it's here."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts import artifact_spots as a
 from valley_planner.facts.rng import NetRandom, day_save_random
@@ -231,9 +232,8 @@ def test_reachable():
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

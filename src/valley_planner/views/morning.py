@@ -24,6 +24,8 @@ import re
 
 from ..engine import cc
 from ..facts import romance
+from ..facts.conditions import clock_of as _clock
+from ..facts.conditions import minutes_of as _minutes
 from . import crops, errands, sell
 from .farm import Farm
 
@@ -304,14 +306,6 @@ def _capped_partners(farm: Farm) -> list[dict]:
 
 DAY_START, DAY_END, EVENING = 600, 2600, 2000
 ERRAND = 60  # minutes allowed for walking to a shop and back and doing the business (a planning choice)
-
-
-def _minutes(t: int) -> int:
-    return t // 100 * 60 + t % 100
-
-
-def _clock(m: int) -> int:
-    return m // 60 * 100 + m % 60
 
 
 def _schedule(farm: Farm, do: list[dict], todays: list[dict], events) -> dict:

@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from .conditions import When, check, split
+from .conditions import clock_of as _time
+from .conditions import minutes_of as _minutes
 
 CATEGORY_TAGS = {
     -26: "artisan_goods", -21: "bait", -9: "big_craftable", -97: "boots", -100: "clothing", -7: "cooking",
@@ -67,14 +69,6 @@ def flavored_price(kind: str, ingredient_price: int, base_price: int = 0, roe_pr
         "DriedFruit": int(p * 5 * 1.5) + 25, "DriedMushroom": int(p * 5 * 1.5) + 25,
         "SmokedFish": p * 2, "Bait": max(1, int(p * 0.1)),
     }[kind]
-
-
-def _minutes(t: int) -> int:
-    return t // 100 * 60 + t % 100
-
-
-def _time(m: int) -> int:
-    return m // 60 * 100 + m % 60
 
 
 def minutes_until_morning(now: int, days: int = 1) -> int:

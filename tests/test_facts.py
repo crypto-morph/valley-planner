@@ -1,6 +1,7 @@
 """Game facts from data: conditions, item prices, shop prices, crops — small fake data, plus the real game."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game
 from valley_planner.facts.conditions import When, check
@@ -95,9 +96,8 @@ GAME = find_game()
 @pytest.mark.game
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_real_pierre_prices():
-    from valley_planner.gamedata import GameData
 
-    data = GameData(GAME)
+    data = shared_data()
     shops, crops = Shops(data), Crops(data)
     seed_shop = {o.item: o for o in shops.offers(spring5()) if o.shop == "SeedShop"}
     assert seed_shop["(O)472"].price == 20 and seed_shop["(O)474"].price == 80  # Parsnip, Cauliflower

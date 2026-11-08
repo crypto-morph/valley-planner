@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import struct
 import zlib
-from pathlib import Path
 
 from .reader import XnbError, XnbReader, _Stream
 
@@ -67,8 +66,3 @@ def encode_png(width: int, height: int, rgba: bytes) -> bytes:
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(rows, 6)) + chunk(b"IEND", b""))
 
-
-def texture_png(path: Path) -> tuple[int, int, bytes]:
-    """(width, height, PNG bytes) for a Texture2D .xnb file."""
-    w, h, px = read_texture(Path(path).read_bytes())
-    return w, h, encode_png(w, h, px)

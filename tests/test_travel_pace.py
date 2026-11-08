@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from shared import shared_data
 
 from valley_planner.engine.route.pace import Pace
 from valley_planner.facts.conditions import When
@@ -13,11 +14,10 @@ def fresh_farm():
     """A new farm from the installed game; skipped where there isn't one, like CI."""
     from valley_planner.discover import find_game
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
     game = find_game()
     if game is None:
         pytest.skip("no game here")
-    return new_farm(GameData(game))
+    return new_farm(shared_data())
 
 
 def at(floor, day):

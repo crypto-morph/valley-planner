@@ -43,7 +43,6 @@ FESTIVAL_DAYS = {  # festival shop id part -> (season, first day, last day): the
     "NightMarket": ("winter", 15, 17), "DesertFestival": ("spring", 15, 17)}
 CART_POOL_SIZE = 334  # objects the cart's random slots can pick from (see econ.red-cabbage-cart)
 CART_PICKS = 10
-FESTIVAL_SHOP_PREFIX = "Festival_"
 
 
 @dataclass(frozen=True)

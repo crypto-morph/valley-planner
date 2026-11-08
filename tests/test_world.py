@@ -89,3 +89,11 @@ def test_a_place_sums_its_goals_gold_and_activities():
     assert s["goals"] == ["Community Center", "Spring Foraging bundle"] and s["gold"] == 75
     assert s["icons"] == ["forage", "bin"] and s["stops"] == [3]
     assert summary(pois, "Beach") == {"goals": [], "gold": 0, "icons": ["bubbles"], "stops": []}
+
+
+def test_a_spot_that_bubbles_twice_is_one_place_with_both_times():
+    spot = {"loc": "Forest", "x": 63, "y": 61}
+    day = {"bubbles": [{"spots": [spot], "spells": ["8:30 AM to 10:10 AM"]},
+                       {"spots": [spot], "spells": ["5:10 PM to 6:40 PM"]}]}
+    pois = from_day(day)[0]
+    assert len(pois) == 1 and pois[0]["time"] == "8:30 AM to 10:10 AM, 5:10 PM to 6:40 PM"

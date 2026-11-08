@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts import help_wanted, skills
 from valley_planner.facts.items import Items
@@ -12,9 +13,8 @@ from valley_planner.save import night_override
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 
@@ -82,7 +82,7 @@ def test_the_plan_finds_the_person_you_are_courting_and_stops_at_low_energy(data
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     v = today.view(farm, time=900, energy=60, spouse="Penny")
@@ -95,7 +95,7 @@ def test_spares_near_the_route_are_offered_as_optional(data):
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        v = today.view(Planner(None).farm())
+        v = today.view(Planner(shared_data()).farm())
     except Exception:
         pytest.skip("no save here")
     assert all("gold" in p and "place" in p and "stop" in p for p in v["passing"])
@@ -117,7 +117,7 @@ def test_the_day_brings_bundle_keepers_out_of_the_way(data):
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        v = today.view(Planner(None).farm(), spouse="Penny")
+        v = today.view(Planner(shared_data()).farm(), spouse="Penny")
     except Exception:
         pytest.skip("no save here")
     assert all(x["count"] > 0 and x["why"] for x in v["bring"])
@@ -149,7 +149,7 @@ def test_a_festival_day_is_only_the_farm_and_the_festival(data):
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     farm.hours.festivals[(farm.save.season, farm.save.day)] = ("A Fair", 900, "Town")
@@ -211,7 +211,7 @@ def test_books_and_catalogues_are_rare_gifts(data):
     from valley_planner.app import Planner
     from valley_planner.views import ask
     try:
-        v = ask.villager(Planner(None).farm(), "Penny")
+        v = ask.villager(Planner(shared_data()).farm(), "Penny")
     except Exception:
         pytest.skip("no save here")
     rare = {x["name"] for x in v["loves"] if x["rare"]}
@@ -237,7 +237,7 @@ def test_the_show_comes_first_at_home_and_is_only_a_note_when_away(data):
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     if not today._show_today(farm):
@@ -253,7 +253,7 @@ def test_a_person_indoors_is_a_stop_at_the_door(data, monkeypatch):
     from valley_planner.facts.schedules import DaySchedule, Stop
     from valley_planner.views import today
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     day = DaySchedule("Tue", (Stop(900, False, "ArchaeologyHouse", 17, 9, 2), Stop(1400, False, "Town", 88, 100, 2)))

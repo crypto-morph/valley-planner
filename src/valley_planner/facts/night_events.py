@@ -49,7 +49,6 @@ from .conditions import date_of
 from .rng import NetRandom, day_save_random, random_seed
 from .walk import Walker
 
-METEORITE = "622"  # the resource clump a meteorite leaves
 CLUMPS = {"600": "stump", "602": "log", "622": "meteorite", "672": "boulder", "752": "boulder", "754": "boulder",
           "756": "boulder", "758": "boulder"}
 COOPS = ("Big Coop", "Deluxe Coop")

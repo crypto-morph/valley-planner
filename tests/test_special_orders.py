@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts import special_orders as so
 from valley_planner.facts.conditions import When
@@ -105,9 +106,8 @@ def test_order_state_reads_the_save(tmp_path):
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

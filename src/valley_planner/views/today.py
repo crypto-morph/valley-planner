@@ -33,6 +33,7 @@ from ..facts import (
     tools,
 )
 from ..facts.buyers import Buyers
+from ..facts.conditions import minutes_of
 from ..facts.fish import Fish
 from ..facts.garbage import CANS
 from ..facts.items import FIXED_SALE_PRICE
@@ -85,7 +86,7 @@ def clock(minutes: int) -> str:
 
 
 def _minutes(game_time: int | None) -> int | None:
-    return None if game_time is None else game_time // 100 * 60 + game_time % 100
+    return None if game_time is None else minutes_of(game_time)
 
 
 def _price(farm: Farm, qid: str) -> int:

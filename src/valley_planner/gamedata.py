@@ -89,11 +89,6 @@ class GameData:
             self._present[name] = (self.install.content / f"{name}.xnb").is_file()
         return self._present[name]
 
-    def assets_in(self, folder: str) -> list[str]:
-        """Asset names in a content folder, e.g. 'Characters/schedules'."""
-        base = self.install.content / folder
-        return sorted(f"{folder}/{p.stem}" for p in base.glob("*.xnb")) if base.is_dir() else []
-
     def text(self, value: str | None) -> str | None:
         """Resolve '[LocalizedText Strings\\Objects:Parsnip_Name]' to the English text; other strings pass through."""
         if not value:

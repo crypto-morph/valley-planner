@@ -33,7 +33,6 @@ from ..views.farm import Farm
 from .unlocks import Unlock, Unlocks
 
 YEAR = 112
-CART_WEEKDAYS = (5, 0)  # Friday, Sunday (day % 7)
 
 
 @dataclass

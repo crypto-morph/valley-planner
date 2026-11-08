@@ -1,6 +1,7 @@
 """The cart in the route: once the seed is known, a visit is a dated purchase that competes with the long way."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.engine.route.plan import Router, route
 from valley_planner.engine.route.start import new_farm
@@ -10,9 +11,8 @@ GAME_ID = "453557957"
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

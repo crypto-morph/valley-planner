@@ -40,6 +40,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .conditions import minutes_of
 from .walk import MINUTES_PER_TILE, NEW_PLAYER_PACE
 
 # --- the spa ---
@@ -49,8 +50,6 @@ SPA_FIRST_TICKS = 800 // TICK_MS + 1  # the timer has to drop below 0: 51 ticks
 SPA_EVERY_TICKS = 100 // TICK_MS + 1  # 7 ticks a point
 SPA_ENERGY_PER_MINUTE = MS_PER_GAME_MINUTE / (SPA_EVERY_TICKS * TICK_MS)  # 6.25
 SPA_OPENS_DAYS_PLAYED = 31  # Summer 3, year 1
-SPA_ADVICE = ("The spa (the Railroad, from Summer 3) is open all day, every day. Stand still in the pool: "
-              "about 6 energy and 6 health a game minute, a full bar in under an hour.")
 
 
 def spa_minutes(energy_now: float, energy_max: float) -> int:
@@ -119,7 +118,7 @@ def evening_checks(bedtime: int) -> int:
     """How many 10-minute happiness checks happen from 6pm until `bedtime` (HHMM, after midnight as 2400+)."""
     if bedtime < HEATER_FROM:
         return 0
-    minutes = (bedtime // 100 * 60 + bedtime % 100) - (HEATER_FROM // 100 * 60)
+    minutes = minutes_of(bedtime) - minutes_of(HEATER_FROM)
     return minutes // 10 + 1
 
 
@@ -135,7 +134,6 @@ def winter_evening(happiness: int, drain: int, *, heater: bool, checks: int) -> 
 # --- truffles ---
 TRUFFLE_DIG_CHANCE = 0.0002  # each tick, outdoors
 TRUFFLE_KEEP_PER_FRIENDSHIP = 1 / 1500
-TRUFFLE_CRAB_CHANCE = 0.002
 TRUFFLE_ADVICE = ("Pigs dig truffles only outside on dry days outside winter, and only on bare ground: no grass, "
                   "paths or objects under them. Let them out early; the more they like you, the more they find.")
 

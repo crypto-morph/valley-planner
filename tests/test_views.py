@@ -1,6 +1,7 @@
 """Views: the crop countdown's season rules, and the web app end to end on a real install."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game, find_saves_root
 from valley_planner.views.crops import _denied_outdoors, _location_season, _run_end, _season_day
@@ -77,7 +78,7 @@ def test_morning_day_fits_shop_hours():
     from valley_planner.app import Planner
     from valley_planner.views import morning
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     agenda = [{"n": farm.when.days_played, "kind": "buy", "text": "Buy a Duck: 1,200g", "why": "", "goal": "",
@@ -96,7 +97,7 @@ def test_morning_cart_line():
     from valley_planner.app import Planner
     from valley_planner.views import morning
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     line = morning._cart(farm)
@@ -108,7 +109,7 @@ def test_special_orders_on_the_morning():
     from valley_planner.app import Planner
     from valley_planner.views import morning
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     today = farm.when.days_played
@@ -131,7 +132,7 @@ def test_quest_log():
     from valley_planner.app import Planner
     from valley_planner.views import quests
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     farm.save.quests = [{"id": "106", "type": "ItemDeliveryQuest", "title": "Cow's Delight", "completed": False,
@@ -156,7 +157,7 @@ def test_cook_report():
     from valley_planner.app import Planner
     from valley_planner.views import cook
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     v = cook.view(farm)
@@ -174,7 +175,7 @@ def test_cook_uses_cheapest_units_first():
     from valley_planner.app import Planner
     from valley_planner.views import cook
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     for r in cook.view(farm)["now"]:
@@ -188,7 +189,7 @@ def test_cook_quality_columns_only_fall():
     from valley_planner.app import Planner
     from valley_planner.views import cook
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     for r in cook.view(farm)["known"]:

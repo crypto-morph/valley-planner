@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 
 from ..facts import artifact_spots, night_events
+from ..facts.conditions import clock_of, minutes_of
 from ..facts.schedules import Situation, time_label
 from ..facts.walk import FARMHOUSE_DOOR, OUTDOORS
 from .farm import Farm
@@ -28,12 +29,11 @@ log = logging.getLogger(__name__)
 
 
 def _minutes(game_time: int) -> int:
-    h, m = divmod(int(game_time), 100)
-    return h * 60 + m
+    return minutes_of(int(game_time))
 
 
 def _clock(minutes: int) -> str:
-    return time_label((minutes // 60) * 100 + minutes % 60)
+    return time_label(clock_of(minutes))
 
 
 def from_day(day: dict) -> tuple[list[dict], list[dict], dict]:
@@ -56,16 +56,21 @@ def from_day(day: dict) -> tuple[list[dict], list[dict], dict]:
                      "title": p["title"], "why": f"On the way to stop {p['stop'] + 1} ({to}): about {p['gold']}g"
                      if p["stop"] < len(plan) else f"On the way home: about {p['gold']}g"})
     fishing = day.get("fishing") or {}
+    bubbles: dict[str, dict] = {}  # one place per tile: a spot can bubble twice a day
     for group in day.get("bubbles") or []:
         words = group.get("spells") or []
         for j, b in enumerate(group.get("spots") or []):
             spell = (words[j] if j < len(words) else b.get("label", "")).split(", ")[0]
+            key = f"bubbles:{b['loc']}:{b['x']}:{b['y']}"
+            if key in bubbles:
+                bubbles[key]["time"] += f", {spell}"
+                continue
             why = "Fish bite much faster in them"
             if fishing.get("location") == b["loc"] and fishing.get("fish"):
                 why += f". Bundle fish here today: {', '.join(fishing['fish'])}"
-            pois.append({"id": f"bubbles:{b['loc']}:{b['x']}:{b['y']}", "loc": b["loc"], "x": b["x"], "y": b["y"],
-                         "kind": "bubbles", "layer": "places", "title": "Fish bubbles", "why": why,
-                         "time": spell})
+            bubbles[key] = {"id": key, "loc": b["loc"], "x": b["x"], "y": b["y"], "kind": "bubbles",
+                            "layer": "places", "title": "Fish bubbles", "why": why, "time": spell}
+    pois += bubbles.values()
     giant = day.get("giant")
     if giant and giant.get("tile"):
         x, y = giant["tile"]

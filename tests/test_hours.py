@@ -1,6 +1,7 @@
 """Shop hours: doors from maps, keepers from schedules, and the closures — small fake data, plus the real game."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game
 from valley_planner.facts.conditions import When
@@ -88,8 +89,7 @@ GAME = find_game()
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_real_week_of_shops():
     """The well-known weekly pattern, from the game's own maps and schedules (Fall Year 1, CC not restored)."""
-    from valley_planner.gamedata import GameData
-    h = Hours(GameData(GAME))
+    h = Hours(shared_data())
 
     def hours(shop, day):
         return h.day(SHOP[shop], When("fall", day, 1, 56 + day)).open

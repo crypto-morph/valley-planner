@@ -41,7 +41,6 @@ from ..save import Crop, Save
 from .conditions import date_of
 from .rng import NetRandom, day_save_random, hash_text, random_seed
 
-QUALITY_NAMES = {0: "normal", 1: "silver", 2: "gold", 4: "iridium"}
 _BOOST = {"368": 1, "369": 2, "919": 3}  # Basic, Quality, Deluxe Fertilizer
 _SEASONLESS = ("Greenhouse",)  # indoors: seasons don't apply
 _ISLAND = "Island"  # Ginger Island places are always summer

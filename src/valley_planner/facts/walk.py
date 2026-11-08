@@ -197,13 +197,19 @@ class Walker:
                 j += 1
             loc = path[i][0]
             seg = [(n[1], n[2]) for n in path[i:j + 1]]
-            last = 0
-            for k, (d, n, a, b) in enumerate(_spans(seg)):
+            last, spans = 0, _spans(seg)
+            for k, (d, n, a, b) in enumerate(spans):
                 part = path[i + a:i + b + 1]
                 out.append({"kind": "walk", "loc": loc, "from": list(seg[a]), "to": list(seg[b]), "heading": d,
                             "tiles": n, "minutes": self.minutes(part), "points": polylines(part)[0]["points"],
                             "text": f"{'Turn' if k else 'Head'} {d} for {n} tile{'s' if n != 1 else ''}"})
                 last = b
+            if not spans and j + 1 == len(path) and len(seg) > 1:  # a hop too short for a leg: still one step
+                (ax, ay), (bx, by) = seg[0], seg[-1]
+                d, n = _heading(bx - ax, by - ay), max(abs(bx - ax), abs(by - ay))
+                out.append({"kind": "walk", "loc": loc, "from": [ax, ay], "to": [bx, by], "heading": d, "tiles": n,
+                            "minutes": self.minutes(path[i:j + 1]), "points": polylines(path[i:j + 1])[0]["points"],
+                            "text": f"Step {d} {n} tile{'s' if n != 1 else ''}"})
             if j + 1 < len(path):
                 edge, onto = _edge(path[j], self.grids), path[j + 1][0]
                 part = path[i + last:j + 1]

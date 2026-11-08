@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts.harvest import giant_roll, giant_tonight, harvest_quality, quality_ahead, quality_boost
 from valley_planner.save import Crop, Save
@@ -137,9 +138,8 @@ def test_no_giant_off_the_farm_or_out_of_season():
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

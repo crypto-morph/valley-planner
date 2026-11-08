@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .conditions import minutes_of
 from .rng import day_save_random
 
 MAPS = ("Town", "Forest", "Mountain", "Beach")
@@ -34,7 +35,7 @@ def _ticks():
 
 
 def _minutes_between(a: int, b: int) -> int:
-    return (b // 100 * 60 + b % 100) - (a // 100 * 60 + a % 100)
+    return minutes_of(b) - minutes_of(a)
 
 
 def _tiles(raw: list[str]) -> set[tuple[int, int]]:

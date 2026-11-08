@@ -90,12 +90,12 @@ tick what's done. The person you're courting is a timed stop, and spare energy b
 
 1. Done: goals as modules, goal dependencies, Mines pace, travel facts.
 2. Done: the day plan, walkable routes, Recalculate, learned walking pace, and forecasts for bins, the board,
-   bubbles and geodes. All were checked against a real game, Spring 1 to 14 of one farm.
+   bubbles and geodes. All were checked against a real game, Spring 1 to 14 of one farm. Since then: maps drawn
+   from the game files (bubble spots, stops, night events), satnav steps, giant crops, special orders and the cart.
 3. Next, from that play test:
    - Plan the watering load: 100+ dry tiles cost more than a day's energy, so it needs food and sprinklers.
    - Bundle reward stops, such as using Speed-Gro from Spring Crops on young crops.
-   - Birthdays as stops, and fishing as a timed stop with a place.
-   - A small map for bubble spots: "the lake" misled in play, because a tile can be in a river arm.
+   - Fishing as a timed stop with a place. (Birthdays are stops now.)
    - Income the route doesn't count yet, so the Vault estimate stops being too low.
 4. The plan past Year 1: `Farmsim` and `Router` stop at the end of the save's year, and Clint's prices, `WEEKS` and
    default deadlines all assume one year.

@@ -22,7 +22,6 @@ import struct
 from dataclasses import dataclass
 from functools import cached_property
 
-FERTILIZER_QUALITY = {"368": 1, "369": 2, "919": 3}  # Basic, Quality, Deluxe Fertilizer
 SEASONS = ("spring", "summer", "fall", "winter")
 
 
@@ -117,11 +116,6 @@ class CropInfo:
 
     def survives_into(self, season: str) -> bool:
         return season in self.seasons
-
-    @property
-    def plantable(self) -> bool:
-        """An empty season list means it can't grow outdoors at all."""
-        return bool(self.seasons)
 
 
 class Crops:

@@ -129,7 +129,7 @@ class Gifts:
         obj = self._objects.get(item_id.removeprefix("(O)"))
         return obj is not None and obj.get("CanBeGivenAsGift", True) is not False
 
-    def lists(self, villager: str, *, include_universal: bool = True) -> dict[str, list[str]]:
+    def lists(self, villager: str) -> dict[str, list[str]]:
         """Every object id this villager loves / likes / … (the full resolution, object by object)."""
         out: dict[str, list[str]] = {t: [] for t in ORDER}
         for oid in self._objects:

@@ -9,6 +9,7 @@ def test_xp_rules():
 
 
 import pytest  # noqa: E402
+from shared import shared_data  # noqa: E402
 
 from valley_planner.discover import find_game  # noqa: E402
 
@@ -23,8 +24,7 @@ def test_fresh_year_route():
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.simulate import FLOAT
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    v = route(new_farm(GameData(GAME)), ["greenhouse", "seed_maker"], ["kitchen", "cc"], tiles=80)
+    v = route(new_farm(shared_data()), ["greenhouse", "seed_maker"], ["kitchen", "cc"], tiles=80)
     by_id = {o["id"]: o for o in v["objectives"]}
     assert by_id["greenhouse"]["status"] == "ok" and by_id["seed_maker"]["status"] == "ok"
     assert min(c["cash"] for c in v["cash"]) >= 0
@@ -50,8 +50,7 @@ def test_route_tree():
     """Each step carries what's behind it in order, and a requirement two goals share is planned once."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    v = route(new_farm(GameData(GAME)), ["greenhouse"], ["cc"], tiles=80, cave="bats")
+    v = route(new_farm(shared_data()), ["greenhouse"], ["cc"], tiles=80, cave="bats")
     gh, cc = v["objectives"]
     built = [n for st in gh["steps"] for n in st["needs"] if n["state"] == "new"]
     assert built and all(n["ready"] for n in built)
@@ -66,8 +65,7 @@ def test_route_agenda():
     """The next week of the route, as days to act on, each naming the goal it serves."""
     from valley_planner.engine.route.plan import AGENDA_DAYS, route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    v = route(new_farm(GameData(GAME)), ["greenhouse", "seed_maker"], [], tiles=80, cave="bats")
+    v = route(new_farm(shared_data()), ["greenhouse", "seed_maker"], [], tiles=80, cave="bats")
     assert v["agenda"] and all(1 <= a["n"] < 1 + AGENDA_DAYS and a["goal"] and a["text"] for a in v["agenda"])
     assert [a["n"] for a in v["agenda"]] == sorted(a["n"] for a in v["agenda"])
 
@@ -79,8 +77,7 @@ def test_more_goals():
     waits for the kitchen and the beach bridge; the Stable waits for a Steel Axe."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    v = route(new_farm(GameData(GAME)), ["stable", "marriage"], ["sprinklers"], tiles=80, cave="bats")
+    v = route(new_farm(shared_data()), ["stable", "marriage"], ["sprinklers"], tiles=80, cave="bats")
     by = {o["id"]: o for o in v["objectives"]}
     stable = by["stable"]["steps"][0]
     assert by["stable"]["status"] == "ok" and stable["needs"][0]["label"].startswith("a Copper Axe")
@@ -99,8 +96,7 @@ def test_tech_tree():
     coloured by the days they have to spare, and a step two goals use names both."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    v = route(new_farm(GameData(GAME)), ["greenhouse"], ["cc"], tiles=80, cave="bats")
+    v = route(new_farm(shared_data()), ["greenhouse"], ["cc"], tiles=80, cave="bats")
     t = v["tree"]
     assert t["columns"][0]["label"].startswith("Spring 1") and len(t["columns"]) == 16
     for lane in t["lanes"]:
@@ -118,8 +114,7 @@ def test_new_goals_fresh():
     """Each new goal plans on a fresh farm, or says clearly why it can't."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     for g in ("deluxe_barn", "deluxe_coop", "silo", "axe_steel", "pickaxe_steel", "can_steel", "mines_bottom",
               "skull_cavern", "jars", "kegs", "house_3"):
         o = next(x for x in route(farm, [g], [], tiles=80, cave="bats")["objectives"] if x["id"] == g)
@@ -140,8 +135,7 @@ def test_tool_level_from_save():
     """Tool chains start from the save's own levels: a Copper Pickaxe needs only the Steel step."""
     from valley_planner.engine.route.start import new_farm
     from valley_planner.engine.unlocks import Unlocks
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     farm.save.tool_levels = {**farm.save.tool_levels, "Pickaxe": 1, "WateringCan": 2}
     u = Unlocks(farm)
     assert [x.label for x in u.chain("tool:Pickaxe@2")] == ["a Steel Pickaxe from Clint"]
@@ -155,8 +149,7 @@ def test_tool_level_from_save():
 def test_cellar_after_second_upgrade():
     from valley_planner.engine.route.start import new_farm
     from valley_planner.engine.unlocks import Unlocks
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     assert [x.key for x in Unlocks(farm).chain("house:3")] == ["kitchen", "house:2", "house:3"]
     farm.save.house_upgrade = 2
     cellar = Unlocks(farm).chain("house:3")
@@ -169,8 +162,7 @@ def test_kegs_wait_for_oak_resin():
     """Kegs need an Oak Resin each: Tappers on oaks first, a week a round, and the Kegs wait for it."""
     from valley_planner.engine.route.plan import Settings, route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     v = route(farm, ["kegs"], [], settings=Settings(kegs=10, tappers=5), tiles=80, cave="bats")
     o = v["objectives"][0]
     assert o["status"] == "ok"
@@ -191,8 +183,7 @@ def test_skull_cavern_needs_the_vault():
     with the Community Center planned first, the Vault is shared, not paid twice."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     def goals(*args, **kw):
         return {o["id"]: o for o in route(farm, *args, tiles=80, cave="bats", **kw)["objectives"]}
 
@@ -213,9 +204,8 @@ def test_new_goals_done_from_save():
     """Placed machines and ones in chests both count; the Skull Key's mail or floor 120 is the Mines' bottom."""
     from valley_planner.engine.route.plan import Router
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
     from valley_planner.save import Item
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     farm.save.machines["Keg"] = 6
     farm.save.items.append(Item(id="12", name="Keg", stack=4, quality=0, where="Farm chest", big=True))
     farm.save.mail.add("HasSkullKey")
@@ -243,8 +233,7 @@ def test_building_under_way_waits_for_robin():
     """A building Robin hasn't finished isn't usable yet: its animals are bought the day she's done."""
     from valley_planner.engine.route.start import new_farm
     from valley_planner.engine.unlocks import Unlocks
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     farm.save.buildings["Coop"] = 1
     farm.save.building_days["Coop"] = 2
     u = Unlocks(farm).get("building:Coop")
@@ -258,8 +247,7 @@ def test_qi_notes():
     Desert step needs the bus."""
     from valley_planner.engine.route.plan import QI_STEPS, Router
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     r = Router(farm, cave="bats")
     reqs, _, notes = r.requirements("qi")
     assert notes and "tunnel" in notes[0]
@@ -279,8 +267,7 @@ def test_robin_one_job_at_a_time():
     """With Robin still building, the kitchen isn't ordered until she's done."""
     from valley_planner.engine.route.plan import route
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     farm.save.money = 50000
     farm.save.buildings["Coop"] = 1
     farm.save.building_days["Coop"] = 3
@@ -295,8 +282,7 @@ def test_clint_one_tool_at_a_time():
     """Two tool upgrades never overlap at Clint's."""
     from valley_planner.engine.route.plan import Router
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     farm.save.money = 60000
     r = Router(farm, cave="bats")
     for goal in ("pickaxe_steel", "can_steel"):

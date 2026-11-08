@@ -34,7 +34,6 @@ HOUSE_2 = (65000, (("709", 100),), 3)  # GameLocation.houseUpgradeAccept: 65,000
 HOUSE_3 = (100000, (), 3)  # the cellar: gold only
 TOOL_NAMES = {"WateringCan": "Watering Can"}
 BRIDGE_WOOD = 300
-SKILLS = ("farming", "fishing", "foraging", "mining", "combat")
 
 
 @dataclass

@@ -1,6 +1,7 @@
 """The walk as satnav steps (facts/walk.py Walker.steps), for static/satnav.js."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts.walk import Landmark, Walker, _legs, _spans
 
@@ -64,7 +65,7 @@ def test_the_days_plan_carries_steps(data):
     from valley_planner.app import Planner
     from valley_planner.views import today
     try:
-        v = today.view(Planner(None).farm())
+        v = today.view(Planner(shared_data()).farm())
     except Exception:
         pytest.skip("no save here")
     assert v["start"][0] in v["places"]
@@ -78,8 +79,15 @@ def test_the_days_plan_carries_steps(data):
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
+
+
+def test_a_hop_too_short_for_a_leg_is_still_a_step():
+    steps = fake_walker().steps(walk("B", [(52, 14), (53, 13), (54, 12)]))
+    assert [(s["kind"], s["heading"], s["tiles"]) for s in steps] == [("walk", "northeast", 2)]
+    assert steps[0]["text"] == "Step northeast 2 tiles"
+    across = fake_walker().steps(PATH[:16] + walk("B", [(0, 10), (1, 10)]))
+    assert [s["kind"] for s in across] == ["walk", "exit", "walk"] and across[-1]["text"] == "Step east 1 tile"

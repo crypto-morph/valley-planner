@@ -1,6 +1,7 @@
 """Save reading: a hand-written save laid out like a 1.6 one, plus real saves when there are some."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game, find_saves_root, list_saves
 from valley_planner.save import read_save, rusty_key
@@ -178,9 +179,8 @@ REAL = find_saves_root()
 @pytest.mark.game
 @pytest.mark.skipif(REAL is None or find_game() is None, reason="no saves or no game here")
 def test_real_saves_read():
-    from valley_planner.gamedata import GameData
 
-    data = GameData(find_game())
+    data = shared_data()
     for path in list_saves(REAL)[:5]:
         s = read_save(path, data)
         assert s.season in ("spring", "summer", "fall", "winter") and 1 <= s.day <= 28

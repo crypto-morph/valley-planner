@@ -7,9 +7,8 @@ import math
 from ..facts import layout
 from .farm import Farm
 
-IRON_BAR, COPPER_BAR, IRON_ORE, COAL = "(O)335", "(O)334", "(O)380", "(O)382"
+IRON_BAR, COPPER_BAR = "(O)335", "(O)334"
 ORE_PER_BAR = 5
-CROPS_PER_SPRINKLER = 4
 ROUND = 20  # field sizes offered go in these steps
 
 

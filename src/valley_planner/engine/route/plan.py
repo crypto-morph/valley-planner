@@ -94,7 +94,6 @@ class Router:
             self.greenhouse_day = self.today
         for a in save.animals:  # animals you already have produce from today
             self.have.setdefault(f"animal:{a['type']}", self.today)
-        self._result = None
 
     # ----- the objectives, each in its own module -----
     def done(self, oid: str) -> bool:

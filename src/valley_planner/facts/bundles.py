@@ -29,7 +29,6 @@ from functools import cached_property
 AREAS = {"Pantry": 0, "Crafts Room": 1, "CraftsRoom": 1, "Fish Tank": 2, "FishTank": 2, "Boiler Room": 3,
          "BoilerRoom": 3, "Vault": 4, "Bulletin": 5, "BulletinBoard": 5, "Bulletin Board": 5,
          "Abandoned Joja Mart": 6}
-AREA_NAMES = ("Pantry", "Crafts Room", "Fish Tank", "Boiler Room", "Vault", "Bulletin Board", "Abandoned Joja Mart")
 VAULT = 4
 JOJA = 6
 NOTE_AFTER = {1: 0, 0: 1, 2: 1, 3: 2, 5: 3, 4: 4}  # area -> complete bundles needed before its notes appear

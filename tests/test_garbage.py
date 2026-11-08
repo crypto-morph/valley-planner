@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts.conditions import When
 from valley_planner.facts.garbage import CANS, LUCKS, GarbageCans, _Roll
@@ -110,7 +111,7 @@ def test_morning_bins_line():
     from valley_planner.app import Planner
     from valley_planner.views import morning
     try:
-        farm = Planner(None).farm()
+        farm = Planner(shared_data()).farm()
     except Exception:
         pytest.skip("no save here")
     assert morning._bins(farm)["kind"] == "bins"

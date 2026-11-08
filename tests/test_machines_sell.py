@@ -1,6 +1,7 @@
 """Machines (rules, flavored prices, timing) and sale prices — small fake data, plus the real game."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game
 from valley_planner.facts.machines import Input, Machines, flavored_price, minutes_until_morning, ready_at
@@ -85,8 +86,7 @@ GAME = find_game()
 @pytest.mark.game
 @pytest.mark.skipif(GAME is None, reason="Stardew Valley isn't installed here")
 def test_real_machines():
-    from valley_planner.gamedata import GameData
-    m = Machines(GameData(GAME))
+    m = Machines(shared_data())
     cases = {("(BC)12", "(O)258"): ("(O)348", 150, 10000), ("(BC)12", "(O)262"): ("(O)346", 200, 1750),
              ("(BC)15", "(O)24"): ("(O)342", 120, 4000), ("(BC)24", "(O)180"): ("(O)306", 190, 180),
              ("(BC)16", "(O)184"): ("(O)424", 230, 200), ("(BC)17", "(O)440"): ("(O)428", 470, 240)}

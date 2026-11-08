@@ -54,7 +54,6 @@ from .rng import NetRandom, random_seed
 XSI = "{http://www.w3.org/2001/XMLSchema-instance}"
 STAT = "timesEnchanted"
 SHARD = "(O)74"
-CINDER = "(O)848"
 SHARD_COST = 20  # Cinder Shards with a Prismatic Shard (or a Galaxy Soul)
 SCYTHES = {"47", "53", "66"}
 TOOL_KINDS = ("Axe", "Pickaxe", "Hoe", "WateringCan", "FishingRod", "Pan", "MilkPail", "Shears", "Wand",

@@ -1,6 +1,7 @@
 """What it all takes: the goals' needs added up, each unlock once, and every way to get each item."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.discover import find_game, find_saves_root
 
@@ -12,8 +13,7 @@ pytestmark = [pytest.mark.game, pytest.mark.skipif(GAME is None, reason="Stardew
 @pytest.fixture(scope="module")
 def fresh():
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    return new_farm(GameData(GAME))
+    return new_farm(shared_data())
 
 
 @pytest.fixture(scope="module")
@@ -21,7 +21,7 @@ def saved():
     if SAVES is None:
         pytest.skip("no save here")
     from valley_planner.app import Planner
-    return Planner(None).farm()
+    return Planner(shared_data()).farm()
 
 
 def _check(v: dict) -> None:
@@ -103,8 +103,7 @@ def test_a_picked_way_is_planned():
     from valley_planner.engine.route.needs import needs
     from valley_planner.engine.route.plan import Settings
     from valley_planner.engine.route.start import new_farm
-    from valley_planner.gamedata import GameData
-    farm = new_farm(GameData(GAME))
+    farm = new_farm(shared_data())
     base = needs(farm, ["greenhouse"], [], settings=Settings(tiles=80), cave="bats")
     choice = next(c for c in base["choices"] if any(o.get("pick") and not o.get("planned") for o in c["options"]))
     other = next(o for o in choice["options"] if o.get("pick") and not o.get("planned"))

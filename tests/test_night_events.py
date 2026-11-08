@@ -1,6 +1,7 @@
 """Overnight farm events: the roll chain, where a meteorite or statue lands, and what stops it."""
 
 import pytest
+from shared import shared_data
 
 from valley_planner.facts import night_events as ne
 
@@ -12,9 +13,8 @@ WIDTH, HEIGHT = 80, 65  # the Standard farm
 
 @pytest.fixture(scope="module")
 def data():
-    from valley_planner.app import Planner
     try:
-        return Planner(None).data
+        return shared_data()
     except RuntimeError:
         pytest.skip("no game here")
 

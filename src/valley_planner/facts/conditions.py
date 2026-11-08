@@ -81,6 +81,16 @@ def date_of(days_played: int) -> tuple[str, int, int]:
     return SEASONS[d // 28 % 4], d % 28 + 1, d // 112 + 1
 
 
+def minutes_of(t: int) -> int:
+    """A game clock time (HHMM, 2400+ after midnight) as minutes since midnight: 1330 -> 810."""
+    return t // 100 * 60 + t % 100
+
+
+def clock_of(m: int) -> int:
+    """Minutes since midnight as a game clock time (HHMM): 810 -> 1330."""
+    return m // 60 * 100 + m % 60
+
+
 CC_RESTORED_EVENT = "191393"
 
 
