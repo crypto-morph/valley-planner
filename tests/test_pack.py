@@ -101,3 +101,29 @@ def test_chests_decide_what_you_can_carry(farm, monkeypatch):
     mines = pack.build(farm, [stop("mines", "mine"), stop("pierre")])
     assert not mines["left_behind"] and "5 Spring Onion" in next(
         s for s in mines["stops"] if s["stop"] == "Pierre's")["items"]
+
+
+def test_a_bundle_item_split_across_chests_waits_if_the_route_passes_the_other_later(farm, monkeypatch):
+    """8 Bat Wings at home and 48 at the Mines: the Community Center comes first, so it's not today."""
+    from dataclasses import replace
+
+    from valley_planner.views import errands, pack
+    wings = [Item("767", "Bat Wing", 8, 0, "Farm chest", chest="lime chest"),
+             Item("767", "Bat Wing", 48, 0, "Mine chest", chest="plain chest")]
+    fake = SimpleNamespace(**{k: getattr(farm, k) for k in ("data", "bundles", "items", "gifts", "when", "path")
+                              if hasattr(farm, k)})
+    fake.save = replace(farm.save, items=wings)
+    fake.where_label, fake.place, fake.name = farm.where_label, farm.place, farm.name
+    fake.held, fake.icon = (lambda: {"(O)767": 56}), (lambda q: None)
+    monkeypatch.setattr(errands, "community_center", lambda f: {"rooms": [{"items": [
+        {"bundle": "Adventurer's", "name": "Bat Wing", "count": 10, "open": True}]}]})
+    monkeypatch.setattr(errands, "gunther", lambda f: {"take": []})
+    monkeypatch.setattr(errands, "clint", lambda f: {"geodes": []})
+    monkeypatch.setattr(errands, "birthdays", lambda f, days=0: {"birthdays": []})
+    monkeypatch.setattr(pack.quests, "view", lambda f: {"quests": []})
+    monkeypatch.setattr(pack.sell, "default", lambda f: {"sell": []})
+    first = pack.build(fake, [stop("cc"), stop("mines", "mine")])["stops"][0]
+    assert first["items"] == [] and first["short"][0]["text"] == "8 of 10 with you; 48 in plain chest, Mines (later today)"
+    mines_first = pack.build(fake, [stop("mines", "mine"), stop("cc")])["stops"]
+    cc = next(s for s in mines_first if s["key"] == "cc")
+    assert cc["items"] == ["10 Bat Wing"] and not cc["short"]

@@ -75,3 +75,17 @@ def test_the_world_endpoint_on_a_real_save():
         for ln in leg["lines"]:
             assert ln["loc"] in ids and all(len(pt) == 2 for pt in ln["points"])
     assert client.get("/world.html").status_code == 200
+
+
+def test_a_place_sums_its_goals_gold_and_activities():
+    from valley_planner.views.world import summary
+    pois = [{"loc": "Town", "layer": "route", "kind": "stop", "n": 3, "goal": "Community Center"},
+            {"loc": "Town", "layer": "places", "kind": "forage", "gold": 60, "goal": "Spring Foraging bundle"},
+            {"loc": "Town", "layer": "places", "kind": "bin", "gold": 15},
+            {"loc": "Town", "layer": "places", "kind": "forage", "gold": 500, "reach": False},  # can't get there
+            {"loc": "Town", "layer": "doors", "kind": "shop"},
+            {"loc": "Beach", "layer": "places", "kind": "bubbles"}]
+    s = summary(pois, "Town")
+    assert s["goals"] == ["Community Center", "Spring Foraging bundle"] and s["gold"] == 75
+    assert s["icons"] == ["forage", "bin"] and s["stops"] == [3]
+    assert summary(pois, "Beach") == {"goals": [], "gold": 0, "icons": ["bubbles"], "stops": []}

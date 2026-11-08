@@ -204,7 +204,7 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 @media (max-width: 640px) {
   .topbar-in { padding: 8px 12px; gap: 6px 10px; }
   .brand { display: none; }
-  .places { order: 2; flex: 1 1 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; }
+  .places { order: 2; flex: 1 1 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
   .places button { padding: 0 2px; font-size: 15px; }
   .cal-grid { gap: 2px; }
   .cal-cell { min-height: 72px; padding: 3px; }
@@ -279,7 +279,23 @@ input[type="search"], input[type="number"], input[type="time"], select, #cart-q 
 .note[open] summary::before { transform: rotate(90deg); }
 .note-why { padding: 0 12px 10px 30px; color: var(--muted); }
 .note-why p { margin: 8px 0 4px; color: var(--ink); }
-@media (max-width: 420px) { .places { grid-template-columns: repeat(6, auto); justify-content: space-between; } .places button { font-size: 14px; padding: 0 5px; } }
+@media (max-width: 420px) { .places { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 0; min-width: 0; } .places::-webkit-scrollbar { display: none; } .places button { flex: none; font-size: 14px; padding: 0 9px; } }
 .note-list li.lvl-later { border-left-color: var(--line, #D9DDD3); }
 .note-list li.lvl-soon { border-left-color: #C77700; }
 .note-list li.lvl-urgent { border-left-color: #B3261E; background: #FBE6E3; }
+.tag.green { background: #E4EFE6; color: #1F4F2E; }
+.tag.pink { background: #F8E1EC; color: #7A1E4A; }
+.cart-table tr.dim td { color: var(--muted); }
+.cart-visit { margin-bottom: 12px; }
+.view-title { margin: 0 0 4px; font-size: 26px; }
+.cart-table { table-layout: fixed; }
+.cart-table td.ic { width: 30px; }
+.cart-table td.num { width: 44px; }
+.cart-table td.num:last-child { width: 68px; }
+.cart-table td { overflow-wrap: anywhere; }
+.pack-table thead th { border-top: 0; font-size: 13px; color: var(--muted); font-weight: 700; text-align: left; padding: 4px; }
+.pack-table tr:not(.first-row):not(.short) td { border-top: 0; padding-top: 0; }
+.pack-table tr.short td { color: #8A4B00; background: #FCEFD6; }
+.glance-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+#t-satnav { margin-bottom: 16px; }
+#view-today.satnav-on > :not(.glance):not(#t-satnav):not(#t-form) { display: none !important; }

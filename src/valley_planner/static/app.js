@@ -318,7 +318,7 @@ function drawNeeds(v) {
 
 // The route as a tech tree: a lane per goal, weekly columns from today, cards coloured by the days they have
 // to spare, and the goal at the end of each lane.
-const LANE_STATUS = { ok: "On track", luck: "Down to luck", impossible: "✕ Not this year", done: "Done" };
+const LANE_STATUS = { ok: "On track", gold: "Needs more gold", luck: "Down to luck", impossible: "✕ Not this year", done: "Done" };
 
 function drawTree(v) {
   const t = v.tree, n = t.columns.length;
@@ -530,6 +530,23 @@ function loadDone(date) {
 function saveDone() {
   try { localStorage.setItem(`done:${todayDone.date}`, JSON.stringify([...todayDone])); } catch { /* fine */ }
 }
+// Satnav mode: the day as one instruction at a time on the map (static/satnav.js), instead of the page.
+let satnav = null;
+function setSatnav(on) {
+  const box = $("#t-satnav");
+  $("#t-satnav-btn").setAttribute("aria-pressed", String(on));
+  $("#t-satnav-btn").textContent = on ? "Back to the list" : "Satnav";
+  $("#view-today").classList.toggle("satnav-on", on);  // the rest of the page steps aside (ui.css)
+  box.hidden = !on;
+  try { localStorage.setItem("satnav", on ? "1" : ""); } catch { /* fine without */ }
+  if (on && !satnav && window.ValleySatnav) {
+    satnav = window.ValleySatnav.mount(box, {
+      params: { ...dayAsk, done: [...todayDone].join(","), spouse: (routeState && routeState.settings.spouse) || "" },
+      onDone: (id) => tick(id, true),
+    });
+  } else if (!on && satnav) { satnav.destroy(); satnav = null; box.innerHTML = ""; }
+}
+
 function tick(id, on) {
   if (on) todayDone.add(id); else todayDone.delete(id);
   saveDone();
@@ -581,16 +598,29 @@ function drawPack(p) {
   $("#t-pack").innerHTML = `<div class="pack-head"><h2>Pack your bag</h2><strong>${s.used} of ${s.max} slots</strong></div>` +
     (p.leave.length ? `<p class="small"><span class="tag amber">Leave in the Chest</span> ${p.leave.map(esc).join(", ")}</p>` : "") +
     (p.tools.length ? `<p class="small"><span class="tag">Keep</span> ${p.tools.map(esc).join(", ")}</p>` : "") +
-    (p.stops.length ? `<table class="pack-table"><tbody>${p.stops.map((x, i) => `<tr><td class="num">${i + 1}</td><td><strong>${esc(x.stop)}</strong>` +
-      (x.first ? `<div class="small first">${esc(x.first)}</div>` : "") +
-      (x.there.length ? `<div class="muted small">Already there: ${x.there.map(esc).join(", ")}</div>` : "") +
-      `</td><td>${x.items.map(esc).join(", ")}${x.gold ? ` <span class="muted small">about ${x.gold.toLocaleString()}g</span>` : ""}</td></tr>`).join("")}</tbody></table>` : "") +
+    (p.stops.length ? `<table class="pack-table"><thead><tr><th></th><th>Stop</th><th>Take</th><th>From</th></tr></thead><tbody>${p.stops.map((x, i) => {
+      const from = new Map((x.rows || []).map((r) => [r.label, r.from.map((f) => f.where).join("; ")]));
+      const items = (x.rows || []).length ? x.items : (x.items.length ? [x.items.join(", ")] : []);
+      const lines = items.map((it) => `<tr${items.indexOf(it) === 0 ? ' class="first-row"' : ""}><td class="num">${items.indexOf(it) === 0 ? i + 1 : ""}</td><td>${items.indexOf(it) === 0 ? `<strong>${esc(x.stop)}</strong>${x.first ? `<div class="small first">${esc(x.first)}</div>` : ""}${x.gold ? `<div class="muted small">about ${x.gold.toLocaleString()}g</div>` : ""}` : ""}</td><td>${esc(it)}</td><td class="small">${esc(from.get(it) || "")}</td></tr>`);
+      const short = (x.short || []).map((sh) => `<tr class="short"><td></td><td>${x.items.length ? "" : `<strong>${esc(x.stop)}</strong>`}</td><td>${esc(sh.label)}</td><td class="small"><strong>Not today</strong>: ${esc(sh.text)}</td></tr>`);
+      const there = x.there.length ? [`<tr><td></td><td></td><td colspan="2" class="muted small">Already in the chest there: ${x.there.map(esc).join(", ")}</td></tr>`] : [];
+      return [...lines, ...short, ...there].join("");
+    }).join("")}</tbody></table>` : "") +
     (worth.length ? `<details class="fold plain"><summary><span>Shipping bin <span class="muted">· ${worth.length} item${worth.length === 1 ? "" : "s"} · about ${p.ship_gold.toLocaleString()}g</span></span></summary>` +
       `<table class="ship-table"><thead><tr><th></th><th>Item</th><th class="num">How many</th><th class="num">Gold</th></tr></thead><tbody>${shipRows}</tbody></table>` +
       (p.dropped.length ? '<p class="muted small">"Bag full": a shop on your route would buy these, but there isn\'t room to carry them.</p>' : "") + "</details>" : "") +
     (junk.length ? `<p class="muted small">Worth nothing, so leave them in the Chest for a Recycling Machine: ${junk.map((x) => esc(x.name)).join(", ")}.</p>` : "") +
     (p.left_behind.length ? `<p class="muted small">Left behind today: ${p.left_behind.map((x) => `${x.items.map(esc).join(", ")} in the chest at ${esc(x.place)}`).join("; ")}.</p>` : "") +
     (s.free_on_purpose ? `<p class="muted small">Leaves ${s.free_on_purpose} slots free for what you pick up.</p>` : "");
+}
+
+// A goal's problems, biggest first: the gold ones by how much, then what's blocked; one shown, the rest folded.
+function problemList(problems) {
+  if (!problems || !problems.length) return "";
+  const gold = (p) => { const m = /([\d,]+)g/.exec(p); return m ? Number(m[1].replace(/,/g, "")) : 0; };
+  const sorted = [...problems].sort((a, b) => gold(b) - gold(a));
+  return `<div><strong>${esc(sorted[0])}</strong></div>` + (sorted.length > 1
+    ? `<details class="note"><summary>${sorted.length - 1} more in the way</summary><ul class="list-plain small">${sorted.slice(1).map((p) => `<li>${esc(p)}</li>`).join("")}</ul></details>` : "");
 }
 
 // One note: a line you can open for the reason (a triangle), coloured by how soon it matters.
@@ -648,9 +678,10 @@ function drawGoals(v) {
   $("#goals-head").textContent = !chosen.length ? "Choose your goals" : off.length
     ? `${off.length} of ${chosen.length} goal${chosen.length === 1 ? "" : "s"} need${off.length === 1 ? "s" : ""} attention` : "All your goals are on track";
   $("#goals-sub").textContent = chosen.length ? "In priority order. Drag to reorder them under Choose goals." : "Pick some below to get a route.";
-  const label = { ok: "On track", done: "Done", luck: "Needs luck", impossible: "Not this year", late: "Late" };
+  const label = { ok: "On track", done: "Done", gold: "Needs more gold", luck: "Needs luck", impossible: "Not this year", late: "Late" };
   $("#goal-cards").innerHTML = chosen.map((o, i) => `<section class="card goal"><div class="goal-top"><span class="muted"><strong>${i + 1}</strong></span><h2>${esc(o.label)}</h2><span class="tag ${o.status === "ok" || o.status === "done" ? "green" : "amber"}">${esc(label[o.status] || o.status)}</span></div>` +
-    (o.finish ? `<div>Planned by ${esc(o.finish)}.</div>` : "") + (o.problems[0] ? `<div>${esc(o.problems[0])}</div>` : "") + "</section>").join("");
+    (o.finish ? `<div>${o.problems.length ? "Every step done by" : "Planned by"} ${esc(o.finish)}${o.problems.length ? ", if these are solved:" : "."}</div>` : "") +
+    (o.status === "gold" ? `<div class="small">${esc(cap((o.info || []).find((x) => x.startsWith("needs about")) || ""))}</div>` : "") + problemList(o.problems) + "</section>").join("");
 }
 
 function giantCard(g) {
@@ -926,12 +957,21 @@ const views = {
   },
 
   async cart() {
-    const v = await get("/api/cart?days=14");
-    $("#cart-days").innerHTML = v.days.map((d) =>
-      `<div class="day"><h3>${esc(d.date)} <span class="sub">${esc(d.place)}</span></h3><ul class="list">` +
-      d.items.map((i) => `<li><span>${esc(i.name)}${i.stock && i.stock > 1 ? ` ×${i.stock}` : ""}${unsure(i.sure)}</span><span>${i.price.toLocaleString()}g</span></li>`).join("") +
-      "</ul></div>"
-    ).join("") || '<p class="sub">No cart in the next two weeks.</p>';
+    const v = await get(`/api/cart/tab?${new URLSearchParams({ spouse: (routeState && routeState.settings.spouse) || "" })}`);
+    const tagHtml = (t) => `<span class="tag ${t.kind === "buy" ? "green" : t.kind === "gift" ? "pink" : t.kind === "maybe" ? "amber" : ""}" title="${esc(t.why || "")}">${t.kind === "buy" ? "Buy · " : ""}${esc(t.text)}</span>${t.why ? ` <span class="muted small">${esc(t.why)}</span>` : ""}`;
+    const row = (r) => `<tr class="${r.tags.length ? "" : "dim"}"><td class="ic">${itemIcon(r.icon)}</td><td><strong>${esc(r.name)}</strong>${r.held ? ` <span class="muted small">you have ${r.held}</span>` : ""}${unsure(r.sure)}` +
+      (r.tags.length ? `<div>${r.tags.map(tagHtml).join("<br>")}</div>` : "") + `</td><td class="num">${r.stock && r.stock > 1 ? `×${r.stock}` : ""}</td><td class="num">${r.price.toLocaleString()}g</td></tr>`;
+    $("#cart-head").textContent = `Its next ${v.visits.length} visits, with what matters to you marked. You have ${v.money.toLocaleString()}g.`;
+    $("#cart-watch").innerHTML = v.cabbage && v.cabbage.level !== "green" ? `<div class="alert ${v.cabbage.level === "red" ? "red" : "amber"}"><strong>${esc(v.cabbage.title)}.</strong> ${esc(v.cabbage.text)}</div>` : "";
+    $("#cart-visits").innerHTML = v.visits.map((d, i) => {
+      const when = d.days_away === 0 ? "today" : d.days_away === 1 ? "tomorrow" : `in ${d.days_away} days`;
+      const marked = d.items.filter((r) => r.tags.length), rest = d.items.filter((r) => !r.tags.length);
+      return `<details class="fold cart-visit"${i === 0 || d.buy ? " open" : ""}><summary><span><strong>${esc(d.date.replace(/, Year \d+/, ""))}</strong> <span class="muted">· ${when} · ${esc(d.place)}</span></span>` +
+        (d.buy ? ` <span class="tag green">${d.buy} to buy · ${d.buy_gold.toLocaleString()}g</span>` : d.marked ? ` <span class="tag">${d.marked} marked</span>` : "") + `</summary>` +
+        `<table class="ship-table cart-table"><tbody>${marked.map(row).join("")}</tbody></table>` +
+        (rest.length ? `<details class="fold plain"><summary>The rest (${rest.length})</summary><table class="ship-table cart-table"><tbody>${rest.map(row).join("")}</tbody></table></details>` : "") +
+        `</details>`;
+    }).join("") || '<p class="muted">No cart in the next few weeks.</p>';
   },
 };
 
@@ -967,10 +1007,10 @@ async function busy(text, work) {
   }
 }
 const LOADING = { today: "Reading your save…", goals: "Planning the rest of the year…", farm: "Reading your farm…",
-                  people: "Looking through your chests…", calendar: "Filling in the month…" };
+                  people: "Looking through your chests…", calendar: "Filling in the month…", cart: "Looking at the cart…" };
 // Old links and pointers still land in the right place.
 const OLD = { morning: ["today"], todo: ["today"], crops: ["farm", "crops"], sell: ["farm", "sell"], cook: ["farm", "cook"],
-              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], cart: ["calendar"], ahead: ["calendar"], sprinklers: ["farm", "sprinklers"] };
+              romance: ["people"], plan: ["goals", "plan"], route: ["goals", "route"], ahead: ["calendar"], sprinklers: ["farm", "sprinklers"] };
 const SUBS = { sprinklers: () => views.sprinklers(), crops: () => views.crops(), sell: () => views.sell(), cook: () => views.cook(), route: () => views.route(), plan: () => views.plan() };
 
 let sprinklerView = null;
@@ -1000,8 +1040,13 @@ function showSub(name) {
 
 let worldMap = null;
 const places = {
+  async cart() {
+    if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
+    await views.cart();
+  },
   async today() {
     await views.dayPlan(dayAsk);  // the plan first: the rest fills in behind it, without holding the page up
+    try { if (localStorage.getItem("satnav") === "1" && !satnav) setSatnav(true); } catch { /* fine without */ }
     views.morning().catch(() => {});
     views.todo().catch(() => {});
   },
@@ -1038,7 +1083,7 @@ const places = {
   },
   async calendar() {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
-    const [day] = await Promise.all([lastDay ? lastDay : views.dayPlan().then(() => lastDay), drawMonth(calMonth.offset), views.cart()]);
+    const [day] = await Promise.all([lastDay ? lastDay : views.dayPlan().then(() => lastDay), drawMonth(calMonth.offset)]);
     $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${placeLink(b.place, b.spots)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
     $("#a-geodes").innerHTML = day.geodes.length ? day.geodes.map((g) => `<div>#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(", or ")}</div>`).join("") : '<p class="muted">No geodes held.</p>';
   },
@@ -1172,6 +1217,7 @@ async function start() {
 start();
 
 $("#t-recalc").addEventListener("click", () => { $("#t-form").hidden = !$("#t-form").hidden; });
+$("#t-satnav-btn").addEventListener("click", () => setSatnav(!satnav));
 $("#t-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const ask = {};

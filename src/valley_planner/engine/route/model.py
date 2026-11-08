@@ -65,7 +65,7 @@ class Outcome:
     label: str
     tier: str
     deadline: int
-    status: str = "ok"  # ok / late / impossible
+    status: str = "ok"  # ok / gold (only short of gold, and it could be earned) / luck / late / impossible
     finish: int | None = None
     steps: list[Step] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)

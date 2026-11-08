@@ -13,6 +13,7 @@ counted as achievable. Skills other than Farming are assumed reached, and said s
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import replace
 
 from ...facts import romance
@@ -529,11 +530,38 @@ class Router:
             return [u for u in self.planner.unlocks.chain("tool:Axe@2") if u.key not in self.have]
         return []
 
+    SPARE_SHARE = 1.0  # of the days left, how many could go on earning more (fishing at the plan's rate): all of
+    # them, so "impossible" means even fishing every day couldn't earn it
+
+    def status_of(self, out: Outcome) -> str:
+        """Money comes quickly in this game, so a goal held up only by gold isn't impossible: it "needs more gold"
+        while the shortfall could still be earned in the days left, fishing at the plan's own rate.
+        Missed seasons and carts, unlocks that can't come in time, Robin and Clint's queues: those are impossible."""
+        hard = [p for p in out.problems if "only by luck" not in p and not _money(p)]
+        if hard:
+            return "impossible"
+        money = [p for p in out.problems if _money(p)]
+        if not money:
+            return "luck"
+        short = sum(_short(p) for p in money)
+        days = max(0, out.deadline - self.today)
+        can = int(days * self.SPARE_SHARE) * self.s.fish_gold
+        if short <= can:
+            days_fishing = -(-short // max(1, self.s.fish_gold))
+            out.info.append(f"needs about {short:,}g more than the plan earns by {self.farm.label(out.deadline)}: "
+                            f"about {days_fishing} days of fishing, or a better harvest, would cover it")
+            return "gold"
+        out.problems.append(f"the gold: about {short:,}g more than fishing every day left ({days} days) could "
+                            f"earn by {self.farm.label(out.deadline)}")
+        return "impossible"
+
     def pay_vault(self, gold: int, out: Outcome, placed: list) -> None:
         res = self.result()
         day = next((d.day for d in res.days if self.result([(d.day, gold)]).lowest_from(d.day) >= 0), None)
         if day is None or day > out.deadline:
-            out.problems.append(f"the Vault's {gold:,}g isn't there by {self.farm.label(out.deadline)}")
+            have = max((d.cash for d in res.days if d.day <= out.deadline), default=0)
+            out.problems.append(f"the Vault's {gold:,}g isn't there by {self.farm.label(out.deadline)} "
+                                f"(about {max(0, gold - have):,}g short)")
             out.misses.append((f"the Vault ({gold:,}g)", f"the gold isn't there by {self.farm.label(out.deadline)}"))
             return
         self.spends.append((day, gold))
@@ -600,7 +628,7 @@ class Router:
         self.misses, self.info = [], []
         firsts = [self.outcomes[n] for n in (OBJECTIVES[oid].needs if oid in OBJECTIVES else ())
                   if n in self.outcomes]
-        stuck = [o for o in firsts if o.status != "done" and (o.status != "ok" or o.finish is None)]
+        stuck = [o for o in firsts if o.status != "done" and (o.status not in ("ok", "gold") or o.finish is None)]
         if stuck:  # nothing here can happen until they do
             for o in stuck:
                 out.misses.append((o.label, f"needed first, and it isn't planned in time ({o.status})"))
@@ -663,7 +691,7 @@ class Router:
         out.steps = [s for s, _ in sorted(placed, key=lambda p: p[0].day)]
         out.finish = max((s.ready for s in out.steps), default=None)
         if out.problems:
-            out.status = "impossible" if any("only by luck" not in p for p in out.problems) else "luck"
+            out.status = self.status_of(out)
         if oid == "greenhouse" and not out.problems and out.finish:
             self.greenhouse_day = out.finish + 1
         if oid == "seed_maker" and not out.problems and out.finish:
@@ -703,7 +731,7 @@ def route(farm, targets: list[str], nice: list[str] = (), *, settings: Settings 
         plans = [_route(farm, targets, nice, settings, deadlines, c) for c in ("bats", "mushrooms")]
 
         def score(p):
-            ok = [o["status"] == "ok" for o in p["objectives"]]
+            ok = [o["status"] in ("ok", "gold") for o in p["objectives"]]
             return (sum(ok[:len(targets)]), sum(ok[len(targets):]), p["end_cash"])
 
         best = max(plans, key=score)
@@ -772,3 +800,13 @@ def _route(farm, targets, nice, settings, deadlines, cave) -> dict:
         "end_cash": res.days[-1].cash if res.days else 0,
         "days": {k: sum(1 for w, _ in r.busy.values() if w == k) for k in ("chop", "mine", "fish")},
     }
+
+
+def _money(problem: str) -> bool:
+    """A problem that's only about gold (a shortfall, the cash all spoken for, the Vault)."""
+    return "g short" in problem or "cash is all committed" in problem or "pay the Vault first" in problem
+
+
+def _short(problem: str) -> int:
+    m = re.search(r"about ([\d,]+)g short", problem)
+    return int(m.group(1).replace(",", "")) if m else 0

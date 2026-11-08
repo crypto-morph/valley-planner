@@ -762,6 +762,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     now = _minutes(time) if time is not None else START
     power = energy if energy is not None else s.stamina
     pos = (where, *_anchor(walker, where)) if where and where != "Farm" else ("Farm", *FARMHOUSE_DOOR)
+    start = pos
     plan: list[dict] = []
     left: list[dict] = []
     legs: list[tuple[int, list]] = []  # (the stop it leads to, the tiles walked)
@@ -912,6 +913,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             if best[1] < len(plan):
                 plan[best[1]].setdefault("extras", []).append(row)
     left = [{k: x[k] for k in ("title", "why")} for x in left if x.get("id") not in placed]
+    for i, path in legs:  # the walk as one instruction at a time, for the satnav (static/satnav.js)
+        if i < len(plan):
+            plan[i]["steps"] = walker.steps(path, farm.place)
     spare = max(0, power - RESERVE)
     hours = max(0, FINISH - now)
     casts = min(int(spare // tools.cast(s.skills.get("fishing", 0))), hours // CAST_MINUTES)
@@ -925,6 +929,13 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     coming: dict[str, dict] = {}
     for row in levels.forecast(farm):  # soonest first, so each skill keeps its next level
         coming.setdefault(row["skill"], row)
+    bag = pack.build(farm, plan, spouse)
+    for st in bag["stops"]:  # a stop's words shouldn't promise what you won't have with you
+        row = next((r for r in plan if r["id"] == st.get("key")), None)
+        if row is not None and st.get("short"):
+            if st["key"] == "cc" and st["items"]:
+                row["why"] = "hand in " + ", ".join(st["items"])
+            row["why"] += "; not today: " + "; ".join(f"{x['label']} ({x['text']})" for x in st["short"])
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [_note(x) for x in (_board_note(farm), tv_note, doomed_note(farm, lost),
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
@@ -934,10 +945,11 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "pace": round(walker.pace / NEW_PLAYER_PACE, 2),
             "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
             "giant": _giant_watch(farm),
-            "pack": pack.build(farm, plan, spouse),
+            "pack": bag,
             "bubbles": _all_bubbles(farm),
             "home": clock(now + walker.minutes(home)) if home else "",
             "route": [{"stop": i, "lines": polylines(path)} for i, path in legs],
+            "start": list(start), "home_steps": walker.steps(home, farm.place) if home else [],
             "skills": [{"name": k.name, "level": k.level, "xp": k.xp, "next": k.next_xp, "to_go": k.to_go,
                         "share": round(k.share, 3), "ways": list(k.ways), "coming": coming.get(k.name)}
                        for k in skills.progress(s.experience)],

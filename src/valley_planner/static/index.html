@@ -18,6 +18,7 @@
         <button type="button" data-view="people">People</button>
         <button type="button" data-view="goals">Goals</button>
         <button type="button" data-view="calendar">Calendar</button>
+        <button type="button" data-view="cart">Cart</button>
         <button type="button" data-view="map">Map</button>
       </nav>
       <label class="find">
@@ -45,7 +46,10 @@
         </div>
         <div class="meter" id="t-energy"></div>
         <div class="gold"><span class="muted">Gold</span><strong id="t-gold"></strong></div>
-        <button type="button" id="t-recalc" class="btn line">Recalculate</button>
+        <div class="glance-btns">
+          <button type="button" id="t-satnav-btn" class="btn line" aria-pressed="false">Satnav</button>
+          <button type="button" id="t-recalc" class="btn line">Recalculate</button>
+        </div>
       </div>
       <form id="t-form" class="recalc" hidden>
         <div class="recalc-title">Off plan? Tell it where you've got to.</div>
@@ -55,6 +59,7 @@
         <button type="submit" class="btn">Replan my day</button>
         <button type="button" id="t-reset" class="btn quiet">Back to this morning</button>
       </form>
+      <div id="t-satnav" hidden></div>
       <div id="t-warning" class="alert amber" role="status" hidden></div>
       <div id="t-giant" hidden></div>
       <div id="t-notes" class="day-notes" hidden></div>
@@ -278,6 +283,32 @@
 
     <section id="view-map" class="view" hidden><div id="world"></div></section>
 
+    <section id="view-cart" class="view" hidden>
+      <div class="cols">
+        <div class="col-main">
+          <h1 class="view-title">The Traveling Cart</h1>
+          <p class="sub" id="cart-head"></p>
+          <div id="cart-watch"></div>
+          <div id="cart-visits"></div>
+        </div>
+        <aside class="col-side">
+          <section class="card">
+            <h2>When is it at the cart?</h2>
+            <div class="askbox-field">
+              <input id="cart-q" type="search" autocomplete="off" placeholder="Red Cabbage, Rare Seed, Truffle…" />
+            </div>
+            <div id="cart-hits"></div>
+          </section>
+          <section class="card"><h2>What the marks mean</h2><ul class="list-plain small">
+            <li><span class="tag green">Buy</span> a bundle item the cart is your way to get (the other way is out of reach, or this is your one chance in time)</li>
+            <li><span class="tag amber">Optional</span> the bundle takes some of its items, not all: others could fill it instead</li>
+            <li><span class="tag">Bundle</span> still needed, but the plan has a cheaper way</li>
+            <li><span class="tag pink">Gift</span> your sweetheart loves it</li>
+          </ul><p class="muted small">Everything else on the cart is dear: you'd only buy it if it's rare.</p></section>
+        </aside>
+      </div>
+    </section>
+
     <section id="view-calendar" class="view" hidden>
       <div><h1 id="cal-head">Calendar</h1><div class="muted" id="cal-sub"></div></div>
       <div id="cal-watch"></div>
@@ -298,14 +329,6 @@
           <section class="card"><h2>Important this month</h2><div id="cal-important"></div></section>
           <section class="card"><h2>Today's bubbles</h2><div id="a-bubbles"></div></section>
           <section class="card"><h2>Your next geodes</h2><div id="a-geodes"></div></section>
-          <section class="card">
-            <h2>When is it at the cart?</h2>
-            <div class="askbox-field">
-              <input id="cart-q" type="search" autocomplete="off" placeholder="Red Cabbage, Rare Seed, Truffle…" />
-            </div>
-            <div id="cart-hits"></div>
-          </section>
-          <details class="fold"><summary>Full stock, next visits</summary><div id="cart-days"></div></details>
           <details class="fold"><summary>What the icons mean</summary><div id="cal-key" class="cal-key"></div></details>
         </aside>
       </div>
@@ -315,6 +338,7 @@
   <footer class="foot"><span id="status">Reading your save…</span> · Reads your own save and your own copy of the game. Not affiliated with ConcernedApe.</footer>
   <script src="/static/map.js"></script>
   <script src="/static/world.js"></script>
+  <script src="/static/satnav.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

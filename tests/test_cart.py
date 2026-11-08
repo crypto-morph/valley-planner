@@ -116,3 +116,36 @@ def test_real_cart_seen_in_a_game():
                    ("Chub", 800, 1), ("Copper Bar", 600, 1), ("Cheese Cauliflower", 1500, 5),
                    ("Eggplant Parmesan", 800, 1), ("Stuffing", 800, 1), ("Escargot", 800, 1),
                    ("'Spires'", 250, 1), ("Rarecrow", 4000, 1)]
+
+
+def test_cart_tab_marks_only_what_the_cart_should_be_bought_for(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    from valley_planner.engine import cc
+    from valley_planner.views import cart as cart_view
+    slots = [{"item": "(O)88", "bundle": "Exotic Foraging", "status": "need", "count": 1,
+              "best": {"kind": "forage", "label": "forage at Calico Desert", "blocked": ["the bus (the Vault)"]}},
+             {"item": "(O)432", "bundle": "Artisan", "status": "need", "count": 1,
+              "best": {"kind": "machine", "label": "a Oil Maker", "blocked": ["a Oil Maker"]}}]
+    monkeypatch.setattr(cc, "plan", lambda farm: {"slots": slots})
+    monkeypatch.setattr("valley_planner.views.month.red_cabbage", lambda farm: None)
+    items = [NS(item="(O)88", name="Coconut", price=600, stock=1, sure=True),
+             NS(item="(O)432", name="Truffle Oil", price=5325, stock=1, sure=True),
+             NS(item="(O)388", name="Wood", price=600, stock=1, sure=True)]
+    day = NS(days_played=33, label="Summer 5, Year 1", place="Forest", items=items)
+    exotic = NS(display="Exotic Foraging", done=False, slots=5,
+                ingredients=[NS(item=f"(O){i}", given=False) for i in (88, 90, 78, 420, 422, 724, 725, 726, 257)])
+    farm = NS(save=NS(money=3000, cart_guarantee=0), when=NS(days_played=28), held=lambda: {},
+              bundles=NS(all=[exotic]),
+              cart=NS(days=lambda *a, **k: iter([day])), place=lambda p: "Cindersap Forest",
+              gifts=NS(taste=lambda who, q: None), icon=lambda q: None,
+              name=lambda q: {"(O)88": "Coconut", "(O)432": "Truffle Oil", "(O)388": "Wood"}.get(q, q))
+    v = cart_view.tab(farm)["visits"][0]
+    tags = {r["name"]: [t["kind"] for t in r["tags"]] for r in v["items"]}
+    # Exotic Foraging takes 5 of 9, so the Coconut is optional; a machine to build isn't a reason to buy either
+    assert tags == {"Coconut": ["maybe"], "Truffle Oil": ["cc"], "Wood": []}
+    assert v["buy"] == 0
+    exotic.slots = 9  # every item needed: now the cart's Coconut saves waiting for the bus
+    v = cart_view.tab(farm)["visits"][0]
+    assert v["buy"] == 1 and v["buy_gold"] == 600 and "waits for the bus" in v["items"][0]["tags"][0]["why"]
+    assert "an Oil Maker" in v["items"][1]["tags"][0]["why"]

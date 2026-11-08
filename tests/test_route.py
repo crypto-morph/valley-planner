@@ -303,3 +303,23 @@ def test_clint_one_tool_at_a_time():
         r.objective(goal, "target")
     jobs = sorted(r.clint)
     assert len(jobs) >= 2 and all(a[1] <= b[0] for a, b in zip(jobs, jobs[1:], strict=False))
+
+
+def test_short_of_gold_is_not_impossible_until_no_amount_of_fishing_would_do():
+    from types import SimpleNamespace as NS
+
+    from valley_planner.engine.route.model import Outcome
+    from valley_planner.engine.route.plan import Router
+    me = NS(today=28, s=NS(fish_gold=300), farm=NS(label=lambda d: f"day {d}"), SPARE_SHARE=Router.SPARE_SHARE)
+
+    def status(*problems, deadline=112):
+        out = Outcome("cc", "The Community Center", "target", deadline=deadline)
+        out.problems = list(problems)
+        return Router.status_of(me, out), out
+
+    st, out = status("Duck Feather (Dye): about 377g short by Fall 7, Year 1",
+                     "Cactus Fruit (Exotic Foraging): needs the bus to the Desert (pay the Vault first)")
+    assert st == "gold" and "377g more" in out.info[0]
+    assert status("Rabbit's Foot (Enchanter's): about 90,000g short by Summer 25, Year 1")[0] == "impossible"
+    assert status("Red Cabbage (Dye): not in time: the cart doesn't sell it again until Year 2")[0] == "impossible"
+    assert status("Iridium Bar (Blacksmith's): only by luck, about 40%")[0] == "luck"

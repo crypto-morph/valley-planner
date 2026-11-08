@@ -50,7 +50,43 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
     stops: dict[str, dict] = {}
 
     def stop(key: str, name: str) -> dict:
-        return stops.setdefault(key, {"stop": name, "first": "", "items": [], "there": [], "gold": 0})
+        return stops.setdefault(key, {"key": key, "stop": name, "first": "", "items": [], "there": [], "gold": 0,
+                                      "rows": [], "short": []})
+
+    def reach_before(key: str) -> set[str]:
+        """Chests you pass before reaching stop `key`: home and the bag always, plus chests at earlier stops."""
+        before = order[:order.index(key)] if key in order else order
+        return {STOP_CHESTS[k] for k in before if k in STOP_CHESTS}
+
+    def take(key: str, name: str, count: int, label: str) -> bool:
+        """Add an item to stop `key` with where each part comes from. False (and a 'short' line instead) when the
+        chests you pass on the way don't hold enough, so it waits for another day."""
+        entry = stop(key, STOP_NAMES.get(key, key))
+        ok_places = reach_before(key)
+        parts: dict[str, list] = {}
+        for it in s.items:
+            if it.name == name and (is_home(it.where) or it.where in ok_places or it.where.endswith(" chest")):
+                where = farm.where_label(it.where, it.chest).replace(f"({farm.place('Farm')})", "(farm)")
+                where = where.removeprefix("the ").replace(" (", ", ").removesuffix(")")
+                part = parts.setdefault(where, [0, is_home(it.where) or it.where in ok_places, it.where])
+                part[0] += it.stack
+        usable = sum(n for n, ok, _raw in parts.values() if ok)
+        rows = [{"where": w, "count": n, "on_route": ok, "raw": raw}
+                for w, (n, ok, raw) in sorted(parts.items(), key=lambda kv: not kv[1][1])]
+        if count and usable < count:
+            after = order[order.index(key) + 1:] if key in order else []
+            later = {STOP_CHESTS[k] for k in after if k in STOP_CHESTS}
+            off = [r for r in rows if not r["on_route"]]
+            where = "; ".join(f"{r['count']} in {r['where']}" for r in off)
+            comes = any(r["raw"] in later for r in off)
+            entry["short"].append({"label": label, "have": usable, "need": count,
+                                   "text": f"{usable} of {count} with you" + (
+                                       f"; {where} (later today)" if comes else f"; {where}" if where else "")})
+            return False
+        entry["items"].append(label)
+        entry["rows"].append({"label": label, "from": [{k: r[k] for k in ("where", "count")} for r in rows
+                                                       if r["on_route"]]})
+        return True
 
     def known(key: str) -> bool:
         return key in order
@@ -78,17 +114,16 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
                 entry = stop("cc", STOP_NAMES["cc"])
                 if i["name"] in in_cc:
                     entry["there"].append(label)
-                else:
-                    entry["items"].append(label)
+                elif take("cc", i["name"], i["count"], label):
                     taken.add(i["name"])
     if known("museum"):
         for t in errands.gunther(farm)["take"]:
-            stop("museum", STOP_NAMES["museum"])["items"].append(t["name"])
-            taken.add(t["name"])
+            if take("museum", t["name"], 1, t["name"]):
+                taken.add(t["name"])
     if known("clint"):
         for g in errands.clint(farm)["geodes"]:
-            stop("clint", STOP_NAMES["clint"])["items"].append(f"{g['held']} {g['name']}")
-            taken.add(g["name"])
+            if take("clint", g["name"], 0, f"{g['held']} {g['name']}"):
+                taken.add(g["name"])
     for q in quests.view(farm)["quests"]:
         if q["deliver_to"] and q["item"]:
             key = WHO_STOP.get(q["deliver_to"], f"give:{q['deliver_to']}")
@@ -157,7 +192,8 @@ def build(farm: Farm, plan: list[dict], spouse: str = "") -> dict:
         if key.startswith("give:"):
             rank[key] = len(order)
     ordered = sorted(stops.items(), key=lambda kv: rank.get(kv[0], len(order)))
-    return {"leave": leave, "tools": tool_names, "stops": [v for _k, v in ordered if v["items"] or v["there"]],
+    kept = [v for _k, v in ordered if v["items"] or v["there"] or v["short"]]
+    return {"leave": leave, "tools": tool_names, "stops": kept,
             "left_behind": [{"place": farm.place(k), "items": v} for k, v in stranded.items()],
             "ship": ship, "ship_gold": sum(x["gold"] for x in ship), "dropped": [x["name"] for x in ship
                                                                                  if x.get("no_room")],

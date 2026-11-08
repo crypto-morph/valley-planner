@@ -60,7 +60,18 @@
 .vw-place .vw-count { font-size: 12px; font-weight: 700; min-width: 20px; padding: 1px 6px; border-radius: 999px;
   background: rgba(0,0,0,.08); text-align: center; }
 .vw-place[aria-pressed="true"] .vw-count { background: rgba(255,255,255,.22); }
-.vw-place .vw-route-dot { width: 8px; height: 8px; border-radius: 50%; background: ${ROUTE}; }
+.vw-place .vw-route-dot { width: 8px; height: 8px; border-radius: 50%; background: ${ROUTE}; flex: none; }
+.vw-card { flex-direction: column; align-items: stretch; gap: 2px; width: 196px; border-radius: 10px; padding: 8px 10px;
+  text-align: left; white-space: normal; }
+.vw-card-head { display: flex; align-items: center; gap: 6px; }
+.vw-card-head strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vw-card-icons { display: inline-flex; gap: 2px; margin-right: 6px; vertical-align: -3px; }
+.vw-card-icons span, .vw-card-icons svg { width: 16px; height: 16px; display: block; }
+.vw-card-facts { font-size: 13px; color: var(--vw-muted); }
+.vw-card-goals { font-size: 12px; font-weight: 700; color: var(--vw-accent); }
+.vw-place[aria-pressed="true"] .vw-card-facts, .vw-place[aria-pressed="true"] .vw-card-goals,
+.vw-place[aria-pressed="true"] .vw-card-icons span { color: #fff !important; }
+.vw-locked { opacity: .6; }
 .vw-place[aria-pressed="true"] .vw-route-dot { background: #fff; }
 .vw-view { position: relative; overflow: hidden; height: min(68vh, 640px); min-height: 280px; border-radius: 10px;
   background: #1b1b1b; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; outline: none; }
@@ -669,11 +680,23 @@
     function renderPlaces() {
       const onRoute = new Set(state.data.route.flatMap((l) => l.lines.map((ln) => ln.loc)));
       places.replaceChildren(...state.data.locations.map((l) => {
-        const b = el("button", { type: "button", class: "vw-place", "aria-pressed": String(l.id === state.loc),
-          onclick: () => show(l.id) },
-          onRoute.has(l.id) ? el("span", { class: "vw-route-dot", title: "On today's route" }) : null,
-          el("span", { text: l.name }),
-          l.count ? el("span", { class: "vw-count", "aria-label": `${l.count} places`, text: String(l.count) }) : null);
+        // a card a place: is it worth the walk today? goals it moves on, gold lying about, what's happening there
+        const goals = l.goals || [], icons = l.icons || [];
+        const facts = [l.stops && l.stops.length ? `Stop${l.stops.length > 1 ? "s" : ""} ${l.stops.join(", ")}` : "",
+          goals.length ? `${goals.length} goal${goals.length > 1 ? "s" : ""}` : "", l.gold ? `${l.gold.toLocaleString()}g to pick up` : ""]
+          .filter(Boolean).join(" · ");
+        const b = el("button", { type: "button", class: `vw-place vw-card${l.locked ? " vw-locked" : ""}`,
+          "aria-pressed": String(l.id === state.loc), onclick: () => show(l.id),
+          title: [goals.length ? `Goals: ${goals.join(", ")}` : "", l.locked ? `Needs ${l.locked}` : ""].filter(Boolean).join("\n") },
+          el("span", { class: "vw-card-head" },
+            onRoute.has(l.id) ? el("span", { class: "vw-route-dot", title: "On today's route" }) : null,
+            el("strong", { text: l.name })),
+          el("span", { class: "vw-card-facts" },
+            icons.length ? el("span", { class: "vw-card-icons" }, ...icons.map((k) => {
+              const g = glyph(k); g.style.color = (KINDS[k] || {}).color || "currentColor"; g.title = (KINDS[k] || {}).label || k; return g;
+            })) : null,
+            el("span", { text: l.locked ? `Needs ${l.locked}` : facts || "Nothing special today" })),
+          goals.length && !l.locked ? el("span", { class: "vw-card-goals", text: goals.join(" · ") }) : null);
         return b;
       }));
       const current = places.querySelector('[aria-pressed="true"]');

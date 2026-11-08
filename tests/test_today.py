@@ -245,7 +245,7 @@ def test_the_show_comes_first_at_home_and_is_only_a_note_when_away(data):
     assert today.view(farm)["plan"][0]["id"] == "tv"
     assert today.view(farm, done={"tv"})["plan"][0]["id"] != "tv"
     away = today.view(farm, time=1100, where="Town", done={"water", "plant", "harvest"})
-    assert not [x for x in away["plan"] if x["id"] == "tv"] and any("Queen of Sauce" in n for n in away["notes"])
+    assert not [x for x in away["plan"] if x["id"] == "tv"] and any("Queen of Sauce" in n["text"] + n["why"] for n in away["notes"])
 
 
 def test_a_person_indoors_is_a_stop_at_the_door(data, monkeypatch):

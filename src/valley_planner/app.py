@@ -127,6 +127,10 @@ def create_app(planner: Planner | None = None) -> FastAPI:
     def cart_view(days: int = 14) -> dict:
         return cart.upcoming(p().farm(), max(1, min(days, 56)))
 
+    @app.get("/api/cart/tab")
+    def cart_tab(spouse: str = "") -> dict:
+        return cart.tab(p().farm(), spouse)
+
     @app.get("/api/cart/search")
     def cart_search(q: str = "") -> dict:
         return cart.search(p().farm(), q[:40])
@@ -294,6 +298,11 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         """Today on the valley's maps: places of interest and the planned walk (static/world.js)."""
         return FileResponse(STATIC / "world.html")
 
+    @app.get("/satnav.html")
+    def satnav_page() -> FileResponse:
+        """Today as a satnav: one instruction at a time on the map (static/satnav.js)."""
+        return FileResponse(STATIC / "satnav.html")
+
     @app.get("/api/world")
     def world_view(time: int | None = None, energy: int | None = None, where: str = "", done: str = "",
                    spouse: str = "") -> dict:
@@ -364,7 +373,8 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         """The page and its files are checked with the server on every load (a quick 'not changed' when they
         haven't), so an update shows at once instead of a browser's cached copy."""
         response = await call_next(request)
-        if request.url.path in ("/", "/map.html", "/world.html") or request.url.path.startswith("/static/"):
+        pages = ("/", "/map.html", "/world.html", "/satnav.html")
+        if request.url.path in pages or request.url.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-cache"
         return response
     return app

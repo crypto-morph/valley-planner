@@ -170,11 +170,64 @@ class Walker:
             leaving = j + 1 < len(path)
             words = ", then ".join(f"{d} {n}" for d, n in legs)
             if leaving:
-                out.append((f"{words}, then " if words else "") + f"out the {_edge(path[j], self.grids)} edge "
-                           f"to {place(path[j + 1][0])}")
+                w, h, _ = self.grids[path[j][0]]
+                x, y = path[j][1], path[j][2]
+                if min(x, y, w - 1 - x, h - 1 - y) > 1:  # a way out inside the map (the Bus Stop's to Town)
+                    back = path[max(i, j - 3)]
+                    out.append((f"{words}, then " if words else "") + f"on {_heading(x - back[1], y - back[2])} "
+                               f"into {place(path[j + 1][0])}")
+                else:
+                    out.append((f"{words}, then " if words else "") + f"out the {_edge(path[j], self.grids)} edge "
+                               f"to {place(path[j + 1][0])}")
             elif words:
                 out.append(words)
             i = j + 1
+        return out
+
+    def steps(self, path: list[Node], place=lambda n: n) -> list[dict]:
+        """The walk as satnav steps, one instruction each (static/satnav.js): a compass leg ("walk"), the edge you
+        leave a map by ("exit"), and the door you go in at when the walk ends at one ("door"). Each is
+        {kind, loc, from: [x, y], to: [x, y], heading, tiles, minutes, points (turning tiles, for drawing), text};
+        an exit also has `onto`, the next map. The legs and their tile counts are the ones `directions` says."""
+        out: list[dict] = []
+        i = 0
+        while i < len(path):
+            j = i
+            while j + 1 < len(path) and path[j + 1][0] == path[i][0]:
+                j += 1
+            loc = path[i][0]
+            seg = [(n[1], n[2]) for n in path[i:j + 1]]
+            last = 0
+            for k, (d, n, a, b) in enumerate(_spans(seg)):
+                part = path[i + a:i + b + 1]
+                out.append({"kind": "walk", "loc": loc, "from": list(seg[a]), "to": list(seg[b]), "heading": d,
+                            "tiles": n, "minutes": self.minutes(part), "points": polylines(part)[0]["points"],
+                            "text": f"{'Turn' if k else 'Head'} {d} for {n} tile{'s' if n != 1 else ''}"})
+                last = b
+            if j + 1 < len(path):
+                edge, onto = _edge(path[j], self.grids), path[j + 1][0]
+                part = path[i + last:j + 1]
+                (fx, fy), (tx, ty) = seg[last], seg[-1]
+                w, h, _ = self.grids[loc]
+                text = f"Leave by the {edge} edge to {place(onto)}"
+                if min(tx, ty, w - 1 - tx, h - 1 - ty) > 1:  # a way out inside the map (the Bus Stop's to Town)
+                    (ax, ay) = seg[max(0, len(seg) - 4)]
+                    edge = _heading(tx - ax, ty - ay)
+                    text = f"Go on {edge} into {place(onto)}"
+                out.append({"kind": "exit", "loc": loc, "from": [fx, fy], "to": [tx, ty], "heading": edge,
+                            "tiles": max(abs(tx - fx), abs(ty - fy)), "minutes": self.minutes(part),
+                            "points": polylines(part)[0]["points"], "onto": onto, "text": text})
+            i = j + 1
+        if path:
+            loc, x, y = path[-1]
+            doors = [m for m in self.landmarks.get(loc, []) if not m.name.startswith("Garbage:")
+                     and abs(m.x - x) <= 1 and -2 <= m.y - y <= -1]  # a door just above where the walk ends
+            if doors:
+                m = min(doors, key=lambda k: abs(k.x - x) + abs(k.y - y))
+                out.append({"kind": "door", "loc": loc, "from": [x, y], "to": [m.x, m.y],
+                            "heading": _heading(m.x - x, m.y - y), "tiles": 0, "minutes": 0,
+                            "points": [[x, y], [m.x, m.y]], "door": m.name,
+                            "text": f"Go in at {place(m.name)}"})
         return out
 
     def near(self, loc: str, tile: tuple[int, int], place=lambda n: n) -> str:
@@ -192,11 +245,13 @@ class Walker:
         return f"{where} of {place(m.name)}'s door" if where else f"at {place(m.name)}'s door"
 
 
-def _legs(tiles: list[tuple[int, int]]) -> list[tuple[str, int]]:
-    """A tile route as compass legs (diagonals too), ignoring wiggles."""
-    legs: list[tuple[str, int]] = []
-    for a, b in zip(tiles[::CHUNK], [*tiles[CHUNK::CHUNK], tiles[-1]], strict=False):
-        dx, dy = b[0] - a[0], b[1] - a[1]
+def _spans(tiles: list[tuple[int, int]]) -> list[tuple[str, int, int, int]]:
+    """A tile route as compass legs (diagonals too), ignoring wiggles: (direction, tiles, first index, last index).
+    The legs run end to end over the whole route: a dropped wiggle's tiles join a leg beside it."""
+    legs: list[list] = []
+    for ia, ib in zip(range(0, len(tiles), CHUNK), [*range(CHUNK, len(tiles), CHUNK), len(tiles) - 1], strict=False):
+        (ax, ay), (bx, by) = tiles[ia], tiles[ib]
+        dx, dy = bx - ax, by - ay
         ns, ew = ("south" if dy > 0 else "north"), ("east" if dx > 0 else "west")
         if not dx and not dy:
             continue
@@ -206,18 +261,37 @@ def _legs(tiles: list[tuple[int, int]]) -> list[tuple[str, int]]:
             d = ew if abs(dx) > abs(dy) else ns
         n = max(abs(dx), abs(dy))
         if legs and legs[-1][0] == d:
-            legs[-1] = (d, legs[-1][1] + n)
+            legs[-1][1] += n
+            legs[-1][3] = ib
         else:
-            legs.append((d, n))
-    kept: list[tuple[str, int]] = []
-    for d, n in legs:  # dropping a wiggle can leave two legs the same way
+            legs.append([d, n, ia, ib])
+    kept: list[list] = []
+    for d, n, a, b in legs:  # dropping a wiggle can leave two legs the same way
         if n < 3:
             continue
         if kept and kept[-1][0] == d:
-            kept[-1] = (d, kept[-1][1] + n)
+            kept[-1][1] += n
+            kept[-1][3] = b
         else:
-            kept.append((d, n))
-    return kept
+            kept.append([d, n, a, b])
+    for k, leg in enumerate(kept):
+        leg[2] = kept[k - 1][3] if k else 0
+    if kept:
+        kept[-1][3] = len(tiles) - 1
+    return [(d, n, a, b) for d, n, a, b in kept]
+
+
+def _legs(tiles: list[tuple[int, int]]) -> list[tuple[str, int]]:
+    """A tile route as compass legs (diagonals too), ignoring wiggles."""
+    return [(d, n) for d, n, _, _ in _spans(tiles)]
+
+
+def _heading(dx: int, dy: int) -> str:
+    """The compass way from one tile to another, to the nearest eighth."""
+    ns, ew = ("south" if dy > 0 else "north" if dy < 0 else ""), ("east" if dx > 0 else "west" if dx < 0 else "")
+    if ns and ew and min(abs(dx), abs(dy)) * SLANT < max(abs(dx), abs(dy)):
+        return ew if abs(dx) > abs(dy) else ns
+    return ns + ew or "north"
 
 
 def _edge(node: Node, grids: dict) -> str:

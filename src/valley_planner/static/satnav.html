@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Valley Satnav</title>
+  <link rel="stylesheet" href="/static/ui.css" />
+  <style>
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--bg, #F3F4EE); color: var(--ink, #1C2620);
+           font: 15px var(--font, "Atkinson Hyperlegible", Verdana, system-ui, sans-serif); overflow-x: hidden; }
+    main { max-width: 1100px; height: 100%; margin: 0 auto; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; }
+    #satnav { flex: 1 1 auto; min-height: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="satnav"></div>
+  </main>
+  <script src="/static/map.js"></script>
+  <script src="/static/satnav.js"></script>
+  <script>
+    // /satnav.html?time=900&energy=120&where=Town&done=water,harvest&spouse=Penny (all optional, as for /api/today)
+    // "Arrived" adds the stop to done= in the address, so a reload of the page plans on without it.
+    const q = new URLSearchParams(location.search);
+    const params = {};
+    for (const k of ["time", "energy", "where", "done", "spouse"]) if (q.get(k)) params[k] = q.get(k);
+    window.satnav = ValleySatnav.mount(document.getElementById("satnav"), {
+      params, fill: true,
+      onDone(id) {
+        const done = (q.get("done") || "").split(",").filter(Boolean);
+        if (!done.includes(id)) done.push(id);
+        q.set("done", done.join(","));
+        history.replaceState(null, "", `${location.pathname}?${q}`);
+      },
+    });
+    window.satnav.ready.then(() => { document.body.dataset.ready = "1"; });
+  </script>
+</body>
+</html>

@@ -269,6 +269,50 @@ def _safely(fn, *args) -> list[dict]:
         return []
 
 
+GOAL_STOPS = {"cc": "Community Center", "quest": "Help Wanted", "museum": "Museum", "clint": "Geodes"}
+ACTIVITY = ("bubbles", "dig", "forage", "bin", "cart", "bookseller", "night", "giant")  # icons, in this order
+
+
+def _worth(farm: Farm, pois: list[dict], day: dict) -> None:
+    """Give each place of interest its gold (what picking it up is worth) and the goal it moves on, if any."""
+    from .today import _forage_why, _price
+    held = farm.held()
+    spouse = next((r["id"].split(":", 1)[1] for r in day.get("plan") or [] if r.get("id", "").startswith("talk:")
+                   and "gift" in (r.get("why") or "") + (r.get("title") or "")), "")
+    for p in pois:
+        qid, kind = p.get("qid"), p["kind"]
+        if kind in ("forage", "dig", "bin") and qid:
+            why, value = _forage_why(farm, qid, held)
+            p["gold"] = _price(farm, qid) * (2 if p["title"].startswith("2 ") else 1)
+            if why.startswith("keep it for the "):
+                p["goal"] = why.removeprefix("keep it for the ").replace(" bundle", "") + " bundle"
+        elif kind == "stop":
+            pid = p.get("plan_id") or ""
+            if pid in GOAL_STOPS:
+                p["goal"] = GOAL_STOPS[pid]
+            elif pid.startswith(("talk:", "give:")):
+                who = pid.split(":", 1)[1]
+                p["goal"] = f"{who}" + (" (a gift)" if who == spouse or "gift" in p.get("why", "") else "")
+            elif pid.startswith("forage:") and "bundle" in p.get("why", ""):
+                p["goal"] = p["why"].split("for the ", 1)[-1].replace(" bundle", "") + " bundle"
+
+
+def _locked(farm: Farm, loc: str) -> str:
+    """What still has to happen before you can go there ("" when you can)."""
+    from ..facts.access import place_open
+    ok, what = place_open(loc, farm.when)
+    return "" if ok else what
+
+
+def summary(pois: list[dict], loc: str) -> dict:
+    """One place at a glance: the goals it moves on, the gold lying about, and what's happening there today."""
+    here = [p for p in pois if p["loc"] == loc and p["layer"] != "doors" and p.get("reach") is not False]
+    goals = sorted({p["goal"] for p in here if p.get("goal")})
+    kinds = {p["kind"] for p in here}
+    return {"goals": goals, "gold": sum(p.get("gold", 0) for p in here),
+            "icons": [k for k in ACTIVITY if k in kinds], "stops": sorted(p["n"] for p in here if p.get("n"))}
+
+
 def view(farm: Farm, day: dict | None = None, **today_args) -> dict:
     """Today on the maps; `day` is today's plan if already worked out (else views/today.view with today_args)."""
     if day is None:
@@ -289,6 +333,7 @@ def view(farm: Farm, day: dict | None = None, **today_args) -> dict:
         if p.get("qid"):
             p["icon"] = farm.icon(p["qid"])
     _safely(_out_of_reach, farm, pois)
+    _safely(_worth, farm, pois, day)
     villagers = _safely(_villagers, farm)
     exits = _safely(_exits, farm)
     counts: dict[str, int] = {}
@@ -300,6 +345,7 @@ def view(farm: Farm, day: dict | None = None, **today_args) -> dict:
     stops = [p for p in pois if p["kind"] == "stop"]
     focus = stops[0]["loc"] if stops else start["loc"]
     return {"date": (day.get("head") or {}).get("date", ""), "weather": (day.get("head") or {}).get("weather", ""),
-            "locations": [{"id": loc, "name": farm.place(loc), "count": counts.get(loc, 0)} for loc in seen],
+            "locations": [{"id": loc, "name": farm.place(loc), "count": counts.get(loc, 0),
+                           **summary(pois, loc), "locked": _locked(farm, loc)} for loc in seen],
             "pois": pois, "villagers": villagers, "route": route, "exits": exits, "start": start, "focus": focus,
             "day": [DAY_START, DAY_END]}
