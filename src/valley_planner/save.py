@@ -219,6 +219,7 @@ class Save:
     hoed: set[tuple[int, int]] = field(default_factory=set)  # the Farm's dirt
     farm_objects: dict[tuple[int, int], str] = field(default_factory=dict)  # what stands on the Farm, by tile
     crab_pots: int = 0
+    placed: dict[str, frozenset] = field(default_factory=dict)  # outdoor map -> tiles with an object on (crab pots…)
     quests: list[dict] = field(default_factory=list)
     special_orders: list[dict] = field(default_factory=list)  # accepted
     special_orders_board: list[dict] = field(default_factory=list)  # Lewis's board this week
@@ -361,6 +362,17 @@ def _forage(root: ET.Element) -> list[Forage]:
             if tile is not None and oid:
                 out.append(Forage(_text(obj, "name"), f"(O){oid}", name,
                                   (int(float(_text(tile, "X", "0"))), int(float(_text(tile, "Y", "0"))))))
+    return out
+
+
+def _placed(root: ET.Element) -> dict[str, frozenset]:
+    """Each map's object tiles: a crab pot in the water makes that tile closed water (isOpenWater)."""
+    out = {}
+    for loc in _or(_child(root, "locations"), []):
+        name = _text(loc, "name")
+        tiles = frozenset(t for t in (_vector(k) for k, _v in _dict(_child(loc, "objects"))) if t)
+        if name and tiles:
+            out[name] = tiles
     return out
 
 
@@ -714,7 +726,7 @@ def read_save(path: Path, data=None) -> Save:
         fish_caught=fish, museum=museum, bundle_data=bundle_data, bundle_slots=bundle_slots, areas_complete=areas,
         buildings=buildings, building_days=building_days, animals=animals, hay=_int(farm, "piecesOfHay"),
         fruit_trees=fruit_trees,
-        machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, quests=quests,
+        machines=machines, sprinklers=sprinklers, crab_pots=crab_pots, placed=_placed(root), quests=quests,
         hoed=hoed, farm_objects=farm_objects,
         special_orders=[_order(o) for o in _or(_child(root, "specialOrders"), []) if _tag(o) == "SpecialOrder"],
         special_orders_board=[o for o in board if o["type"] not in ("Qi", "QiChallenge")],

@@ -56,6 +56,10 @@ class Map:
     water: set[tuple[int, int]] = field(default_factory=set)  # Back tiles with the Water property
     no_fishing: set[tuple[int, int]] = field(default_factory=set)
     rubble: set[tuple[int, int]] = field(default_factory=set)  # logs and rocks in the water (isOpenWater)
+    built: set[tuple[int, int]] = field(default_factory=set)  # any tile at all on the Buildings layer
+    # GameLocation.isTilePassable's own test, which reads only the tile sheets' marks: a Back tile marked Passable
+    # (whatever the value) or a Buildings tile not marked Shadow or Passable stops you
+    closed: set[tuple[int, int]] = field(default_factory=set)
     sheets: list[Sheet] = field(default_factory=list)  # in the file's order
 
     def as_dict(self) -> dict:
@@ -66,6 +70,7 @@ class Map:
 
         return {"Id": self.id, "Properties": self.properties, "Blocked": tiles(self.blocked),
                 "Water": tiles(self.water), "NoFishing": tiles(self.no_fishing), "Rubble": tiles(self.rubble),
+                "Built": tiles(self.built), "Closed": tiles(self.closed),
                 "Layers": {
             lid: {"Width": layer.width, "Height": layer.height, "Properties": layer.properties,
                   "Tiles": {f"{x},{y}": p for (x, y), p in layer.tile_properties.items()}}
@@ -132,6 +137,8 @@ def read_tbin(data: bytes, tiles: bool = False) -> Map:
     water: set[tuple[int, int]] = set()
     no_fishing: set[tuple[int, int]] = set()
     rubble: set[tuple[int, int]] = set()
+    built: set[tuple[int, int]] = set()
+    closed: set[tuple[int, int]] = set()
 
     def walled(lid: str, x: int, y: int, sheet: str, index: int, own: dict) -> None:
         """The game's walking rule: a Buildings tile blocks unless marked Passable; a Back tile only if marked
@@ -148,6 +155,11 @@ def read_tbin(data: bytes, tiles: bool = False) -> Map:
                 no_fishing.add((x, y))
         if lid == "Buildings" and sheet == "outdoors" and index in (628, 629, 734, 759):
             rubble.add((x, y))
+        if lid == "Buildings":
+            built.add((x, y))
+        if (lid == "Back" and marked is not None) or (lid == "Buildings" and marked is None
+                                                      and f"@TileIndex@{index}@Shadow" not in props):
+            closed.add((x, y))
 
     for _ in range(r.i32()):
         lid = r.string()
@@ -204,4 +216,4 @@ def read_tbin(data: bytes, tiles: bool = False) -> Map:
                     raise TbinError(f"bad tile command {cmd!r} at {lid} {x},{y}")
         layer.tiles = grid
         layers[lid] = layer
-    return Map(map_id, props, layers, blocked, water, no_fishing, rubble, drawn if tiles else [])
+    return Map(map_id, props, layers, blocked, water, no_fishing, rubble, built, closed, drawn if tiles else [])

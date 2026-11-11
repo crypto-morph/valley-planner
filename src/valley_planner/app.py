@@ -358,7 +358,7 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         except HTTPException:
             farm = None
         try:
-            asset = map_asset(location, farm.save.farm_type if farm else 0)
+            asset = map_asset(location, farm.save.farm_type if farm else 0, pl.data)
             pl.textures.path(asset)
         except NotAllowed as e:
             raise HTTPException(400, str(e)) from e
