@@ -571,7 +571,7 @@ def _fishing(farm: Farm) -> dict | None:
     if not spots:
         return None
     best = max(spots, key=lambda k: len(spots[k]))
-    spells = bubbles.forecast(farm.data, best, s.days_played, int(s.unique_id), legacy=s.legacy_random)
+    spells = bubbles.spells(farm.data, best, farm.sky)
     return {"place": farm.place(best), "fish": spots[best], "bubbles": _bubble_words(farm, best),
             "location": best, "spots": [list(x.tile) for x in spells if 700 <= x.start < 2000]}
 
@@ -613,22 +613,55 @@ def _berries(farm: Farm) -> list[dict]:
 
 
 def _all_bubbles(farm: Farm) -> list[dict]:
-    s = farm.save
     out = []
     for loc in bubbles.MAPS:
-        spells = bubbles.forecast(farm.data, loc, s.days_played, int(s.unique_id), legacy=s.legacy_random)
+        spells = bubbles.spells(farm.data, loc, farm.sky)
         out.append({"place": farm.place(loc), "spells": _bubble_words(farm, loc),
                     "spots": [{"loc": loc, "x": x.tile[0], "y": x.tile[1], "label": clock(_minutes(x.start))}
                               for x in spells if 700 <= x.start < 2000]})
     return out
 
 
+def _spell_words(farm: Farm, location: str, start: int, end: int, tile: tuple[int, int]) -> str:
+    near = farm.walker.near(location, tile, farm.place)
+    return f"{clock(_minutes(start))} to {clock(_minutes(min(end, 2400)))}" + (f", {near}" if near else "")
+
+
 def _bubble_words(farm: Farm, location: str) -> list[str]:
+    spells = bubbles.spells(farm.data, location, farm.sky)
+    return [_spell_words(farm, location, x.start, x.end, x.tile) + (", maybe a Fish Frenzy" if x.frenzy else "")
+            for x in spells if 700 <= x.start < 2000]
+
+
+def _all_pans(farm: Farm) -> list[dict]:
+    """Where ore shimmers in the water for the pan today, on the maps you can reach; nothing before the Fish Tank."""
+    from ..facts.access import place_open
+    day = farm.sky
+    if not day.fish_tank:
+        return []
+    out = []
+    for loc in bubbles.PAN_MAPS:
+        if not place_open(loc, farm.when)[0]:
+            continue
+        spots = [x for x in bubbles.pan_spots(farm.data, loc, day) if 600 <= x.start < 2400]
+        if spots:
+            out.append({"place": farm.place(loc), "loc": loc,
+                        "spells": [_spell_words(farm, loc, x.start, x.end, x.tile) for x in spots],
+                        "spots": [{"loc": loc, "x": x.tile[0], "y": x.tile[1], "label": clock(_minutes(x.start))}
+                                  for x in spots]})
+    return out
+
+
+def pan_note(farm: Farm, pans: list[dict]) -> dict | None:
+    """With a Pan in hand, the day's pan spots: ore and coal from a tool you already own, for a few swings."""
     s = farm.save
-    spells = bubbles.forecast(farm.data, location, s.days_played, int(s.unique_id), legacy=s.legacy_random)
-    return [f"{clock(_minutes(x.start))} to {clock(_minutes(min(x.end, 2400)))}"
-            + (f", {farm.walker.near(location, x.tile, farm.place)}" if farm.walker.near(location, x.tile, farm.place)
-               else "") for x in spells if 700 <= x.start < 2000]
+    if not pans or s.tool_levels.get("Pan", -1) < 0 or s.tool_at_clint == "Pan":
+        return None
+    first = [f"{g['place']} from {g['spells'][0]}" for g in pans[:3]]
+    return {"text": "Ore in the water for your Pan today: " + "; ".join(first) + ".",
+            "why": "Each spot shimmers until it fades by itself or someone pans it. They're forecast as if nobody "
+                   "pans: once you pan one, the later spots on that map come at other times and places (other "
+                   "maps keep theirs). All of today's spots are on the Map and in the Calendar."}
 
 
 def _door(farm: Farm, location: str, name: str) -> tuple | None:
@@ -1296,13 +1329,14 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             if st["key"] == "cc" and st["items"]:
                 row["why"] = "hand in " + ", ".join(st["items"])
             row["why"] += "; not today: " + "; ".join(f"{x['label']} ({x['text']})" for x in st["short"])
+    pans = _all_pans(farm)
     return {"head": _head(farm), "plan": plan, "left": left, "spare": extra,
             "notes": [_note(x) for x in (_board_note(farm), tv_note, doomed_note(farm, lost),
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
                                          letters_note(farm), *asks.notes(farm),
                                          planting_note(held_seeds - spoken, room, watered, plant_all),
                                          machines_note(sold), cash_note(needs, sold),
-                                         rare_note(plan, left))
+                                         rare_note(plan, left), pan_note(farm, pans))
                       if x],
             "passing": passing,
             "bring": bring_list(farm, spouse), "fishing": _fishing(farm), "geodes": geode_forecast(farm, held),
@@ -1314,7 +1348,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "load": [{"where": w, "items": sorted(items.values(),
                                                   key=lambda x: (x["name"], QUALITY_ORDER[x["quality"]]))}
                      for w, items in load.items() if w != "your backpack"],
-            "bubbles": _all_bubbles(farm),
+            "bubbles": _all_bubbles(farm), "pans": pans,
             "home": clock(now + walker.minutes(home)) if home else "",
             "route": [{"stop": i, "lines": polylines(path)} for i, path in legs],
             "start": list(start), "home_steps": walker.steps(home, farm.place) if home else [],

@@ -3,7 +3,7 @@
 `view(farm)` (GET /api/world) returns
 - `locations`: the maps to switch between ({id, name, count}), the main outdoor ones first;
 - `pois`: places of interest ({id, loc, x, y, kind, layer, title, why, time?, n?, icon?}); kinds: stop (numbered
-  by plan order, `n`), forage, dig, bin, bubbles, cart, bookseller, night, giant, shop (layer "doors");
+  by plan order, `n`), forage, dig, bin, bubbles, pan, cart, bookseller, night, giant, shop (layer "doors");
 - `villagers`: where each villager is over the day ({name, icon?, stops: [{t, time, loc, x, y, where}]}, t in
   minutes after midnight, indoors drawn at the building's door);
 - `route`: today's walk ({stop, home, lines: [{loc, points}]}) and `exits`: the map edges you can walk off
@@ -71,6 +71,20 @@ def from_day(day: dict) -> tuple[list[dict], list[dict], dict]:
             bubbles[key] = {"id": key, "loc": b["loc"], "x": b["x"], "y": b["y"], "kind": "bubbles",
                             "layer": "places", "title": "Fish bubbles", "why": why, "time": spell}
     pois += bubbles.values()
+    pans: dict[str, dict] = {}
+    for group in day.get("pans") or []:
+        words = group.get("spells") or []
+        for j, b in enumerate(group.get("spots") or []):
+            spell = (words[j] if j < len(words) else b.get("label", "")).split(", ")[0]
+            key = f"pan:{b['loc']}:{b['x']}:{b['y']}"
+            if key in pans:  # the same tile again later in the day
+                pans[key]["time"] += f"; {spell}"
+                continue
+            pans[key] = {"id": key, "loc": b["loc"], "x": b["x"], "y": b["y"], "kind": "pan", "layer": "places",
+                         "title": "Pan spot", "time": spell,
+                         "why": "Ore shimmering in the water: pan it from the shore for ore, coal or gems. Forecast "
+                                "as if nobody pans: panning one changes the later spots on this map"}
+    pois += pans.values()
     giant = day.get("giant")
     if giant and giant.get("tile"):
         x, y = giant["tile"]
@@ -258,8 +272,8 @@ def _out_of_reach(farm: Farm, pois: list[dict]) -> list[dict]:
     walker = farm.walker
     reach = walker.reach(("Farm", *FARMHOUSE_DOOR))
     for p in pois:
-        if p["layer"] != "places" or p["kind"] == "bubbles" or p["loc"] not in OUTDOORS:
-            continue  # bubbles are cast to from the shore
+        if p["layer"] != "places" or p["kind"] in ("bubbles", "pan") or p["loc"] not in OUTDOORS:
+            continue  # bubbles are cast to, and pan spots panned, from the shore
         if walker.path(reach, (p["loc"], p["x"], p["y"])) is None:
             p["reach"] = False
             p["why"] = (p["why"] + ". " if p["why"] else "") + "You can't walk there today"
@@ -275,7 +289,7 @@ def _safely(fn, *args) -> list[dict]:
 
 
 GOAL_STOPS = {"cc": "Community Center", "quest": "Help Wanted", "museum": "Museum", "clint": "Geodes"}
-ACTIVITY = ("bubbles", "dig", "forage", "bin", "cart", "bookseller", "night", "giant")  # icons, in this order
+ACTIVITY = ("bubbles", "pan", "dig", "forage", "bin", "cart", "bookseller", "night", "giant")  # icons, in this order
 
 
 def _worth(farm: Farm, pois: list[dict], day: dict) -> None:

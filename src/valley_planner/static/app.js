@@ -1152,6 +1152,9 @@ const places = {
     if (!routeState) routeState = loadRouteState(await get("/api/route/objectives"));
     const [day] = await Promise.all([lastDay ? lastDay : views.dayPlan().then(() => lastDay), drawMonth(calMonth.offset)]);
     $("#a-bubbles").innerHTML = day.bubbles.map((b) => `<div class="pack-stop"><strong>${placeLink(b.place, b.spots)}</strong><div class="muted">${b.spells.slice(0, 3).map(esc).join("<br>") || "None today"}</div></div>`).join("");
+    const pans = day.pans || [];
+    $("#a-pans-card").hidden = !pans.length;
+    $("#a-pans").innerHTML = pans.map((b) => `<div class="pack-stop"><strong>${placeLink(b.place, b.spots)}</strong><div class="muted">${b.spells.slice(0, 4).map(esc).join("<br>")}${b.spells.length > 4 ? `<br>and ${b.spells.length - 4} more` : ""}</div></div>`).join("");
     $("#a-geodes").innerHTML = day.geodes.length ? day.geodes.map((g) => `<div>#${g.crack}: ${g.gives.map((x) => `${esc(x.geode)} gives ${x.stack > 1 ? `${x.stack} ` : ""}${esc(x.item)}`).join(", or ")}</div>`).join("") : '<p class="muted">No geodes held.</p>';
   },
 };

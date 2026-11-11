@@ -105,6 +105,12 @@ class Farm:
         return Fish(self.data, self.save.farm_type)
 
     @cached_property
+    def sky(self):
+        """What today's seeded bubble and pan-spot rolls need from the save (facts.bubbles.Day)."""
+        from ..facts.bubbles import Day
+        return Day.from_save(self.save, self.data)
+
+    @cached_property
     def schedules(self) -> Schedules:
         return Schedules(self.data)
 

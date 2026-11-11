@@ -12986,19 +12986,49 @@
   {
    "id": "fish.bubbles",
    "area": "Fish",
-   "summary": "Bubbles are rolled at every 10-minute tick on each outdoor map from a generator seeded with the day, the save, the time and the map width, so they're predictable. With none up: a coin-flip, then two tries at a random tile that's open water, fishable and 2 to 4 tiles from land. With some up: they end at 10% plus minutes up / 1800 once they've lasted over 60 minutes. A cast into them waits a quarter as long for a bite (half in a Fish Frenzy). Confirmed in play: the forecast spot and time matched on Spring 12 of a real game.",
+   "summary": "Bubbles are rolled at every 10-minute tick on each outdoor map from a generator seeded with the day, the save, the time and the map width, so they're predictable. With none up: a coin-flip (drawn on every farm, but only the Riverland farm goes on), then two tries at a random tile that's open water, fishable and 2 to 4 tiles from land, where land in the first ring round the tile is 0 and land only in the fifth ring (or none) is 5, so the land must be in the third or fourth ring. A spot found rolls for a Fish Frenzy (1%, 0.8% on the Beach; Town, Forest, Mountain and Beach; from day 5, before 11 PM, no festival, three kinds caught or past day 15), which draws once more for its fish. With some up: they end at 10% plus minutes up / 1800 once they've lasted over 60 minutes (120 in a frenzy). A cast into them waits a quarter as long for a bite (half in a Fish Frenzy). Confirmed in play: the forecast spot and time matched on Spring 12 of a real game, before the ring count was corrected from one ring too near: several of that day's spots (Town, Mountain, Beach) come out the same either way, but which one was checked isn't recorded, so the correction wants a fresh check in play.",
    "checked_against": [
-    "StardewValley.GameLocation.performTenMinuteUpdate",
     "StardewValley.GameLocation.isOpenWater",
-    "StardewValley.Tools.FishingRod.distanceToLand"
+    "StardewValley.GameLocation.isWaterTile",
+    "StardewValley.GameLocation.performTenMinuteUpdate",
+    "StardewValley.Tools.FishingRod.distanceToLand",
+    "StardewValley.Utility.getBorderOfThisRectangle"
    ],
    "data": [
-    "Maps/* (Water, NoFishing)"
+    "Maps/* (Water, NoFishing)",
+    "Data/Festivals/FestivalDates"
    ],
    "status": "verified",
    "refs": [],
    "tests": [
+    "tests/test_bubbles.py::test_distance_to_land_counts_rings_from_zero",
     "tests/test_today.py::test_bubbles_rise_in_fishable_water_near_land"
+   ]
+  },
+  {
+   "id": "fish.pan-spots",
+   "area": "Fish",
+   "summary": "Once the host has the Fish Tank done (ccFishTank), every outdoor map but the Beach rolls a pan spot at each 10-minute tick, from the same generator the bubbles just drew from, so it's predictable too. With none up: a coin-flip, then up to eight tries at a random tile that's open water, has no Buildings tile, and has land at most one tile away (first or second ring) where the first land tile met going round the ring touches a tile you could stand on (the game checks that land tile for water, not its neighbour, so a water neighbour counts). With one up: it goes at 10% a tick. Ginger Island's north tries three times, only at x 4-14, y 45-69, without the standing check, and its spot goes at 20%. Both reset each morning. Panning a spot ends it at once (an upgraded Pan may roll a new one from the unseeded random), and while none is up the next tick rolls afresh, so a forecast holds only until you pan. Checked against the code; not yet seen in play.",
+   "checked_against": [
+    "StardewValley.GameLocation.performTenMinuteUpdate",
+    "StardewValley.GameLocation.performOrePanTenMinuteUpdate",
+    "StardewValley.Locations.IslandNorth.performOrePanTenMinuteUpdate",
+    "StardewValley.Tools.FishingRod.distanceToLand",
+    "StardewValley.Utility.getBorderOfThisRectangle",
+    "StardewValley.Utility.getSurroundingTileLocationsArray",
+    "StardewValley.GameLocation.isOpenWater",
+    "StardewValley.GameLocation.isTilePassable",
+    "StardewValley.GameLocation.DayUpdate",
+    "StardewValley.Tools.Pan.DoFunction",
+    "StardewValley.Extensions.RandomExtensions.NextBool"
+   ],
+   "data": [
+    "Maps/* (Water, Buildings layer, Passable and Shadow tile-sheet marks)"
+   ],
+   "status": "verified",
+   "refs": [],
+   "tests": [
+    "tests/test_bubbles.py::test_pan_spots_rise_by_the_shore_once_the_fish_tank_is_done"
    ]
   },
   {

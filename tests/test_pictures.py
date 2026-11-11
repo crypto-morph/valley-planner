@@ -80,6 +80,15 @@ def test_asset_names_that_are_fine():
         map_asset("../Data/Crops")
 
 
+def test_a_location_draws_its_own_map():
+    class Data:
+        def asset(self, name):
+            return {"IslandNorth": {"CreateOnLoad": {"MapPath": "Maps\\Island_N"}}}
+
+    assert map_asset("IslandNorth", 0, Data()) == "Maps/Island_N"
+    assert map_asset("Town", 0, Data()) == "Maps/Town"
+
+
 @pytest.fixture
 def content(tmp_path):
     root = tmp_path / "Content"

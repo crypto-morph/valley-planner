@@ -143,10 +143,16 @@ class Textures:
         return f"/api/tex/{name}.png?v={self.stamp(name)}"
 
 
-def map_asset(location: str, farm_type: int = 0) -> str:
+def map_asset(location: str, farm_type: int = 0, data=None) -> str:
+    """The map a location draws from; with the game's data, by its own map path (IslandNorth -> Maps/Island_N)."""
     if not LOCATION.match(location):
         raise NotAllowed(f"not a location: {location!r}")
-    return f"Maps/{FARM_MAPS.get(farm_type, 'Farm')}" if location == "Farm" else f"Maps/{location}"
+    if location == "Farm":
+        return f"Maps/{FARM_MAPS.get(farm_type, 'Farm')}"
+    found = (data.asset("Data/Locations").get(location) or {}) if data else {}
+    path = (found.get("CreateOnLoad") or {}).get("MapPath")
+    name = (path or "").replace("\\", "/").removeprefix("Maps/")
+    return f"Maps/{name}" if name and LOCATION.match(name) else f"Maps/{location}"
 
 
 def seasonal_name(image: str, season: str) -> str:
