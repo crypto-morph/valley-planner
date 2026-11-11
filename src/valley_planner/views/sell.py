@@ -8,8 +8,10 @@ not the materials your known crafting recipes use.
 What to keep back: views/keep.py's rules, in order (bundles, requests, the Museum, festivals, birthdays, the
 Seed Maker, Help Wanted, gifts), each set to always, ask or off. What no rule keeps is sold or processed.
 The Seed Maker keeps the lowest quality: it gives 1-3 seeds whatever goes in (rule seedmaker.output-1-3).
-Machines: each machine you own takes one batch (we can't see which are
-busy), when its product sells for at least 1.3x the raw goods.
+Machines: each one free today (empty, or done before the day ends) takes the load that gains most, when its
+product sells for at least 1.3x the raw goods; the machines rule keeps more for when one is free.
+Short of cash (`need`, from views/today.cash_needs): the rules set to let go give up their holds, only as much as
+covers the gap.
 
 Worth getting: for whatever's left raw (or whatever your own machines manage), we also check every machine
 in the game's data, owned or not. One you don't have at all, that would pay better than what you're doing
@@ -59,8 +61,11 @@ def _take(stacks: list[_Stack], n: int, min_q: int = 0) -> list[tuple[int, int]]
     return got
 
 
-def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[str] = frozenset()) -> dict:
-    """`rules`: {rule id: mode} for views/keep.py's rules; `declined`: the ids of Today's questions you said no to."""
+def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[str] = frozenset(),
+         need: int = 0) -> dict:
+    """`rules`: {rule id: mode} for views/keep.py's rules; `declined`: the ids of Today's questions you said no to;
+    `need`: gold the next few days need beyond what you hold (views/today.cash_needs). When what's free to sell
+    won't cover it, the rules that let go when short give up what they keep, the last rule first, until it does."""
     s, w = farm.save, farm.when
     objects = farm.data.asset("Data/Objects")
     by_id: dict[str, list[_Stack]] = defaultdict(list)
@@ -88,7 +93,8 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
     kept_by: dict[str, dict[str, int]] = {r.id: {"count": 0, "value": 0} for r in keep_rules.RULES}
     owned = {_machine_id(farm, name): n for name, n in s.machines.items()}
     seed_jobs = []
-    for rule in keep_rules.RULES:
+    holds: list[tuple] = []  # what each rule kept: (rule index, rule id, item, quality, count, why, gold each, gain)
+    for i_rule, rule in enumerate(keep_rules.RULES):
         if mode[rule.id] == keep_rules.OFF:
             continue
         for c in rule.claims(farm, sellable):
@@ -98,7 +104,9 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
                 keep[(c.item, q, c.why)] += k
                 kept_by[rule.id]["count"] += k
                 it = next(x.it for x in by_id[c.item] if x.it.quality == q)
-                kept_by[rule.id]["value"] += k * item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+                each = item_sell_price(it, farm.farmer, profit_margin=s.profit_margin)
+                kept_by[rule.id]["value"] += k * each
+                holds.append((i_rule, rule.id, c.item, q, k, c.why, each, 0))
                 if rule.id == "seeds" and owned.get(SEED_MAKER) and "you have no" in c.why:
                     seed = c.why.rsplit("you have no ", 1)[1]
                     seed_jobs.append({"name": farm.name(c.item), "count": 1, "machine": "Seed Maker",
@@ -144,10 +152,14 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
         used[(qid, it.quality)] += use
         st.left -= use
     if mode["machines"] != keep_rules.OFF:  # the rest of what a machine improves waits for one to be free
-        for q, k, why in _queue(farm, stacks_all, produce, w, spare, objects):
+        i_machines = next(i for i, r in enumerate(keep_rules.RULES) if r.id == "machines")
+        for q, k, why, gain in _queue(farm, stacks_all, produce, w, spare, objects):
             keep[(q, k[0], why)] += k[1]
             kept_by["machines"]["count"] += k[1]
             kept_by["machines"]["value"] += k[2]
+            holds.append((i_machines, "machines", q, k[0], k[1], why, k[2] // k[1], gain))
+    short_modes = keep_rules.short_modes(rules)
+    short = _let_go(farm, need, holds, stacks_all, produce, keep, kept_by, short_modes)
     for qid, st in stacks_all:
         it, n = st.it, st.left
         if not n:
@@ -188,9 +200,9 @@ def view(farm: Farm, rules: dict[str, str] | None = None, declined: frozenset[st
     return {"total": sum(r["total"] for r in sell_rows), "count": sum(r["count"] for r in sell_rows),
             "sell": sell_rows, "process": proc_rows, "process_gain": sum(r["gain"] for r in proc_rows),
             "keep": keep_rows, "materials": sorted(materials.items(), key=lambda kv: -kv[1]),
-            "machines": busy,
-            "rules": [{"id": r.id, "label": r.label, "mode": mode[r.id], "modes": list(r.modes), **kept_by[r.id]}
-                      for r in keep_rules.RULES],
+            "machines": busy, "short": short,
+            "rules": [{"id": r.id, "label": r.label, "mode": mode[r.id], "modes": list(r.modes),
+                       "short": short_modes[r.id], **kept_by[r.id]} for r in keep_rules.RULES],
             "items": items,
             "hints": hint_rows}
 
@@ -244,8 +256,43 @@ def _queue(farm: Farm, stacks: list, produce, w, spare: dict, objects: dict) -> 
         room[mid] -= -(-use // o.uses)
         st.left -= use
         out.append((qid, (st.it.quality, use, use * each),
-                    f"the {_machine_name(farm, mid)} when it's free: {o.name}, +{int(gain / o.uses):,}g each"))
+                    f"the {_machine_name(farm, mid)} when it's free: {o.name}, +{int(gain / o.uses):,}g each",
+                    gain / o.uses))
     return out
+
+
+def _let_go(farm: Farm, need: int, holds: list[tuple], stacks: list, produce, keep: dict, kept_by: dict,
+            short_modes: dict[str, str]) -> dict | None:
+    """Short of cash: when what's free to sell won't cover `need`, the rules set to let go give up what they keep,
+    the last rule first; within a rule, the machines' queue the smallest gain first, anything else the dearest
+    first (fewest given up). Only as much as covers the gap. What's let go goes back on the stacks, to be sold."""
+    if need <= 0:
+        return None
+    s = farm.save
+    free = sum(st.left * item_sell_price(st.it, farm.farmer, profit_margin=s.profit_margin)
+               for qid, st in stacks if st.left and produce(qid, st.it))
+    gap, out = need - free, {}
+    order = sorted((h for h in holds if short_modes.get(h[1]) == keep_rules.OFF),
+                   key=lambda h: (-h[0], h[7] if h[1] == "machines" else -h[6]))
+    for _i, rule_id, qid, q, n, why, each, _gain in order:
+        if gap <= 0:
+            break
+        if each <= 0:
+            continue
+        k = min(n, -(-gap // each))
+        gap -= k * each
+        keep[(qid, q, why)] -= k
+        if not keep[(qid, q, why)]:
+            del keep[(qid, q, why)]
+        kept_by[rule_id]["count"] -= k
+        kept_by[rule_id]["value"] -= k * each
+        next(st for i, st in stacks if i == qid and st.it.quality == q).left += k
+        row = out.setdefault((qid, q), {"name": farm.name(qid), "quality": QUALITY_WORD.get(q, ""), "count": 0,
+                                        "gold": 0, "why": []})
+        row["count"] += k
+        row["gold"] += k * each
+        row["why"].append(why)
+    return {"need": need, "free": free, "let_go": list(out.values()), "still_short": max(0, gap)}
 
 
 def _best_output(farm: Farm, qid: str, it, n: int, w, mids: list[str], spare: dict[str, int], objects: dict):
@@ -327,10 +374,12 @@ def _material_name(farm: Farm, qid: str) -> str:
     return _machine_name(farm, qid) if qid.startswith("(BC)") else farm.name(f"(O){qid}")
 
 
-def default(farm: Farm, declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None) -> dict:
-    """The view for these answers and rule settings, worked out once per save: the day plan asks several times."""
+def default(farm: Farm, declined: frozenset[str] = frozenset(), rules: dict[str, str] | None = None,
+            need: int = 0) -> dict:
+    """The view for these answers, rule settings and cash need, worked out once per save: the day plan asks several
+    times."""
     cache = farm.__dict__.setdefault("_sold", {})
-    key = (frozenset(declined), tuple(sorted(keep_rules.modes(rules).items())))
+    key = (frozenset(declined), tuple(sorted((rules or {}).items())), need)
     if key not in cache:
-        cache[key] = view(farm, rules, declined=key[0])
+        cache[key] = view(farm, rules, declined=key[0], need=need)
     return cache[key]

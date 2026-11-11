@@ -136,9 +136,21 @@ def create_app(planner: Planner | None = None) -> FastAPI:
         return cart.search(p().farm(), q[:40])
 
     @app.get("/api/sell")
-    def sell_view(rules: str = "", declined: str = "") -> dict:
-        """`rules`: the keep rules' modes (views/keep.py) as 'id:mode,...'; `declined`: Today's questions said no to."""
-        return sell.view(p().farm(), keep.parse(rules), declined=frozenset(filter(None, declined.split(","))))
+    def sell_view(rules: str = "", declined: str = "", goals: str = "", plant_all: bool = False) -> dict:
+        """`rules`: the keep rules' modes (views/keep.py) as 'id:mode,...'; `declined`: Today's questions said no to;
+        `goals` and `plant_all` as for /api/today, for what the next few days need in gold (short of cash?)."""
+        from .views import today
+        farm = p().farm()
+        route = None
+        if goals:
+            try:
+                route = planned(RouteAsk.model_validate_json(goals))
+            except ValueError:
+                route = None
+        cash = today.cash_needs(farm, route, today._shopping(farm, plant_all)[0])
+        out = sell.view(farm, keep.parse(rules), declined=frozenset(filter(None, declined.split(","))),
+                        need=cash["short"])
+        return {**out, "cash": cash}
 
     @app.get("/api/romance")
     def romance_view(target: str = "") -> dict:

@@ -135,5 +135,35 @@ def test_what_a_machine_improves_waits_for_it_up_to_what_it_gets_through(monkeyp
     farm = SimpleNamespace(save=SimpleNamespace(machines={"Preserves Jar": 1}, profit_margin=1), farmer=None)
     onions = sell._Stack(SimpleNamespace(quality=0), 40)
     out = sell._queue(farm, [("(O)399", onions)], lambda q, it: True, None, {}, {})
-    assert out == [("(O)399", (0, 10, 80), "the Preserves Jar when it's free: Pickles, +58g each")]
+    assert out == [("(O)399", (0, 10, 80), "the Preserves Jar when it's free: Pickles, +58g each", 58)]
     assert onions.left == 30  # one jar gets through 10 loads in 4 weeks; the rest can be sold
+
+
+def test_short_of_cash_lets_go_only_what_covers_the_gap_last_rule_first(monkeypatch):
+    from types import SimpleNamespace
+
+    from valley_planner.views import sell
+    monkeypatch.setattr(sell, "item_sell_price", lambda it, *a, **k: it.price)
+    farm = SimpleNamespace(save=SimpleNamespace(profit_margin=1), farmer=None, name=lambda q: q)
+    monkeypatch.setattr(sell, "QUALITY_WORD", {0: ""})
+    onion = sell._Stack(SimpleNamespace(quality=0, price=8), 0)
+    carrot = sell._Stack(SimpleNamespace(quality=0, price=25), 0)
+    ruby = sell._Stack(SimpleNamespace(quality=0, price=250), 0)
+    junk = sell._Stack(SimpleNamespace(quality=0, price=10), 2)  # free to sell: 20g
+    stacks = [("onion", onion), ("carrot", carrot), ("ruby", ruby), ("junk", junk)]
+    keep = {("onion", 0, "jar"): 10, ("carrot", 0, "jar"): 2, ("ruby", 0, "gift"): 1}
+    kept_by = {"machines": {"count": 12, "value": 130}, "loved": {"count": 1, "value": 250},
+               "bundles": {"count": 0, "value": 0}}
+    holds = [(7, "loved", "ruby", 0, 1, "gift", 250, 0),
+             (9, "machines", "carrot", 0, 2, "jar", 25, 54), (9, "machines", "onion", 0, 10, "jar", 8, 58)]
+    out = sell._let_go(farm, 90, holds, stacks, lambda q, it: True, keep, kept_by,
+                       {"loved": "off", "machines": "off", "bundles": "always"})
+    # 70g to find: the machines' queue goes first, the smallest gain first (carrots), then onions; the gift stays
+    assert [(x["name"], x["count"]) for x in out["let_go"]] == [("carrot", 2), ("onion", 3)]
+    assert out["still_short"] == 0 and carrot.left == 2 and onion.left == 3 and ruby.left == 0
+    assert keep == {("onion", 0, "jar"): 7, ("ruby", 0, "gift"): 1}
+
+
+def test_plenty_of_cash_lets_nothing_go():
+    from valley_planner.views import sell
+    assert sell._let_go(None, 0, [], [], None, {}, {}, {}) is None

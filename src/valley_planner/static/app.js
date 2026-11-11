@@ -969,8 +969,14 @@ const views = {
   },
 
   async sell() {
-    const v = await get("/api/sell?" + new URLSearchParams({ rules: rulesParam(), declined: [...declined()].join(",") }));
-    $("#sell-head").textContent = `Sell ${v.count} for about ${v.total.toLocaleString()}g; everything else stays, for the reason given.`;
+    const v = await get("/api/sell?" + new URLSearchParams({ ...dayParams(), goals: JSON.stringify(routeBody(routeState, "save")) }));
+    const c = v.cash, sh = v.short;
+    const cashLine = c && c.short
+      ? ` Short of cash: the next few days need ${c.spend.toLocaleString()}g (${c.items.map((x) => `${x.what}, ${x.gold.toLocaleString()}g ${x.when}`).join("; ")}) and you have ${c.money.toLocaleString()}g` +
+        (sh && sh.let_go.length ? `, so ${sh.let_go.map((x) => `${x.count} ${x.quality ? x.quality + " " : ""}${x.name}`).join(", ")} ${sh.let_go.length === 1 && sh.let_go[0].count === 1 ? "is" : "are"} sold instead of kept.` : ".") +
+        (sh && sh.still_short ? ` Still ${sh.still_short.toLocaleString()}g short.` : "")
+      : " Plenty of cash for the next few days, so the rules keep everything they ask for.";
+    $("#sell-head").textContent = `Sell ${v.count} for about ${v.total.toLocaleString()}g; everything else stays, for the reason given.` + cashLine;
     const q = (x) => x ? ` <span class="q-${esc(x)}">${esc(x)}</span>` : "";
     $("#sell-rows").innerHTML = `<thead><tr><th></th><th>Item</th><th class="num">Have</th><th class="num">Sell</th><th class="num">Gold</th><th>Keep</th></tr></thead><tbody>` +
       v.items.map((r) => `<tr><td class="ic">${r.icon ? itemIcon(r.icon) : ""}</td><td>${esc(r.name)}${q(r.quality)}</td><td class="num">${r.have}</td>` +
@@ -983,7 +989,9 @@ const views = {
     const MODE = { always: "Always", ask: "Ask", off: "Off" };
     $("#sell-rules").innerHTML = '<ol class="rules">' + v.rules.map((r) => `<li><div><strong>${esc(r.label)}</strong>` +
       `<div class="small muted">${r.mode === "off" ? "Not keeping anything" : r.count ? `Keeping ${r.count} (about ${r.value.toLocaleString()}g)` : "Nothing to keep today"}</div></div>` +
-      `<div class="seg rule-seg" role="group" aria-label="${esc(r.label)}">${r.modes.map((m) => `<button type="button" data-rule="${esc(r.id)}" data-mode="${m}"${m === r.mode ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${MODE[m]}</button>`).join("")}</div></li>`).join("") + "</ol>";
+      `<div class="rule-sets"><div class="seg rule-seg" role="group" aria-label="${esc(r.label)}">${r.modes.map((m) => `<button type="button" data-rule="${esc(r.id)}" data-mode="${m}"${m === r.mode ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${MODE[m]}</button>`).join("")}</div>` +
+      (r.mode === "off" ? "" : `<div class="seg rule-seg rule-short" role="group" aria-label="${esc(r.label)} when short of cash"><span class="small muted">Short of cash:</span>${[["always", "Keep"], ["off", "Let go"]].map(([m, w]) => `<button type="button" data-rule="${esc(r.id)}@short" data-mode="${m}"${m === r.short ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${w}</button>`).join("")}</div>`) +
+      "</div></li>").join("") + "</ol>";
     document.querySelectorAll("#sell-rules [data-rule]").forEach((b) => b.addEventListener("click", () => {
       saveRules({ ...keepRules(), [b.dataset.rule]: b.dataset.mode });
       lastDay = null;  // Today sells by these too

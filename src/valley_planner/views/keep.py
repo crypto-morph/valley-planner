@@ -7,6 +7,11 @@ claims is sold, or put through a machine when that pays (views/sell.py).
 Each rule has a mode: "always", "off", or for an occasion you might want to skip, "ask": Today asks a yes/no
 question (views/asks.py), and a no lets it go. Settings come from the page as {rule id: mode}; anything not set
 uses the rule's default.
+
+Each rule also says what happens when you're short of cash, that is when the next few days need more gold than
+you hold and what's free to sell would bring in (views/today.cash_needs): keep as usual, or let go. A rule that lets
+go only gives up as much as covers the gap, the last rule first (views/sell.py). The page sets it as
+{"<rule id>@short": "always" | "off"}.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ class Rule:
     default: str
     modes: tuple[str, ...]
     claims: Callable[[Farm, set[str]], Iterable[Claim]]  # (farm, ids of things it may keep for gifts etc.)
+    short: str = ALWAYS  # when the next few days need more gold than you have: keep as usual, or OFF to let it go
 
 
 def _bundles(farm: Farm, _sellable) -> Iterable[Claim]:
@@ -158,13 +164,13 @@ RULES = [
          _birthdays),
     Rule("seeds", "The Seed Maker: one of every crop, the lowest quality", ALWAYS, (ALWAYS, OFF), _seeds),
     Rule("help_wanted", "Help Wanted: one of each thing the board can ask for this season", ALWAYS, (ALWAYS, OFF),
-         _help_wanted),
-    Rule("loved", "Gifts a villager loves: 2 for each who loves it, up to 4", ALWAYS, (ALWAYS, OFF), _loved),
-    Rule("liked", "Gifts a villager likes: 1", OFF, (ALWAYS, OFF), _liked),
+         _help_wanted, OFF),
+    Rule("loved", "Gifts a villager loves: 2 for each who loves it, up to 4", ALWAYS, (ALWAYS, OFF), _loved, OFF),
+    Rule("liked", "Gifts a villager likes: 1", OFF, (ALWAYS, OFF), _liked, OFF),
     # claims nothing up front: views/sell.py keeps what's left after today's machine loads that a machine you own
     # turns into more, as much as your machines get through in the next 4 weeks (selling it raw loses money)
     Rule("machines", "Your machines: what they turn into more, for when one is free", ALWAYS, (ALWAYS, OFF),
-         lambda _farm, _sellable: ()),
+         lambda _farm, _sellable: (), OFF),
 ]
 BY_ID = {r.id: r for r in RULES}
 
@@ -173,6 +179,13 @@ def modes(settings: dict[str, str] | None = None) -> dict[str, str]:
     """Each rule's mode: the setting if it's one the rule allows, else its default."""
     settings = settings or {}
     return {r.id: settings.get(r.id) if settings.get(r.id) in r.modes else r.default for r in RULES}
+
+
+def short_modes(settings: dict[str, str] | None = None) -> dict[str, str]:
+    """What each rule does when you're short of cash: ALWAYS (keep as usual) or OFF (let it go as needed)."""
+    settings = settings or {}
+    return {r.id: settings.get(f"{r.id}@short") if settings.get(f"{r.id}@short") in (ALWAYS, OFF) else r.short
+            for r in RULES}
 
 
 def parse(text: str) -> dict[str, str]:

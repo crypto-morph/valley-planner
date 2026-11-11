@@ -795,6 +795,63 @@ def _wizard(farm: Farm) -> list[dict]:
              "minutes": 15, "value": 2 * QUEST_VALUE, "from": 6 * 60, "until": 23 * 60}]
 
 
+def _shopping(farm: Farm, plant_all: bool = False) -> tuple[list[dict], set, int, bool]:
+    """(seed_list for today, the tiles your Sprinklers water, how many of those are free, whether only they get
+    planted): planting waits for a Sprinkler once one is down, unless `plant_all`."""
+    s = farm.save
+    watered = sprinkler_tiles(s.farm_objects)
+    growing = {c.tile for c in s.crops if c.location == "Farm" and not c.dead}
+    room = len({t for t in watered if t not in growing and t not in s.farm_objects})
+    sprinklers_only = bool(watered) and not plant_all
+    return seed_list(farm, room if sprinklers_only else None), watered, room, sprinklers_only
+
+
+SPEND_DAYS = 3  # how far ahead "short of cash" looks: what the goals route spends in the next few days
+
+
+def cash_needs(farm: Farm, route: dict | None, shopping: list[dict]) -> dict:
+    """The gold the next few days need: today's seeds, and what the goals route buys in the next SPEND_DAYS days.
+    {items: [{what, gold, when}], spend, money, short}: short is what you hold less than that; then the keep
+    rules set to let go when short give some of their holds up to the shipping bin (views/sell.py)."""
+    s = farm.save
+    items = []
+    seeds = sum(x["count"] * x["price"] for x in shopping)
+    if seeds:
+        items.append({"what": "seeds at Pierre's", "gold": seeds, "when": "today"})
+    seen = set()
+    for o in (route or {}).get("objectives", []):
+        for step in o.get("steps", []):
+            for n in step.get("needs", []):
+                on = n.get("on")
+                if n.get("state") != "new" or not n.get("gold") or n["key"] in seen or on is None:
+                    continue
+                if on <= s.days_played + SPEND_DAYS:
+                    seen.add(n["key"])
+                    d = on - s.days_played
+                    when = "today" if d <= 0 else "tomorrow" if d == 1 else f"in {d} days"
+                    items.append({"what": n["label"], "gold": n["gold"], "when": when})
+    spend = sum(x["gold"] for x in items)
+    return {"items": items, "spend": spend, "money": s.money, "short": max(0, spend - s.money)}
+
+
+def cash_note(cash: dict, sold: dict) -> dict | None:
+    """Short of cash: what the next few days need, and what's being sold for it that would otherwise be kept."""
+    short = sold.get("short")
+    if not cash["short"] or not short:
+        return None
+    what = ", ".join(f"{x['what']} ({x['gold']:,}g, {x['when']})" for x in cash["items"])
+    let = short["let_go"]
+    text = f"Short of cash: the next {SPEND_DAYS} days need {cash['spend']:,}g ({what}); you have {cash['money']:,}g."
+    if let:
+        text += " So these go in the shipping bin instead of waiting: " + ", ".join(
+            f"{x['count']} {(x['quality'] + ' ') if x['quality'] else ''}{x['name']}" for x in let) + "."
+    elif not short["still_short"]:
+        text += " What's free to sell covers it."
+    if short["still_short"]:
+        text += f" Still {short['still_short']:,}g short after that: the keep rules hold the rest (Sell tab)."
+    return {"text": text, "level": "urgent" if short["still_short"] else "soon"}
+
+
 def _pierre(farm: Farm, shopping: list[dict]) -> list[dict]:
     """Pierre's for seeds. The shipping bin pays the same overnight, so selling there only earns its place when
     today's gold won't cover the seeds: he pays on the spot."""
@@ -1004,7 +1061,9 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     (views/keep.py), so the day sells what the Sell tab says; `plant_all`: plant every seed you hold, not only
     where a Sprinkler waters (the default once one is down)."""
     s = farm.save
-    sold = sell.default(farm, declined, rules)  # what to sell, after what today's questions keep
+    shopping, watered, room, sprinklers_only = _shopping(farm, plant_all)
+    needs = cash_needs(farm, route, shopping)
+    sold = sell.default(farm, declined, rules, needs["short"])  # what to sell, after what the rules and answers keep
     walker = farm.walker
     walker.pace = pace or NEW_PLAYER_PACE
     held = farm.held()
@@ -1035,11 +1094,6 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
     thirsty = 0 if wet else sum(1 for c in s.crops if c.location == "Farm" and not c.watered and not c.ready
                                 and not c.dead and c not in lost)
     held_seeds = sum(i.stack for i in s.items if i.type == "Seeds" and i.category == -74)
-    watered = sprinkler_tiles(s.farm_objects)
-    growing = {c.tile for c in s.crops if c.location == "Farm" and not c.dead}
-    room = len({t for t in watered if t not in growing and t not in s.farm_objects})
-    sprinklers_only = bool(watered) and not plant_all
-    shopping = seed_list(farm, room if sprinklers_only else None)
     no_fert = {x["id"] for x in shopping if x["id"] in FERT_IDS and x["count"]}  # still to buy at Pierre's
     spoken = sum(min(x["held"], x["need"]) for x in shopping if x["needed"] and x["id"] not in FERT_IDS
                  and x["fert"] not in no_fert)
@@ -1247,7 +1301,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
                                          sprinkler_note(farm, thirsty), wood_note(farm, trees), night_note(farm, power),
                                          letters_note(farm), *asks.notes(farm),
                                          planting_note(held_seeds - spoken, room, watered, plant_all),
-                                         machines_note(sold),
+                                         machines_note(sold), cash_note(needs, sold),
                                          rare_note(plan, left))
                       if x],
             "passing": passing,
@@ -1256,7 +1310,7 @@ def view(farm: Farm, *, time: int | None = None, energy: int | None = None, wher
             "energy": {"now": s.stamina, "max": s.max_stamina, "planned_left": power}, "warning": warning,
             "giant": _giant_watch(farm),
             "asks": [{**a.view(), "yes": a.id not in declined} for a in keep.questions(farm, rules)],
-            "pack": bag, "held_back": [{"item": k, "why": v} for k, v in hold.items()],
+            "cash": needs, "pack": bag, "held_back": [{"item": k, "why": v} for k, v in hold.items()],
             "load": [{"where": w, "items": sorted(items.values(),
                                                   key=lambda x: (x["name"], QUALITY_ORDER[x["quality"]]))}
                      for w, items in load.items() if w != "your backpack"],
